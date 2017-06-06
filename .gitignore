@@ -1,0 +1,4 @@
+target/
+bin/
+local.properties
+.idea/
