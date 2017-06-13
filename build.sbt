@@ -1,8 +1,8 @@
-name := "Beatmete Generator"
+name := "Beatmeter Generator"
 
 version := "0.1-SNAPSHOT"
 
-scalaVersion := "2.12.1"
+scalaVersion := "2.12.2"
 
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-Xcheckinit", "-encoding", "utf8")
 
@@ -16,3 +16,11 @@ libraryDependencies ++= Seq(
 
 fork := true
 
+mainClass in assembly := Some("io.gitlab.sklavedaniel.beatmetergenerator.Main")
+
+assemblyMergeStrategy in assembly := {
+  case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+  case x => MergeStrategy.first
+}
+
+assemblyJarName in assembly := s"beatmeter-generator.jar"
