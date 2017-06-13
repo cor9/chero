@@ -22,8 +22,11 @@ import scalafx.util.Duration
 import scalafx.util.converter.DoubleStringConverter
 
 object BeatEditor {
-  class Conf extends Subcommand("editor") {
+  class Conf extends Main.ExecutableSubcommand("editor") {
     val input = opt[File](required = true, descr = "Audio or video file to play")
+    def execute(args: Array[String]): Unit = {
+      new BeatEditor(this).main(args)
+    }
   }
 }
 class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {

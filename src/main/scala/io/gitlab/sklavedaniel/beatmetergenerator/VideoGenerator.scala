@@ -10,17 +10,15 @@ import org.apache.batik.anim.dom.SVGDOMImplementation
 import org.apache.batik.transcoder._
 import org.apache.batik.transcoder.image.ImageTranscoder
 import org.apache.batik.util.SVGConstants
-import org.rogach.scallop.ScallopConf
 
-object VideoGenerator extends App {
+object VideoGenerator {
 
-  object Conf extends ScallopConf(args) {
+  class Conf extends Main.ExecutableSubcommand("video") {
     val input = opt[File](required = true, descr = "File containing beat definitions")
     validateFileExists(input)
     val output = opt[File](required = true, descr = "Directory for generated images")
     validateFileDoesNotExist(output)
     val duration = opt[Double](required = true, descr = "Duration of generated image sequence in seconds")
-    version("Beatmeter Generator 0.1.0")
     val frames = opt[Double](default = Some(25), descr = "Frames per second")
     val width = opt[Int](required = true, descr = "Width of generated video")
     val height = opt[Int](default = Some(30), descr = "Width of generated video")
@@ -50,8 +48,12 @@ object VideoGenerator extends App {
       .orElse(Some(getClass.getResource("/meter/waveEnd.svg").toURI))
     val waveMiddleImg = opt[File](descr = "Middle wave svg image").map(_.toURI)
       .orElse(Some(getClass.getResource("/meter/waveMiddle.svg").toURI))
-    verify()
+
+    override def execute(args: Array[String]) = new VideoGenerator(this).main(args)
   }
+}
+
+class VideoGenerator(Conf: VideoGenerator.Conf) extends App {
 
   val beatmeterForeground = getImage(Conf.foregroundImg(), Conf.fgHeight())
   val beatmeterMarker = getImage(Conf.markerImg(), Conf.fgHeight())
@@ -81,7 +83,7 @@ object VideoGenerator extends App {
   assert(beats.size > 2, "You need at least two beats.")
 
   val imageSequence =
-    getImageLine(((beats.head * Conf.speed() + Conf.target() - Conf.end()) * Conf.width()- beatmeterBeat.getWidth / 2.0).round.toInt, beatmeterWavePattern) ++
+    getImageLine(((beats.head * Conf.speed() + Conf.target() - Conf.end()) * Conf.width() - beatmeterBeat.getWidth / 2.0).round.toInt, beatmeterWavePattern) ++
       beats.sliding(2).filter(_.size == 2).flatMap {
         case Seq(beat1, beat2) =>
           assert((beat2 - beat1) * Conf.speed() * Conf.width() - beatmeterBeat.getWidth >= 0, s"Beat distance to low. Maybe increase speed bettwen beats at $beat1 and $beat2.")

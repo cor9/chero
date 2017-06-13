@@ -4,11 +4,10 @@ import java.io.{File, InputStream}
 import javax.sound.sampled._
 
 import org.apache.commons.io.IOUtils
-import org.rogach.scallop.ScallopConf
 
-object AudioGenerator extends App {
+object AudioGenerator {
 
-  object Conf extends ScallopConf(args) {
+  class Conf extends Main.ExecutableSubcommand("audio") {
     val input = opt[File](required = true, descr = "File containing beat definitions")
     validateFileExists(input)
     val output = opt[File](required = true, descr = "Generated wav file")
@@ -16,9 +15,12 @@ object AudioGenerator extends App {
     val beat = opt[File](descr = "Single beat wav file")
     validateFileExists(beat)
     val duration = opt[Double](required = true, descr = "Duration of generated wav file in seconds")
-    version("Beatmeter Generator 0.1.0")
-    verify()
+    override def execute(args: Array[String]) = new AudioGenerator(this).main(args)
   }
+
+}
+
+class AudioGenerator(Conf: AudioGenerator.Conf) extends App {
 
   val beats: Seq[Double] = BeatFiles.load(Conf.input()).map(_ / 1000.0)
 

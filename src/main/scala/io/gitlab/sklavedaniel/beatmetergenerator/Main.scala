@@ -1,20 +1,29 @@
 package io.gitlab.sklavedaniel.beatmetergenerator
 
-import org.rogach.scallop.ScallopConf
+import org.rogach.scallop.{ScallopConf, Subcommand}
 
 object Main extends App {
 
-  val beatEditorConf = new BeatEditor.Conf()
+  abstract class ExecutableSubcommand(name: String) extends Subcommand(name) {
+    def execute(args: Array[String])
+  }
+
+  val commands: Seq[ExecutableSubcommand] = Seq(
+    new BeatEditor.Conf(),
+    new AudioGenerator.Conf(),
+    new VideoGenerator.Conf()
+  )
 
   object Conf extends ScallopConf(args) {
-    addSubcommand(beatEditorConf)
+    for (subcommand: ExecutableSubcommand <- commands)
+      addSubcommand(subcommand)
     version("Beatmeter Generator 0.1.0")
     verify()
   }
 
   Conf.subcommand match {
-    case Some(c) if c == beatEditorConf =>
-      new BeatEditor(beatEditorConf).main(args)
+    case Some(c: ExecutableSubcommand) =>
+      c.execute(args)
     case _ => Conf.printHelp()
   }
 
