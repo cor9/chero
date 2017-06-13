@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="9.5259838mm"
+   height="11.597134mm"
+   viewBox="0 0 33.753486 41.092205"
+   id="svg2"
+   version="1.1"
+   inkscape:version="0.91 r13725"
+   sodipodi:docname="beatmeterBeat.svg">
+  <defs
+     id="defs4" />
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="11.2"
+     inkscape:cx="-1.4879819"
+     inkscape:cy="17.8033"
+     inkscape:document-units="px"
+     inkscape:current-layer="g4704"
+     showgrid="false"
+     fit-margin-top="0"
+     fit-margin-left="0"
+     fit-margin-right="0"
+     fit-margin-bottom="0"
+     inkscape:window-width="1366"
+     inkscape:window-height="709"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     showguides="true"
+     inkscape:guide-bbox="true">
+    <sodipodi:guide
+       position="-32.442811,25.143861"
+       orientation="0,1"
+       id="guide4167" />
+    <sodipodi:guide
+       position="-21.83621,15.294873"
+       orientation="0,1"
+       id="guide4169" />
+    <sodipodi:guide
+       position="-24.866667,30.068355"
+       orientation="0,1"
+       id="guide4171" />
+    <sodipodi:guide
+       position="-23.982783,10.370379"
+       orientation="0,1"
+       id="guide4173" />
+  </sodipodi:namedview>
+  <metadata
+     id="metadata7">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Ebene 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-118.86574,-456.65765)">
+    <g
+       id="g4704">
+      <path
+         sodipodi:nodetypes="czcccccccczc"
+         inkscape:connector-curvature="0"
+         id="path4161"
+         d="m 118.87494,477.72283 c 1.76564,-0.0175 2.38243,0.005 2.85744,-0.72173 0.47502,-0.72648 2.48129,-8.16111 2.48129,-8.16111 l 3.3083,19.65343 3.47011,-26.38554 3.27732,28.55718 3.47009,-29.42584 3.27731,28.12285 3.11553,-23.12806 3.30832,19.4188 c 0,0 1.73327,-6.67037 2.33308,-7.32776 0.5998,-0.65738 1.39074,-0.65149 2.8455,-0.65149"
+         style="fill:none;fill-rule:evenodd;stroke:#ff1800;stroke-width:1.60000002;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+    </g>
+  </g>
+</svg>

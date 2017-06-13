@@ -1,20 +1,21 @@
 package io.gitlab.sklavedaniel.beatmetergenerator
 
-import scalafx.application.JFXApp
-import scalafx.application.JFXApp.PrimaryStage
-import scalafx.geometry.Insets
-import scalafx.scene.Scene
-import scalafx.scene.control.Label
-import scalafx.scene.layout.BorderPane
+import org.rogach.scallop.ScallopConf
 
-object Main extends JFXApp {
-  stage = new PrimaryStage {
-    scene = new Scene {
-      root = new BorderPane {
-        padding = Insets(25)
-        center = new Label("Hello SBT")
-      }
-    }
+object Main extends App {
+
+  val beatEditorConf = new BeatEditor.Conf()
+
+  object Conf extends ScallopConf(args) {
+    addSubcommand(beatEditorConf)
+    version("Beatmeter Generator 0.1.0")
+    verify()
   }
-}
 
+  Conf.subcommand match {
+    case Some(c) if c == beatEditorConf =>
+      new BeatEditor(beatEditorConf).main(args)
+    case _ => Conf.printHelp()
+  }
+
+}
