@@ -22,7 +22,7 @@ object AudioPlayer {
 class AudioPlayer(audioData: InputStream, beatData: InputStream) {
   self =>
 
-  val bufferDuration = 0.5
+  val bufferDuration = 0.1
 
   val format = new AudioFormat(44100, 16, 2, true, false)
 
@@ -31,6 +31,11 @@ class AudioPlayer(audioData: InputStream, beatData: InputStream) {
   val audio = readData(audioData, format)
   val audioCount = audio.length / format.getChannels
   val duration = audioCount.toDouble / format.getFrameRate
+
+  val avgDuration = 0.05
+  val avgFrames = (avgDuration * format.getFrameRate * format.getChannels).round.toInt
+  val avgTimes = (0 to audio.length / avgFrames).map(_ * avgDuration) :+ duration
+  val avgs: Seq[(Double, Double)] = (Iterator.single(0.0) ++ audio.toIterable.grouped(avgFrames).map(l => l.map(_.abs.toDouble).sum/ l.size)).zip(avgTimes.toIterator).toSeq
 
   var rate = 0.5f
   var position = 0.0

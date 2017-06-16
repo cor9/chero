@@ -1,7 +1,5 @@
 package io.gitlab.sklavedaniel.beatmetergenerator
 
-import java.io.{BufferedInputStream, File, FileInputStream}
-
 import org.rogach.scallop.{ScallopConf, Subcommand}
 
 object Main extends App {

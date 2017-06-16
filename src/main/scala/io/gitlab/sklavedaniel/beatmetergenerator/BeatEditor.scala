@@ -7,11 +7,13 @@ import javafx.collections.FXCollections
 import scalafx.Includes._
 import scalafx.application.JFXApp.PrimaryStage
 import scalafx.application.{JFXApp, Platform}
-import scalafx.scene.Scene
 import scalafx.scene.control._
 import scalafx.scene.control.cell.TextFieldListCell
 import scalafx.scene.layout._
+import scalafx.scene.paint.Color
+import scalafx.scene.shape.{Circle, Line}
 import scalafx.scene.text.Text
+import scalafx.scene.{Group, Scene}
 import scalafx.stage.FileChooser
 import scalafx.util.converter.DoubleStringConverter
 
@@ -30,6 +32,7 @@ object BeatEditor {
 class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
 
   val player = new AudioPlayer(new BufferedInputStream(new FileInputStream(conf.input())), getClass.getResourceAsStream("/beats/click.wav"))
+
   var restartPlayer = false
   player.ratio = 0.8
   player.rate = 0.5f
@@ -84,7 +87,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
   }
 
   val beatsView = new ListView(beats) {
-    minHeight = 300
+    minHeight = 200
     editable = true
     cellFactory = TextFieldListCell.forListView(new DoubleStringConverter())
     onEditCommit = (t: ListView.EditEvent[Double]) => {
@@ -121,21 +124,89 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
     max = player.duration
     value = 0
   }
+  val secondWidth = 100
+  val volumeHeight = 150
   positionSlider.value.onChange { (_, _, d) =>
     val b = restartPlayer
     if (b) player.pause()
     player.position = d.doubleValue()
     position.text() = f"${d.doubleValue()}%07.2f s"
+    positionLine.startX = 100 + d.doubleValue() * secondWidth
+    positionLine.endX = 100 + d.doubleValue() * secondWidth
+    waveView.layoutX = -(d.doubleValue() * secondWidth)
     if (b) player.play()
   }
+
+  val waveGroup = new Group {
+    layoutX = 0
+    layoutY = 0
+    children = (for (Seq((avg1, time1), (avg2, time2)) <- player.avgs.sliding(2)) yield {new Line {
+      startX = 100 + time1 * secondWidth
+      startY = volumeHeight + 10 - avg1 / Short.MaxValue * volumeHeight
+      endX = 100 + time2 * secondWidth
+      endY = volumeHeight + 10 - avg2 / Short.MaxValue * volumeHeight
+    }
+    }).toSeq
+  }
+  val beatsGroup = new Group {
+    layoutX = 0
+    layoutY = 0
+  }
+  val positionLine = new Line {
+    startX = 100
+    startY = 0
+    endX = 100
+    endY = 200
+    stroke = Color.Red
+  }
+  val waveView = new Pane {
+    layoutX = 0
+    layoutY = 0
+    style = "-fx-background: blue"
+    prefHeight = 160
+    children = Seq(
+      waveGroup,
+      beatsGroup,
+      new Line {
+        startX = 0
+        startY = 160
+        endX = player.duration * secondWidth + 10000
+        endY = 160
+        stroke = Color.DarkGray
+        strokeWidth = 0.5
+      },
+      positionLine
+    )
+  }
+  class Beat(val time: Double) extends Circle {
+      radius = 4
+      centerY = 170
+      centerX = 100 + time * secondWidth
+      fill = Color.Red
+      onMouseClicked = handle {
+        beatsView.selectionModel().select(time)
+        beatsView.scrollTo(time)
+      }
+  }
+  beats.onChange {
+    beatsGroup.children.clear()
+    for (beat <- beats) {
+      beatsGroup.children.add(new Beat(beat))
+    }
+  }
+
   stage = new PrimaryStage {
     self =>
     scene = new Scene {
       root = new VBox {
         spacing = 5
         children = Seq(
-          beatsView,
+          new Pane {
+            minHeight = 200
+            children = Seq(waveView)
+          },
           positionSlider,
+          beatsView,
           new HBox {
             spacing = 5
             children = List(
@@ -181,13 +252,21 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
           },
           new HBox {
             spacing = 5
-            children = Seq(new Text {text = "Speed"}, rateSlider, new Text {text = "Beats"}, ratioSlider)
+            children = Seq(new Text {
+              text = "Speed"
+            }, rateSlider, new Text {
+              text = "Beats"
+            }, ratioSlider)
           },
           new HBox {
             spacing = 5
             children = Seq(
-              new Text {text = "Current:"}, position,
-              new Text {text = "Duration:"}, duration
+              new Text {
+                text = "Current:"
+              }, position,
+              new Text {
+                text = "Duration:"
+              }, duration
             )
           },
           new HBox {
