@@ -9,14 +9,21 @@ object BeatFiles {
     val output = new BufferedWriter(new FileWriter(file))
     try {
       for (b <- beats) {
-        val beat = b / 1000.0
-        output.write(s"$beat $beat beat\n")
+        output.write(s"$b $b beat\n")
       }
     } finally
       output.close()
   }
+
   def load(file: File): Seq[Double] = {
-    val result = Source.fromFile(file).getLines().map("\\s+".r.split(_).head.replace(",", ".").toDouble * 1000.0).toList
+    val result = Source.fromFile(file).getLines().flatMap { l =>
+      val parts = "\\s+".r.split(l)
+      val time = parts(0).replace(",", ".").toDouble
+      if (parts(2) == "beat")
+        Some(time)
+      else
+        None
+    }.toList
     assert(result == result.sorted, "Input file must be sorted.")
     result
   }

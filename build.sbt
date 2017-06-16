@@ -11,7 +11,8 @@ libraryDependencies ++= Seq(
   "org.apache.xmlgraphics" % "batik-transcoder" % "1.9",
   "org.apache.xmlgraphics" % "batik-svg-dom" % "1.9",
   "commons-io" % "commons-io" % "2.5",
-  "org.rogach" %% "scallop" % "2.1.3"
+  "org.rogach" %% "scallop" % "2.1.3",
+  "com.jsuereth" %% "scala-arm" % "2.0"
 )
 
 fork := true
@@ -24,3 +25,5 @@ assemblyMergeStrategy in assembly := {
 }
 
 assemblyJarName in assembly := s"beatmeter-generator.jar"
+
+cancelable in Global := true

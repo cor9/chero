@@ -15,6 +15,7 @@ object AudioGenerator {
     val beat = opt[File](descr = "Single beat wav file")
     validateFileExists(beat)
     val duration = opt[Double](required = true, descr = "Duration of generated wav file in seconds")
+    val click = opt[Boolean](default = Some(false), descr = "Use click sound")
     override def execute(args: Array[String]) = new AudioGenerator(this).main(args)
   }
 
@@ -22,9 +23,9 @@ object AudioGenerator {
 
 class AudioGenerator(Conf: AudioGenerator.Conf) extends App {
 
-  val beats: Seq[Double] = BeatFiles.load(Conf.input()).map(_ / 1000.0)
+  val beats: Seq[Double] = BeatFiles.load(Conf.input())
 
-  val ais = AudioSystem.getAudioInputStream(Conf.beat.map(_.toURI.toURL).getOrElse(getClass.getResource("/beats/beat.wav")))
+  val ais = AudioSystem.getAudioInputStream(Conf.beat.map(_.toURI.toURL).getOrElse(getClass.getResource(if(Conf.click()) "/beats/click.wav" else "/beats/beat.wav")))
   val format = ais.getFormat
   val frameCount = (Conf.duration() * format.getFrameRate).ceil.toInt
   val bytes = IOUtils.toByteArray(ais)

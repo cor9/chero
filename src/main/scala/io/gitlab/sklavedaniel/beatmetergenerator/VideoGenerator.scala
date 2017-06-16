@@ -68,7 +68,7 @@ class VideoGenerator(Conf: VideoGenerator.Conf) extends App {
     IndexedSeq((beatmeterWaveMiddle, beatmeterWaveEnd)))
 
 
-  val beats: Seq[Double] = BeatFiles.load(Conf.input()).map(_ / 1000.0)
+  val beats: Seq[Double] = BeatFiles.load(Conf.input())
 
   val beatmeterMiddle = Conf.height() / 2.0
   val beatmeterWidth = ((Conf.start() - Conf.end()) * Conf.width()).round.toInt

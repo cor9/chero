@@ -4,68 +4,59 @@ import java.io._
 import java.util
 import javafx.collections.FXCollections
 
-import org.rogach.scallop.Subcommand
-
 import scalafx.Includes._
-import scalafx.animation.{KeyFrame, Timeline}
 import scalafx.application.JFXApp.PrimaryStage
 import scalafx.application.{JFXApp, Platform}
 import scalafx.scene.Scene
-import scalafx.scene.control.SpinnerValueFactory.DoubleSpinnerValueFactory
 import scalafx.scene.control._
 import scalafx.scene.control.cell.TextFieldListCell
 import scalafx.scene.layout._
-import scalafx.scene.media.{Media, MediaPlayer}
 import scalafx.scene.text.Text
 import scalafx.stage.FileChooser
-import scalafx.util.Duration
 import scalafx.util.converter.DoubleStringConverter
 
 object BeatEditor {
+
   class Conf extends Main.ExecutableSubcommand("editor") {
     val input = opt[File](required = true, descr = "Audio or video file to play")
+
     def execute(args: Array[String]): Unit = {
       new BeatEditor(this).main(args)
     }
   }
+
 }
+
 class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
 
-  val media = new Media(conf.input().toURI.toURL.toString)
-  val player = new MediaPlayer(media)
-
-  val beatMedia = new Media(getClass.getResource("/beats/click.wav").toURI.toString)
-  val beatMediaPlayer = new MediaPlayer(beatMedia)
-
-  player.setVolume(0.1)
-  player.setRate(0.5)
-  player.onPlaying() = () => {
-    beatTimeline.foreach(_.playFrom(player.getCurrentTime))
-  }
-
-  val valueFactory = new DoubleSpinnerValueFactory(0, 0, 0)
-  valueFactory.amountToStepBy = 1000
-  val duration = new Text {
-    text = f"${0.0}%07.1f ms"
-  }
-  val position = new Text {
-    text = f"${0.0}%07.1f ms"
-  }
-  player.currentTime.onChange((_, _, y) => {
-    if (!y.isUnknown)
-      Platform.runLater(position.text() = f"${y.toMillis}%07.1f ms")
-  })
-  player.totalDuration.onChange((_, _, y) => {
-    if (!y.isUnknown) {
-      Platform.runLater(valueFactory.max = y.toMillis)
-      duration.text = f"${y.toMillis}%07.1f ms"
+  val player = new AudioPlayer(new BufferedInputStream(new FileInputStream(conf.input())), getClass.getResourceAsStream("/beats/click.wav"))
+  var restartPlayer = false
+  player.ratio = 0.8
+  player.rate = 0.5f
+  player.listener = Some((d, s) => {
+    Platform.runLater {
+      restartPlayer = false
+      positionSlider.value() = d
+      if (s != AudioPlayer.Stopped)
+        restartPlayer = true
     }
   })
-  valueFactory.value.onChange((_, _, x) => {
-    player.seek(Duration(x))
-  })
+
+  override def stopApp(): Unit = {
+    player.pause()
+  }
+
+  val duration = new Text {
+    text = f"${
+      player.duration
+    }%07.2f s"
+  }
+  val position = new Text {
+    text = f"${
+      0.0
+    }%07.2f s"
+  }
   val beats = FXCollections.observableList(new util.ArrayList[Double]())
-  var beatTimeline: Option[Timeline] = None
 
   def insertBeat(beat: Double): Unit = {
     if (beats.isEmpty) {
@@ -92,11 +83,6 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
     }
   }
 
-  val durationSpinner = new Spinner(valueFactory) {
-    editable = true
-    prefWidth = 100
-  }
-
   val beatsView = new ListView(beats) {
     minHeight = 300
     editable = true
@@ -112,6 +98,36 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
     max = 1.0
     value = 0.5
   }
+  rateSlider.value.onChange { (_, _, d) =>
+    val b = restartPlayer
+    if (b) player.pause()
+    player.rate = d.floatValue()
+    if (b) player.play()
+  }
+  val ratioSlider = new Slider {
+    min = 0.0
+    max = 1.0
+    value = 0.8
+  }
+  ratioSlider.value.onChange { (_, _, d) =>
+    val b = restartPlayer
+    if (b) player.pause()
+    player.ratio = d.floatValue()
+    if (b) player.play()
+  }
+
+  val positionSlider = new Slider {
+    min = 0
+    max = player.duration
+    value = 0
+  }
+  positionSlider.value.onChange { (_, _, d) =>
+    val b = restartPlayer
+    if (b) player.pause()
+    player.position = d.doubleValue()
+    position.text() = f"${d.doubleValue()}%07.2f s"
+    if (b) player.play()
+  }
   stage = new PrimaryStage {
     self =>
     scene = new Scene {
@@ -119,45 +135,27 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
         spacing = 5
         children = Seq(
           beatsView,
+          positionSlider,
           new HBox {
             spacing = 5
             children = List(
               new Button {
                 text = "Play"
                 onAction = handle {
-                  if (beatTimeline.isEmpty) {
-                    durationSpinner.disable = true
-                    val tl = Timeline(beats.map {
-                      t =>
-                        KeyFrame(Duration(t), onFinished = handle {
-                          beatMediaPlayer.play()
-                          beatMediaPlayer.seek(Duration(0))
-                          Platform.runLater(beatsView.getSelectionModel.select(t))
-                        })
-                    })
-                    beatTimeline = Some(tl)
-                    tl.rate() = rateSlider.value()
-                    player.rate() = rateSlider.value()
-                    player.play()
-                  }
+                  player.beats = beats.toSeq
+                  player.play()
                 }
               },
               new Button {
-                text = "beat"
+                text = "Beat"
                 armed.onChange((_, _, x) => {
-                  val t = player.getCurrentTime
-                  if (!t.isUnknown && x)
-                    insertBeat(t.toMillis)
+                  if (x) insertBeat(player.currentPosition)
                 })
               },
               new Button {
                 text = "Pause"
                 onAction = handle {
                   player.pause()
-                  beatTimeline.foreach(_.stop())
-                  beatTimeline = None
-                  valueFactory.value() = player.getCurrentTime.toMillis
-                  durationSpinner.disable = false
                 }
 
               },
@@ -166,25 +164,11 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                 onAction = handle {
                   val idx = beatsView.getSelectionModel.getSelectedIndex
                   if (idx != -1) {
-                    player.seek(Duration(beats(idx)))
+                    positionSlider.value() = beats(idx)
                   }
 
                 }
-              }
-            )
-          },
-          rateSlider,
-          new HBox {
-            spacing = 5
-            children = Seq(
-              durationSpinner,
-              duration,
-              position
-            )
-          },
-          new HBox {
-            spacing = 5
-            children = Seq(
+              },
               new Button {
                 text = "Remove"
                 onAction = handle {
@@ -192,11 +176,29 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                     beats.remove(i, i + 1)
                   }
                 }
-              },
+              }
+            )
+          },
+          new HBox {
+            spacing = 5
+            children = Seq(new Text {text = "Speed"}, rateSlider, new Text {text = "Beats"}, ratioSlider)
+          },
+          new HBox {
+            spacing = 5
+            children = Seq(
+              new Text {text = "Current:"}, position,
+              new Text {text = "Duration:"}, duration
+            )
+          },
+          new HBox {
+            spacing = 5
+            children = Seq(
               new Button {
                 text = "Load"
                 onAction = handle {
+
                   import scala.collection.JavaConverters._
+
                   val fileChooser = new FileChooser()
                   fileChooser.setTitle("Open Beats File")
                   val file = fileChooser.showOpenDialog(stage)
