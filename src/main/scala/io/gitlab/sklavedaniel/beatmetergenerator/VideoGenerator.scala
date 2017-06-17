@@ -21,14 +21,14 @@ object VideoGenerator {
     val duration = opt[Double](required = true, descr = "Duration of generated image sequence in seconds")
     val frames = opt[Double](default = Some(25), descr = "Frames per second")
     val width = opt[Int](required = true, descr = "Width of generated video")
-    val height = opt[Int](default = Some(30), descr = "Width of generated video")
+    val height = opt[Int](descr = "Width of generated video").orElse(width.toOption.map(x => (x / 42.66).round.toInt))
     val speed = opt[Double](default = Some(0.2), descr = "Speed of the beatmeter in video widths per second")
     val start = opt[Double](default = Some(0.95), descr = "Left position of the beatmeter relative to width (Between 0 and 1)")
     val end = opt[Double](default = Some(0.05), descr = "Right position of the beatmeter relative to width (Between 0 and 1)")
     val target = opt[Double](default = Some(0.2), descr = "Target position of the beatmeter relative to width (Between 0 and 1)")
-    val bmHeight = opt[Int](default = Some(20), descr = "Height of the actual beatmeter")
-    val fgHeight = opt[Int](default = Some(28), descr = "Height of the forground decorations")
-    val bgHeight = opt[Int](default = Some(20), descr = "Height of the beatmeter background")
+    val bmHeight = opt[Int](descr = "Height of the actual beatmeter").orElse(height.toOption.map(x => (x * 2 / 3.0).round.toInt))
+    val fgHeight = opt[Int](descr = "Height of the forground decorations").orElse(height.toOption.map(x => (x * 14 / 15.0).round.toInt))
+    val bgHeight = opt[Int](descr = "Height of the beatmeter background").orElse(bmHeight.toOption)
     val bgColor = opt[Int](default = Some(0xB4FFFFFF), descr = "Color of the beatmeter background in ARGB")
     val foregroundImg = opt[File](descr = "Foreground svg image clipped to beatmeter width").map(_.toURI)
       .orElse(Some(getClass.getResource("/meter/foreground.svg").toURI))
@@ -55,6 +55,8 @@ object VideoGenerator {
 }
 
 class VideoGenerator(conf: VideoGenerator.Conf) extends App {
+
+  println(s"Estimated heights: video: ${conf.height}, beatmeter: ${conf.bmHeight}, foreground: ${conf.bmHeight}, background: ${conf.bmHeight}")
 
   val beatmeterForeground = getImage(conf.foregroundImg(), conf.fgHeight())
   val beatmeterMarker = getImage(conf.markerImg(), conf.fgHeight())
