@@ -51,78 +51,92 @@ object VideoGenerator {
 
     override def execute(args: Array[String]) = new VideoGenerator(this).main(args)
   }
+
 }
 
-class VideoGenerator(Conf: VideoGenerator.Conf) extends App {
+class VideoGenerator(conf: VideoGenerator.Conf) extends App {
 
-  val beatmeterForeground = getImage(Conf.foregroundImg(), Conf.fgHeight())
-  val beatmeterMarker = getImage(Conf.markerImg(), Conf.fgHeight())
-  val beatmeterStart = getImage(Conf.startImg(), Conf.fgHeight())
-  val beatmeterEnd = getImage(Conf.endImg(), Conf.fgHeight())
-  val beatmeterBeat = getImage(Conf.beatImg(), Conf.bmHeight())
-  val beatmeterWaveStart = getImage(Conf.waveStartImg(), Conf.bmHeight())
-  val beatmeterWaveMiddle = getImage(Conf.waveMiddleImg(), Conf.bmHeight())
-  val beatmeterWaveEnd = getImage(Conf.waveEndImg(), Conf.bmHeight())
-  val beatmeterWaveStraight = getImage(Conf.waveStraightImg(), Conf.bmHeight())
+  val beatmeterForeground = getImage(conf.foregroundImg(), conf.fgHeight())
+  val beatmeterMarker = getImage(conf.markerImg(), conf.fgHeight())
+  val beatmeterStart = getImage(conf.startImg(), conf.fgHeight())
+  val beatmeterEnd = getImage(conf.endImg(), conf.fgHeight())
+  val beatmeterBeat = getImage(conf.beatImg(), conf.bmHeight())
+  val beatmeterWaveStart = getImage(conf.waveStartImg(), conf.bmHeight())
+  val beatmeterWaveMiddle = getImage(conf.waveMiddleImg(), conf.bmHeight())
+  val beatmeterWaveEnd = getImage(conf.waveEndImg(), conf.bmHeight())
+  val beatmeterWaveStraight = getImage(conf.waveStraightImg(), conf.bmHeight())
   val beatmeterWavePattern = (beatmeterWaveStraight, beatmeterWaveStart,
     IndexedSeq((beatmeterWaveMiddle, beatmeterWaveEnd)))
 
 
-  val beats: Seq[Double] = BeatFiles.load(Conf.input())
+  val beats: Seq[Double] = BeatFiles.load(conf.input())
 
-  val beatmeterMiddle = Conf.height() / 2.0
-  val beatmeterWidth = ((Conf.start() - Conf.end()) * Conf.width()).round.toInt
-  val beatmeterY = (beatmeterMiddle - Conf.bmHeight() / 2.0).round.toInt
-  val beatmeterBackgroundY = (beatmeterMiddle - Conf.bgHeight() / 2.0).round.toInt
-  val beatmeterForegroundY = (beatmeterMiddle - Conf.fgHeight() / 2.0).round.toInt
-  val frameCount = (Conf.frames() * Conf.duration()).round.toInt
+  val beatmeterMiddle = conf.height() / 2.0
+  val beatmeterWidth = ((conf.start() - conf.end()) * conf.width()).round.toInt
+  val beatmeterY = (beatmeterMiddle - conf.bmHeight() / 2.0).round.toInt
+  val beatmeterBackgroundY = (beatmeterMiddle - conf.bgHeight() / 2.0).round.toInt
+  val beatmeterForegroundY = (beatmeterMiddle - conf.fgHeight() / 2.0).round.toInt
+  val frameCount = (conf.frames() * conf.duration()).round.toInt
 
   def currentPosition(targetTime: Double, currentTime: Double): Double =
-    (targetTime - currentTime) * Conf.speed() + Conf.target()
+    (targetTime - currentTime) * conf.speed() + conf.target()
 
   assert(beats.size > 2, "You need at least two beats.")
 
+  val beatDistances = beats.sliding(2).flatMap {
+    case Seq(beat1, beat2) =>
+      Some((beat1, beat2, (beat2 - beat1) * conf.speed() * conf.width())).filter(_._3 < beatmeterBeat.getWidth)
+  }.toStream
+  if (!beatDistances.isEmpty) {
+    println(s"Error: The following beats have distance below ${beatmeterBeat.getWidth / conf.speed() / conf.width()}:")
+    for((beat1, beat2, _) <- beatDistances) {
+      println(s"    $beat1 $beat2")
+    }
+    println("Increase beatmeter speed or beat distance")
+    System.exit(1)
+  }
+
   val imageSequence =
-    getImageLine(((beats.head * Conf.speed() + Conf.target() - Conf.end()) * Conf.width() - beatmeterBeat.getWidth / 2.0).round.toInt, beatmeterWavePattern) ++
-      beats.sliding(2).filter(_.size == 2).flatMap {
+    getImageLine(((beats.head * conf.speed() + conf.target() - conf.end()) * conf.width() - beatmeterBeat.getWidth / 2.0).round.toInt, beatmeterWavePattern) ++
+      beats.sliding(2).flatMap {
         case Seq(beat1, beat2) =>
-          assert((beat2 - beat1) * Conf.speed() * Conf.width() - beatmeterBeat.getWidth >= 0, s"Beat distance to low. Maybe increase speed bettwen beats at $beat1 and $beat2.")
-          beatmeterBeat +: getImageLine(((beat2 - beat1) * Conf.speed() * Conf.width() - beatmeterBeat.getWidth).round.toInt, beatmeterWavePattern)
+          assert((beat2 - beat1) * conf.speed() * conf.width() - beatmeterBeat.getWidth >= 0, s"Beat distance to low. Maybe increase speed bettwen beats at $beat1 and $beat2.")
+          beatmeterBeat +: getImageLine(((beat2 - beat1) * conf.speed() * conf.width() - beatmeterBeat.getWidth).round.toInt, beatmeterWavePattern)
       }.toStream ++
-      Stream(beatmeterBeat) ++ getImageLine((Conf.duration() * Conf.width()).round.toInt, beatmeterWavePattern)
-  val imagePositions = imageSequence.scanLeft((Conf.end() * Conf.width()).round.toInt) {
+      Stream(beatmeterBeat) ++ getImageLine((conf.duration() * conf.width()).round.toInt, beatmeterWavePattern)
+  val imagePositions = imageSequence.scanLeft((conf.end() * conf.width()).round.toInt) {
     case (pos, img) => pos + img.getWidth
   }
   var remainingImages = imageSequence.zip(imagePositions)
 
-  Conf.output().mkdirs()
+  conf.output().mkdirs()
   for (i <- 0 until frameCount) {
     println(s"Encoding frame ${i + 1} of $frameCount")
-    val currentTime = i.toDouble / Conf.frames()
-    val image = new BufferedImage(Conf.width(), Conf.height(), BufferedImage.TYPE_INT_ARGB)
+    val currentTime = i.toDouble / conf.frames()
+    val image = new BufferedImage(conf.width(), conf.height(), BufferedImage.TYPE_INT_ARGB)
     val g = image.getGraphics
 
-    g.setColor(new Color(Conf.bgColor()))
-    g.fillRect((Conf.width() * Conf.end()).round.toInt, beatmeterBackgroundY, (Conf.width() * Conf.start()).round.toInt - (Conf.width() * Conf.end()).round.toInt, Conf.bgHeight())
-    g.setClip((Conf.width() * Conf.end()).round.toInt, beatmeterY, (Conf.width() * Conf.start()).round.toInt - (Conf.width() * Conf.end()).round.toInt, Conf.bmHeight())
-    val currentOffset = (currentTime * Conf.speed() * Conf.width()).round.toInt
+    g.setColor(new Color(conf.bgColor(), true))
+    g.fillRect((conf.width() * conf.end()).round.toInt, beatmeterBackgroundY, (conf.width() * conf.start()).round.toInt - (conf.width() * conf.end()).round.toInt, conf.bgHeight())
+    g.setClip((conf.width() * conf.end()).round.toInt, beatmeterY, (conf.width() * conf.start()).round.toInt - (conf.width() * conf.end()).round.toInt, conf.bmHeight())
+    val currentOffset = (currentTime * conf.speed() * conf.width()).round.toInt
     remainingImages = remainingImages.dropWhile {
       case (img, pos) => pos - currentOffset + img.getWidth < 0
     }
     val currentImages = remainingImages.takeWhile {
-      case (_, pos) => pos - currentOffset <= Conf.width()
+      case (_, pos) => pos - currentOffset <= conf.width()
     }.map(x => (x._1, x._2 - currentOffset))
     for ((img, pos) <- currentImages) {
       g.drawImage(img, pos, beatmeterY, null)
     }
     g.setClip(null)
 
-    g.drawImage(beatmeterMarker, (Conf.target() * Conf.width() - beatmeterMarker.getWidth / 2.0).round.toInt, beatmeterForegroundY, null)
-    g.drawImage(clipImage(beatmeterForeground, beatmeterWidth).get, (Conf.end() * Conf.width()).round.toInt, beatmeterForegroundY, null)
-    g.drawImage(beatmeterStart, (Conf.start() * Conf.width() - beatmeterStart.getWidth / 2.0).round.toInt, beatmeterForegroundY, null)
-    g.drawImage(beatmeterEnd, (Conf.end() * Conf.width() - beatmeterEnd.getWidth / 2.0).round.toInt, beatmeterForegroundY, null)
+    g.drawImage(beatmeterMarker, (conf.target() * conf.width() - beatmeterMarker.getWidth / 2.0).round.toInt, beatmeterForegroundY, null)
+    g.drawImage(clipImage(beatmeterForeground, beatmeterWidth).get, (conf.end() * conf.width()).round.toInt, beatmeterForegroundY, null)
+    g.drawImage(beatmeterStart, (conf.start() * conf.width() - beatmeterStart.getWidth / 2.0).round.toInt, beatmeterForegroundY, null)
+    g.drawImage(beatmeterEnd, (conf.end() * conf.width() - beatmeterEnd.getWidth / 2.0).round.toInt, beatmeterForegroundY, null)
 
-    ImageIO.write(image, "PNG", new File(Conf.output(), f"frame-$i%010d.png"))
+    ImageIO.write(image, "PNG", new File(conf.output(), f"frame-$i%010d.png"))
   }
 
   def getImageLine(width: Int, pattern: (BufferedImage, BufferedImage, IndexedSeq[(BufferedImage, BufferedImage)])): Stream[BufferedImage] = {

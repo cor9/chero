@@ -21,13 +21,13 @@ object AudioGenerator {
 
 }
 
-class AudioGenerator(Conf: AudioGenerator.Conf) extends App {
+class AudioGenerator(conf: AudioGenerator.Conf) extends App {
 
-  val beats: Seq[Double] = BeatFiles.load(Conf.input())
+  val beats: Seq[Double] = BeatFiles.load(conf.input())
 
-  val ais = AudioSystem.getAudioInputStream(Conf.beat.map(_.toURI.toURL).getOrElse(getClass.getResource(if(Conf.click()) "/beats/click.wav" else "/beats/beat.wav")))
+  val ais = AudioSystem.getAudioInputStream(conf.beat.map(_.toURI.toURL).getOrElse(getClass.getResource(if(conf.click()) "/beats/click.wav" else "/beats/beat.wav")))
   val format = ais.getFormat
-  val frameCount = (Conf.duration() * format.getFrameRate).ceil.toInt
+  val frameCount = (conf.duration() * format.getFrameRate).ceil.toInt
   val bytes = IOUtils.toByteArray(ais)
   val silence = Stream.continually(Array.fill(format.getFrameSize)(0.toByte))
   var beat: Stream[Array[Byte]] = bytes.grouped(format.getFrameSize).toStream ++ silence
@@ -37,7 +37,7 @@ class AudioGenerator(Conf: AudioGenerator.Conf) extends App {
       case (Seq(beat1, beat2), i) =>
         println(s"Generating beat ${i + 2} of ${beats.size}")
         beat.slice(0, ((beat2 - beat1) * ais.getFormat.getSampleRate).round.toInt).toIterator.flatten
-    } ++ beat.slice(0, ((Conf.duration() - beats.last) * ais.getFormat.getSampleRate).round.toInt).toIterator.flatten
+    } ++ beat.slice(0, ((conf.duration() - beats.last) * ais.getFormat.getSampleRate).round.toInt).toIterator.flatten
 
   val is = new InputStream {
     override def read(): Int = if (itr.hasNext) itr.next & 0xff else -1
@@ -45,6 +45,6 @@ class AudioGenerator(Conf: AudioGenerator.Conf) extends App {
 
   val out = new AudioInputStream(is, ais.getFormat, frameCount)
   println(s"Generating beat 1 of ${beats.size}")
-  AudioSystem.write(out, AudioFileFormat.Type.WAVE, Conf.output())
+  AudioSystem.write(out, AudioFileFormat.Type.WAVE, conf.output())
   out.close()
 }
