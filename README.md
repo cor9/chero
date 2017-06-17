@@ -31,11 +31,11 @@ You only have to supply the files and the duration. You can choose an alternativ
 
 ## Download
 The current binary can be downloaded:
-[beatmeter-generator.jar](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/home/beatmeter-generator.jar)
+[beatmeter-generator.jar](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/beatmeter-generator.jar)
 
 ## Notes
 The tools do not do much error handling yet. If you provide unreasonable options like a duration shorter than the list of beats you might get strange output or internal error messages.
 
 ## Screenshot
-![main](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/home/screenshot.png)
+![main](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/screenshot.png)
 
