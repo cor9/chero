@@ -38,7 +38,9 @@ The current binary can be downloaded:
 [beatmeter-generator.jar](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/beatmeter-generator.jar)
 
 ## Notes
-The tools do not do much error handling yet. If you provide unreasonable options like a duration shorter than the list of beats you might get strange output or internal error messages.
+- The tools do not do much error handling yet. If you provide unreasonable options like a duration shorter than the list of beats you might get strange output or internal error messages.
+- To see all command line options just run
+``java -jar beatmeter-generator.jar
 
 ## Screenshot
 ![main](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/screenshot.png)
