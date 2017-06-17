@@ -4,6 +4,10 @@ A set of tools to generate so called beat meters for videos, i.e. a visual indic
 The set comprises a visual editor to edit beat sequences matching an audio file, a command line tool to generate a sequence of images at a selected frame rate, suitable to generate the animated beat meter, and a command line tool to generate a audio file playing a beat sound for every beat.
 The file format used to store beats is compatible with the Audacity lable format.
 
+## Example Image
+
+![example](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/example.png)
+
 ## Basic usage
 ### Beat editing
 
