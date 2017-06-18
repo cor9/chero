@@ -24,6 +24,12 @@ You can add beats clicking the beat-button. Start playing the audio file (adjust
 
 You can jump directly to positions in the audio file by double clicking in the audio visualisation at the top. You can also select beats from that view.
 
+If you double click on a beat you jump exactly to that beat.
+
+You can copy and paste beats (even multiple times at once). They will get inserted to the left or the right of the current position moving the current position to the last beat of the insertion. To insert a pattern repeatedly, select the pattern and the first beat of its repetition and paste it as many times as you want.
+
+There are also two aligment tools, align equally will spead the selected beats such that their distance is equal. Align pattern requires you to select a number of pattern repetitions plus one additional beat. Then it will distribute the pattern euqaly adjusting the beats within a pattern to their average positions. For example if you have a pattern 123 123 123 123, set repetition to 3 and rest to 2 as you have 3 repetitions of the 123 pattern with two additional beats. (The last 123 is not a full pattern, as there is no beat to mark the end of the break after the last 3-beat).
+
 ### Generating image sequences
 Once you are satisfied with your beat pattern you can generate a sequence of images for the beatmeter animation:
 

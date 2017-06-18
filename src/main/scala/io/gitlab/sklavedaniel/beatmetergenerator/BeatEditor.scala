@@ -13,6 +13,7 @@ import scalafx.application.{JFXApp, Platform}
 import scalafx.beans.Observable
 import scalafx.beans.property.BooleanProperty
 import scalafx.collections.ObservableBuffer
+import scalafx.geometry.Pos
 import scalafx.scene.control.ListView.sfxListView2jfx
 import scalafx.scene.control._
 import scalafx.scene.control.cell.TextFieldListCell
@@ -351,13 +352,30 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                           insertBeat(positionField.getText.toDouble)
                         }
                       },
-                      positionField
+                      positionField,
+                      new Button {
+                        text = "Align equally"
+                        onAction = handle {
+                          val bs = beatsView.getSelectionModel.getSelectedItems.toList
+                          if (beatsView.getSelectionModel.getSelectedIndices.size >= 3) {
+                            val distance = (bs.last - bs.head) / (bs.length - 1)
+                            beatsView.getSelectionModel.clearSelection()
+                            beats.removeAll(bs: _*)
+                            for (i <- bs.indices) {
+                              val b = i * distance + bs.head
+                              insertBeat(b)
+                              beatsView.getSelectionModel.select(b)
+                            }
+                          }
+                        }
+                      }
                     )
                   },
                   new HBox {
                     spacing = 5
                     val stepSpinner = new Spinner[Double](0.01, 60, 0.05, 0.05) {
                       prefWidth = 80
+                      editable = true
                     }
 
                     def moveSelected(delta: Double): Unit = {
@@ -408,6 +426,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                     spacing = 5
                     val repetitionSpinner = new Spinner[Int](1, Int.MaxValue, 1) {
                       prefWidth = 80
+                      editable = true
                     }
                     children = Seq(
                       new Button {
@@ -447,6 +466,59 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                         }
                       },
                       repetitionSpinner
+                    )
+                  },
+                  new HBox {
+                    spacing = 5
+                    alignment = Pos.BaselineLeft
+                    val repetitionSpinner = new Spinner[Int](1, Int.MaxValue, 2) {
+                      prefWidth = 80
+                      editable = true
+                    }
+                    val restSpinner = new Spinner[Int](0, Int.MaxValue, 0) {
+                      prefWidth = 80
+                      editable = true
+                    }
+                    children = Seq(
+                      new Button {
+                        text = "Align Pattern"
+                        onAction = handle {
+                          val bs = beatsView.getSelectionModel.getSelectedItems.toVector
+                          if (repetitionSpinner.value() + restSpinner.value() >= 2
+                            && beatsView.getSelectionModel.getSelectedIndices.size >= 2
+                            && (bs.size - restSpinner.value() - 1) % repetitionSpinner.value() == 0
+                          ) {
+                            val patternSize = (bs.size - restSpinner.value() - 1) / repetitionSpinner.value()
+                            val alignCount = (bs.size - 1) / patternSize
+                            val alignPos = alignCount * patternSize
+                            val alignDuration = bs(alignPos) - bs.head
+                            val patternDuration = alignDuration / alignCount
+                            val avgs: IndexedSeq[Double] = for (i <- 0 to patternSize) yield {
+                              val tmp: IndexedSeq[Double] = for {
+                                j <- 0 to bs.size / patternSize
+                                pos = j * patternSize + i
+                                if pos < bs.size
+                              } yield bs(pos) - patternDuration * j - bs.head
+                              tmp.sum / tmp.size
+                            }
+                            beatsView.getSelectionModel.clearSelection()
+                            beats.removeAll(bs: _*)
+                            for (i <- bs.indices) {
+                              val b = (i / patternSize) * patternDuration + avgs(i % patternSize) + bs.head
+                              insertBeat(b)
+                              beatsView.getSelectionModel.select(b)
+                            }
+                          }
+                        }
+                      },
+                      new Text {
+                        text = "Rep."
+                      },
+                      repetitionSpinner,
+                      new Text {
+                        text = "Rest"
+                      },
+                      restSpinner
                     )
                   },
                   new HBox {
