@@ -13,6 +13,7 @@ import scalafx.application.{JFXApp, Platform}
 import scalafx.beans.Observable
 import scalafx.beans.property.BooleanProperty
 import scalafx.collections.ObservableBuffer
+import scalafx.scene.control.ListView.sfxListView2jfx
 import scalafx.scene.control._
 import scalafx.scene.control.cell.TextFieldListCell
 import scalafx.scene.input.MouseButton
@@ -283,7 +284,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
     }
   }
 
-  var copiedBeads: Seq[Double] = Seq()
+  var copiedBeats: Seq[Double] = Seq()
 
   stage = new PrimaryStage {
     self =>
@@ -334,18 +335,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                     val positionField = new TextField {
                       prefWidth = 50
                     }
-                    val stepSpinner = new Spinner[Double](0.01, 60, 0.05, 0.05) {
-                      prefWidth = 80
-                    }
-                    def moveSelected(delta: Double): Unit = {
-                      val bs = beatsView.getSelectionModel.getSelectedItems.toList
-                      beatsView.getSelectionModel.clearSelection()
-                      beats.removeAll(bs: _*)
-                      for (b <- bs) {
-                        insertBeat(b + delta)
-                        beatsView.getSelectionModel.select(b + delta)
-                      }
-                    }
+
                     children = Seq(
                       new Button {
                         text = "Remove"
@@ -361,7 +351,26 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                           insertBeat(positionField.getText.toDouble)
                         }
                       },
-                      positionField,
+                      positionField
+                    )
+                  },
+                  new HBox {
+                    spacing = 5
+                    val stepSpinner = new Spinner[Double](0.01, 60, 0.05, 0.05) {
+                      prefWidth = 80
+                    }
+
+                    def moveSelected(delta: Double): Unit = {
+                      val bs = beatsView.getSelectionModel.getSelectedItems.toList
+                      beatsView.getSelectionModel.clearSelection()
+                      beats.removeAll(bs: _*)
+                      for (b <- bs) {
+                        insertBeat(b + delta)
+                        beatsView.getSelectionModel.select(b + delta)
+                      }
+                    }
+
+                    children = Seq(
                       new Button {
                         text = "-"
                         onAction = handle {
@@ -383,24 +392,61 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                             moveSelected(-offset + positionSlider.value())
                           }
                         }
+                      },
+                      new Button {
+                        text = "Right to now"
+                        onAction = handle {
+                          if (!beatsView.getSelectionModel.getSelectedIndices.isEmpty) {
+                            val offset = beatsView.getSelectionModel.getSelectedItems.last
+                            moveSelected(-offset + positionSlider.value())
+                          }
+                        }
                       }
                     )
                   },
                   new HBox {
                     spacing = 5
+                    val repetitionSpinner = new Spinner[Int](1, Int.MaxValue, 1) {
+                      prefWidth = 80
+                    }
                     children = Seq(
                       new Button {
                         text = "Copy"
+                        onAction = handle {
+                          copiedBeats = beatsView.getSelectionModel.getSelectedItems.toList
+                        }
                       },
                       new Button {
                         text = "Insert Left"
+                        onAction = handle {
+                          if (!copiedBeats.isEmpty)
+                            for (_ <- 1 to repetitionSpinner.value()) {
+                              beatsView.getSelectionModel.clearSelection()
+                              for (b <- copiedBeats) {
+                                val tmp = b - copiedBeats.head + positionSlider.value()
+                                insertBeat(tmp)
+                                beatsView.getSelectionModel.select(tmp)
+                              }
+                              positionSlider.value() = copiedBeats.last - copiedBeats.head + positionSlider.value()
+                            }
+                        }
                       },
                       new Button {
                         text = "Insert Right"
+                        onAction = handle {
+                          if (!copiedBeats.isEmpty)
+                            for (_ <- 1 to repetitionSpinner.value()) {
+                              beatsView.getSelectionModel.clearSelection()
+                              for (b <- copiedBeats) {
+                                val tmp = b - copiedBeats.last + positionSlider.value()
+                                insertBeat(tmp)
+                                beatsView.getSelectionModel.select(tmp)
+                              }
+                              positionSlider.value() = copiedBeats.head - copiedBeats.last + positionSlider.value()
+                            }
+                        }
                       },
-                      new Spinner[Int](1, Int.MaxValue, 1) {
-                        prefWidth = 80
-                      }
+                      repetitionSpinner
                     )
                   },
                   new HBox {
