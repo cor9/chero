@@ -208,7 +208,6 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
     fill <== when(selected) choose Color.Blue otherwise Color.Red
     var clickDelay: Option[Timeline] = None
     onMouseClicked = e => {
-      println(e.getButton + " " + e.getClickCount)
       clickDelay.foreach(_.stop())
       clickDelay = None
       if (MouseButton.Primary.equals(e.getButton)) {
@@ -284,6 +283,8 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
     }
   }
 
+  var copiedBeads: Seq[Double] = Seq()
+
   stage = new PrimaryStage {
     self =>
     scene = new Scene {
@@ -325,16 +326,6 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                           player.pause()
                         }
 
-                      },
-                      new Button {
-                        text = "Jump"
-                        onAction = handle {
-                          val idx = beatsView.getSelectionModel.getSelectedIndex
-                          if (idx != -1) {
-                            positionSlider.value() = beats(idx)
-                          }
-
-                        }
                       }
                     )
                   },
@@ -342,6 +333,18 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                     spacing = 5
                     val positionField = new TextField {
                       prefWidth = 50
+                    }
+                    val stepSpinner = new Spinner[Double](0.01, 60, 0.05, 0.05) {
+                      prefWidth = 80
+                    }
+                    def moveSelected(delta: Double): Unit = {
+                      val bs = beatsView.getSelectionModel.getSelectedItems.toList
+                      beatsView.getSelectionModel.clearSelection()
+                      beats.removeAll(bs: _*)
+                      for (b <- bs) {
+                        insertBeat(b + delta)
+                        beatsView.getSelectionModel.select(b + delta)
+                      }
                     }
                     children = Seq(
                       new Button {
@@ -360,26 +363,43 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                       },
                       positionField,
                       new Button {
-                        text = "None"
+                        text = "-"
                         onAction = handle {
-                          beatsView.getSelectionModel.clearSelection()
+                          moveSelected(-stepSpinner.value())
+                        }
+                      },
+                      stepSpinner,
+                      new Button {
+                        text = "+"
+                        onAction = handle {
+                          moveSelected(stepSpinner.value())
                         }
                       },
                       new Button {
-                        text = "+ 0.05"
+                        text = "Left to now"
                         onAction = handle {
-                          for (i <- beatsView.getSelectionModel.getSelectedIndices) {
-                            beats.set(i, beats.get(i) + 0.05)
+                          if (!beatsView.getSelectionModel.getSelectedIndices.isEmpty) {
+                            val offset = beatsView.getSelectionModel.getSelectedItems.head
+                            moveSelected(-offset + positionSlider.value())
                           }
                         }
+                      }
+                    )
+                  },
+                  new HBox {
+                    spacing = 5
+                    children = Seq(
+                      new Button {
+                        text = "Copy"
                       },
                       new Button {
-                        text = "- 0.05"
-                        onAction = handle {
-                          for (i <- beatsView.getSelectionModel.getSelectedIndices) {
-                            beats.set(i, beats.get(i) - 0.05)
-                          }
-                        }
+                        text = "Insert Left"
+                      },
+                      new Button {
+                        text = "Insert Right"
+                      },
+                      new Spinner[Int](1, Int.MaxValue, 1) {
+                        prefWidth = 80
                       }
                     )
                   },
