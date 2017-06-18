@@ -7,6 +7,7 @@ import javafx.collections.{FXCollections, ObservableList}
 import scala.collection.JavaConverters.asJavaCollection
 import scala.collection.mutable
 import scalafx.Includes._
+import scalafx.animation.{KeyFrame, Timeline}
 import scalafx.application.JFXApp.PrimaryStage
 import scalafx.application.{JFXApp, Platform}
 import scalafx.beans.Observable
@@ -21,6 +22,7 @@ import scalafx.scene.shape.{Circle, Line}
 import scalafx.scene.text.Text
 import scalafx.scene.{Group, Scene}
 import scalafx.stage.FileChooser
+import scalafx.util.Duration
 import scalafx.util.converter.DoubleStringConverter
 
 object BeatEditor {
@@ -172,7 +174,8 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
     endY = 200
     stroke = Color.Red
   }
-  val waveView = new Pane {pane =>
+  val waveView = new Pane {
+    pane =>
     layoutX = 0
     layoutY = 0
     style = "-fx-background: blue"
@@ -203,29 +206,42 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
     centerX = 100 + time * secondWidth
     val selected = BooleanProperty(initSelected)
     fill <== when(selected) choose Color.Blue otherwise Color.Red
+    var clickDelay: Option[Timeline] = None
     onMouseClicked = e => {
-      if (MouseButton.Primary.equals(e.getButton) && e.getClickCount == 1) {
-        val index = beats.indexOf(time)
-        val selected = beatsView.selectionModel().isSelected(index)
-        val selectedIndex = beatsView.selectionModel().getSelectedIndex
-        if (!e.isControlDown) {
-          beatsView.selectionModel().clearSelection()
-        }
-        if (e.isShiftDown) {
-          if (selectedIndex != -1) {
-            if (index < selectedIndex) {
-              beatsView.selectionModel().selectRange(index, selectedIndex + 1)
-            } else if (selectedIndex < index) {
-              beatsView.selectionModel().selectRange(selectedIndex , index+ 1)
+      println(e.getButton + " " + e.getClickCount)
+      clickDelay.foreach(_.stop())
+      clickDelay = None
+      if (MouseButton.Primary.equals(e.getButton)) {
+        if (e.getClickCount == 1) {
+          val t = Timeline(KeyFrame(Duration(300), onFinished = _ => {
+            val index = beats.indexOf(time)
+            val selected = beatsView.selectionModel().isSelected(index)
+            val selectedIndex = beatsView.selectionModel().getSelectedIndex
+            if (!e.isControlDown) {
+              beatsView.selectionModel().clearSelection()
             }
-          }
-        } else if(selected) {
-          beatsView.selectionModel().clearSelection(index)
-        } else {
-          beatsView.selectionModel().select(index)
+            if (e.isShiftDown) {
+              if (selectedIndex != -1) {
+                if (index < selectedIndex) {
+                  beatsView.selectionModel().selectRange(index, selectedIndex + 1)
+                } else if (selectedIndex < index) {
+                  beatsView.selectionModel().selectRange(selectedIndex, index + 1)
+                }
+              }
+            } else if (selected) {
+              beatsView.selectionModel().clearSelection(index)
+            } else {
+              beatsView.selectionModel().select(index)
+            }
+            beatsView.scrollTo(index)
+          }))
+          t.play()
+          clickDelay = Some(t)
+        } else if (e.getClickCount == 2) {
+          positionSlider.value() = time
         }
-        beatsView.scrollTo(index)
       }
+      e.consume()
     }
   }
 
@@ -252,7 +268,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
       }
     }
   }
-  beatsView.selectionModel().selectedItems.onChange{(_, changes)=>
+  beatsView.selectionModel().selectedItems.onChange { (_, changes) =>
     for (change <- changes) {
       change match {
         case ObservableBuffer.Add(_, t) =>
