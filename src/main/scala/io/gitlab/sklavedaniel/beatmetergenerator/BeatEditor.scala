@@ -3,6 +3,9 @@ package io.gitlab.sklavedaniel.beatmetergenerator
 import java.io._
 import java.util
 import javafx.collections.{FXCollections, ObservableList}
+import javafx.scene.input
+
+import com.sun.glass.ui.Window.EventHandler
 
 import scala.collection.JavaConverters.asJavaCollection
 import scala.collection.mutable
@@ -12,11 +15,12 @@ import scalafx.application.JFXApp.PrimaryStage
 import scalafx.application.{JFXApp, Platform}
 import scalafx.beans.property.BooleanProperty
 import scalafx.collections.ObservableBuffer
+import scalafx.event.{Event, EventType}
 import scalafx.geometry.Pos
 import scalafx.scene.control.ListView.sfxListView2jfx
 import scalafx.scene.control._
 import scalafx.scene.control.cell.TextFieldListCell
-import scalafx.scene.input.MouseButton
+import scalafx.scene.input.{KeyCombination, KeyEvent, MouseButton, MouseEvent}
 import scalafx.scene.layout._
 import scalafx.scene.paint.Color
 import scalafx.scene.shape.{Circle, Line}
@@ -44,7 +48,6 @@ object BeatEditor {
 class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
 
   val player = new AudioPlayer(new BufferedInputStream(new FileInputStream(conf.input())), new BufferedInputStream(getClass.getResourceAsStream("/beats/click.wav")))
-  var playerRunning = false
   var playerSuspended = false
   var playerIgnore = false
 
@@ -112,93 +115,79 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
     }
   }
   beatsView.getSelectionModel.setSelectionMode(SelectionMode.Multiple)
-  val rateSlider = new Slider {
-    min = 0.1
-    max = 1.0
-    value = 0.5
-    blockIncrement = 0.1
-  }
-  rateSlider.value.onChange { (_, _, d) =>
-    if (playerRunning && !playerSuspended) player.pause()
-    player.rate.set(d.floatValue())
-    if (playerRunning && !playerSuspended) {
-      player.beats.set(beats.toList)
-      player.play()
-    }
-  }
-  rateSlider.onMousePressed() = handle {
-    if (playerRunning) {
+
+  def suspendPlayer(): Unit = {
+    if (playButton.selected()) {
       player.pause()
       playerSuspended = true
     }
   }
-  rateSlider.onMouseReleased() = handle {
-    if (playerRunning) {
-      playerSuspended = false
-      player.beats.set(beats.toList)
-      player.play()
-    }
-  }
-  val ratioSlider = new Slider {
-    min = 0.0
-    max = 1.0
-    value = 0.8
-    blockIncrement = 0.1
-  }
-  ratioSlider.value.onChange { (_, _, d) =>
-    if (playerRunning && !playerSuspended) player.pause()
-    player.ratio.set(d.floatValue())
-    if (playerRunning && !playerSuspended) {
-      player.beats.set(beats.toList)
-      player.play()
-    }
-  }
-  ratioSlider.onMousePressed() = handle {
-    if (playerRunning) {
-      player.pause()
-      playerSuspended = true
-    }
-  }
-  ratioSlider.onMouseReleased() = handle {
-    if (playerRunning) {
+
+  def unsuspendPlayer(): Unit = {
+    if (playButton.selected()) {
       playerSuspended = false
       player.beats.set(beats.toList)
       player.play()
     }
   }
 
-  val positionSlider = new Slider {
+  val rateSlider = new Slider {
+    min = 0.1
+    max = 1.0
+    value = 0.5
+    blockIncrement = 0.1
+    value.onChange { (_, _, d) =>
+      if (playButton.selected() && !playerSuspended) player.pause()
+      player.rate.set(d.floatValue())
+      if (playButton.selected() && !playerSuspended) {
+        player.beats.set(beats.toList)
+        player.play()
+      }
+    }
+    onMousePressed() = handle(suspendPlayer())
+    onMouseReleased() = handle(unsuspendPlayer())
+  }
+
+  val ratioSlider = new Slider {
+    min = 0.0
+    max = 1.0
+    value = 0.8
+    blockIncrement = 0.1
+    value.onChange { (_, _, d) =>
+      if (playButton.selected() && !playerSuspended) player.pause()
+      player.ratio.set(d.floatValue())
+      if (playButton.selected() && !playerSuspended) {
+        player.beats.set(beats.toList)
+        player.play()
+      }
+    }
+    onMousePressed() = handle(suspendPlayer())
+    onMouseReleased() = handle(unsuspendPlayer())
+  }
+
+
+  val secondWidth = 100
+  val volumeHeight = 150
+  val positionSlider: Slider = new Slider {
     min = 0
     max = player.duration
     value = 0
     blockIncrement = 1
-  }
-  val secondWidth = 100
-  val volumeHeight = 150
-  positionSlider.value.onChange { (a, _, d) =>
-    if (playerRunning && !playerSuspended && !playerIgnore) player.pause()
-    player.position.set(d.doubleValue())
-    position.text() = f"${d.doubleValue()}%07.2f s"
-    positionLine.startX = 100 + d.doubleValue() * secondWidth
-    positionLine.endX = 100 + d.doubleValue() * secondWidth
-    waveView.layoutX = -(d.doubleValue() * secondWidth)
-    if (playerRunning && !playerSuspended && !playerIgnore) {
-      player.beats.set(beats.toList)
-      player.play()
+
+    value.onChange { (a, _, d) =>
+      if (playButton.selected() && !playerSuspended && !playerIgnore) player.pause()
+      player.position.set(d.doubleValue())
+      position.text() = f"${d.doubleValue()}%07.2f s"
+      positionLine.startX = 100 + d.doubleValue() * secondWidth
+      positionLine.endX = 100 + d.doubleValue() * secondWidth
+      waveView.layoutX = -(d.doubleValue() * secondWidth)
+      if (playButton.selected() && !playerSuspended && !playerIgnore) {
+        player.beats.set(beats.toList)
+        player.play()
+      }
     }
-  }
-  positionSlider.onMousePressed() = handle {
-    if (playerRunning) {
-      player.pause()
-      playerSuspended = true
-    }
-  }
-  positionSlider.onMouseReleased() = handle {
-    if (playerRunning) {
-      playerSuspended = false
-      player.beats.set(beats.toList)
-      player.play()
-    }
+    onMousePressed() = handle(suspendPlayer())
+    onMouseReleased() = handle(unsuspendPlayer())
   }
 
   val waveGroup = new Group {
@@ -335,9 +324,176 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
 
   var copiedBeats: Seq[Double] = Seq()
 
+  val playButton = new ToggleButton {
+    text = "Play"
+    selected.onChange { (_, _, b) =>
+      if (b) {
+        player.beats.set(beats.toList)
+        player.play()
+      } else {
+        player.pause()
+      }
+    }
+  }
+
   stage = new PrimaryStage {
     self =>
     scene = new Scene {
+      val beatButton = new Button {
+        text = "Beat"
+        armed.onChange((_, _, x) => {
+          if (x) insertBeat(player.currentPosition)
+        })
+      }
+      val removeButton = new Button {
+        text = "Remove"
+        onAction = handle {
+          for (i <- beatsView.getSelectionModel.getSelectedIndices.reverse) {
+            beats.remove(i, i + 1)
+          }
+        }
+      }
+      val positionField = new TextField {
+        prefWidth = 50
+      }
+      val addButton = new Button {
+        text = "Add"
+        onAction = handle {
+          insertBeat(positionField.getText.toDouble)
+        }
+      }
+      val alignEquallyButton = new Button {
+        text = "Align equally"
+        onAction = handle {
+          val bs = beatsView.getSelectionModel.getSelectedItems.toList
+          if (beatsView.getSelectionModel.getSelectedIndices.size >= 3) {
+            val distance = (bs.last - bs.head) / (bs.length - 1)
+            beatsView.getSelectionModel.clearSelection()
+            beats.removeAll(bs: _*)
+            for (i <- bs.indices) {
+              val b = i * distance + bs.head
+              insertBeat(b)
+              beatsView.getSelectionModel.select(b)
+            }
+          }
+        }
+      }
+      val stepSpinner = new Spinner[Double](0.01, 60, 0.05, 0.05) {
+        prefWidth = 80
+        editable = true
+      }
+
+      def moveSelected(delta: Double): Unit = {
+        val bs = beatsView.getSelectionModel.getSelectedItems.toList
+        beatsView.getSelectionModel.clearSelection()
+        beats.removeAll(bs: _*)
+        for (b <- bs) {
+          insertBeat(b + delta)
+          beatsView.getSelectionModel.select(b + delta)
+        }
+      }
+
+      val moveLeftButton = new Button {
+        text = "-"
+        onAction = handle {
+          moveSelected(-stepSpinner.value())
+        }
+      }
+      val moveRightButton = new Button {
+        text = "+"
+        onAction = handle {
+          moveSelected(stepSpinner.value())
+        }
+      }
+      val leftToNowButton = new Button {
+        text = "Left to now"
+        onAction = handle {
+          if (!beatsView.getSelectionModel.getSelectedIndices.isEmpty) {
+            val offset = beatsView.getSelectionModel.getSelectedItems.head
+            moveSelected(-offset + positionSlider.value())
+          }
+        }
+      }
+      val rightToNowButton = new Button {
+        text = "Right to now"
+        onAction = handle {
+          if (!beatsView.getSelectionModel.getSelectedIndices.isEmpty) {
+            val offset = beatsView.getSelectionModel.getSelectedItems.last
+            moveSelected(-offset + positionSlider.value())
+          }
+        }
+      }
+      val repetitionSpinner = new Spinner[Int](1, Int.MaxValue, 1) {
+        prefWidth = 80
+        editable = true
+      }
+      val copyButton = new Button {
+        text = "Copy"
+        onAction = handle {
+          copiedBeats = beatsView.getSelectionModel.getSelectedItems.toList
+        }
+      }
+      val insertLeftButton = new Button {
+        text = "Insert Left"
+        onAction = handle {
+          if (!copiedBeats.isEmpty)
+            for (_ <- 1 to repetitionSpinner.value()) {
+              beatsView.getSelectionModel.clearSelection()
+              for (b <- copiedBeats) {
+                val tmp = b - copiedBeats.head + positionSlider.value()
+                insertBeat(tmp)
+                beatsView.getSelectionModel.select(tmp)
+              }
+              positionSlider.value() = copiedBeats.last - copiedBeats.head + positionSlider.value()
+            }
+        }
+      }
+      val insertRightButton = new Button {
+        text = "Insert Right"
+        onAction = handle {
+          if (!copiedBeats.isEmpty)
+            for (_ <- 1 to repetitionSpinner.value()) {
+              beatsView.getSelectionModel.clearSelection()
+              for (b <- copiedBeats) {
+                val tmp = b - copiedBeats.last + positionSlider.value()
+                insertBeat(tmp)
+                beatsView.getSelectionModel.select(tmp)
+              }
+              positionSlider.value() = copiedBeats.head - copiedBeats.last + positionSlider.value()
+            }
+        }
+      }
+      val shortcuts = Seq[(KeyCombination, () => Unit)](
+        KeyCombination("p") -> (() => playButton.fire()),
+        KeyCombination("b") -> (() => {
+          beatButton.arm()
+          beatButton.fire()
+          beatButton.disarm()
+        }),
+        KeyCombination("ctrl+left") -> (() => moveLeftButton.fire()),
+        KeyCombination("ctrl+right") -> (() => moveRightButton.fire()),
+        KeyCombination("left") -> (() => positionSlider.value() -= 1),
+        KeyCombination("right") -> (() => positionSlider.value() += 1),
+        KeyCombination("alt+left") -> (() => positionSlider.value() -= 0.05),
+        KeyCombination("alt+right") -> (() => positionSlider.value() += 0.05),
+        KeyCombination("shift+left") -> (() => positionSlider.value() -= 10),
+        KeyCombination("shift+right") -> (() => positionSlider.value() += 10),
+        KeyCombination("n") -> (() => leftToNowButton.fire()),
+        KeyCombination("shift+n") -> (() => rightToNowButton.fire()),
+        KeyCombination("c") -> (() => copyButton.fire()),
+        KeyCombination("v") -> (() => insertLeftButton.fire()),
+        KeyCombination("shift+v") -> (() => insertRightButton.fire()),
+        KeyCombination("e") -> (() => alignEquallyButton.fire()),
+        KeyCombination("del") -> (() => removeButton.fire())
+      )
+      addEventFilter(KeyEvent.KeyPressed, (e: input.KeyEvent) => {
+        shortcuts.find(_._1.`match`(e)) match {
+          case Some((_, f)) =>
+            f()
+            e.consume()
+          case None =>
+        }
+      })
       root = new VBox {
         spacing = 5
         children = Seq(
@@ -357,164 +513,35 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                   new HBox {
                     spacing = 5
                     children = Seq(
-                      new Button {
-                        text = "Play"
-                        onAction = handle {
-                          playerRunning = true
-                          player.beats.set(beats.toList)
-                          player.play()
-                        }
-                      },
-                      new Button {
-                        text = "Beat"
-                        armed.onChange((_, _, x) => {
-                          if (x) insertBeat(player.currentPosition)
-                        })
-                      },
-                      new Button {
-                        text = "Pause"
-                        onAction = handle {
-                          player.pause()
-                          playerRunning = false
-                        }
-
-                      }
+                      playButton,
+                      beatButton
                     )
                   },
                   new HBox {
                     spacing = 5
-                    val positionField = new TextField {
-                      prefWidth = 50
-                    }
-
                     children = Seq(
-                      new Button {
-                        text = "Remove"
-                        onAction = handle {
-                          for (i <- beatsView.getSelectionModel.getSelectedIndices.reverse) {
-                            beats.remove(i, i + 1)
-                          }
-                        }
-                      },
-                      new Button {
-                        text = "Add"
-                        onAction = handle {
-                          insertBeat(positionField.getText.toDouble)
-                        }
-                      },
+                      removeButton,
+                      addButton,
                       positionField,
-                      new Button {
-                        text = "Align equally"
-                        onAction = handle {
-                          val bs = beatsView.getSelectionModel.getSelectedItems.toList
-                          if (beatsView.getSelectionModel.getSelectedIndices.size >= 3) {
-                            val distance = (bs.last - bs.head) / (bs.length - 1)
-                            beatsView.getSelectionModel.clearSelection()
-                            beats.removeAll(bs: _*)
-                            for (i <- bs.indices) {
-                              val b = i * distance + bs.head
-                              insertBeat(b)
-                              beatsView.getSelectionModel.select(b)
-                            }
-                          }
-                        }
-                      }
+                      alignEquallyButton
                     )
                   },
                   new HBox {
                     spacing = 5
-                    val stepSpinner = new Spinner[Double](0.01, 60, 0.05, 0.05) {
-                      prefWidth = 80
-                      editable = true
-                    }
-
-                    def moveSelected(delta: Double): Unit = {
-                      val bs = beatsView.getSelectionModel.getSelectedItems.toList
-                      beatsView.getSelectionModel.clearSelection()
-                      beats.removeAll(bs: _*)
-                      for (b <- bs) {
-                        insertBeat(b + delta)
-                        beatsView.getSelectionModel.select(b + delta)
-                      }
-                    }
-
                     children = Seq(
-                      new Button {
-                        text = "-"
-                        onAction = handle {
-                          moveSelected(-stepSpinner.value())
-                        }
-                      },
+                      moveLeftButton,
                       stepSpinner,
-                      new Button {
-                        text = "+"
-                        onAction = handle {
-                          moveSelected(stepSpinner.value())
-                        }
-                      },
-                      new Button {
-                        text = "Left to now"
-                        onAction = handle {
-                          if (!beatsView.getSelectionModel.getSelectedIndices.isEmpty) {
-                            val offset = beatsView.getSelectionModel.getSelectedItems.head
-                            moveSelected(-offset + positionSlider.value())
-                          }
-                        }
-                      },
-                      new Button {
-                        text = "Right to now"
-                        onAction = handle {
-                          if (!beatsView.getSelectionModel.getSelectedIndices.isEmpty) {
-                            val offset = beatsView.getSelectionModel.getSelectedItems.last
-                            moveSelected(-offset + positionSlider.value())
-                          }
-                        }
-                      }
+                      moveRightButton,
+                      leftToNowButton,
+                      rightToNowButton
                     )
                   },
                   new HBox {
                     spacing = 5
-                    val repetitionSpinner = new Spinner[Int](1, Int.MaxValue, 1) {
-                      prefWidth = 80
-                      editable = true
-                    }
                     children = Seq(
-                      new Button {
-                        text = "Copy"
-                        onAction = handle {
-                          copiedBeats = beatsView.getSelectionModel.getSelectedItems.toList
-                        }
-                      },
-                      new Button {
-                        text = "Insert Left"
-                        onAction = handle {
-                          if (!copiedBeats.isEmpty)
-                            for (_ <- 1 to repetitionSpinner.value()) {
-                              beatsView.getSelectionModel.clearSelection()
-                              for (b <- copiedBeats) {
-                                val tmp = b - copiedBeats.head + positionSlider.value()
-                                insertBeat(tmp)
-                                beatsView.getSelectionModel.select(tmp)
-                              }
-                              positionSlider.value() = copiedBeats.last - copiedBeats.head + positionSlider.value()
-                            }
-                        }
-                      },
-                      new Button {
-                        text = "Insert Right"
-                        onAction = handle {
-                          if (!copiedBeats.isEmpty)
-                            for (_ <- 1 to repetitionSpinner.value()) {
-                              beatsView.getSelectionModel.clearSelection()
-                              for (b <- copiedBeats) {
-                                val tmp = b - copiedBeats.last + positionSlider.value()
-                                insertBeat(tmp)
-                                beatsView.getSelectionModel.select(tmp)
-                              }
-                              positionSlider.value() = copiedBeats.head - copiedBeats.last + positionSlider.value()
-                            }
-                        }
-                      },
+                      copyButton,
+                      insertLeftButton,
+                      insertRightButton,
                       repetitionSpinner
                     )
                   },
