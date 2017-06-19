@@ -5,7 +5,6 @@ import java.util
 import javafx.collections.{FXCollections, ObservableList}
 import javafx.scene.input
 
-import com.sun.glass.ui.Window.EventHandler
 
 import scala.collection.JavaConverters.asJavaCollection
 import scala.collection.mutable
@@ -15,7 +14,6 @@ import scalafx.application.JFXApp.PrimaryStage
 import scalafx.application.{JFXApp, Platform}
 import scalafx.beans.property.BooleanProperty
 import scalafx.collections.ObservableBuffer
-import scalafx.event.{Event, EventType}
 import scalafx.geometry.Pos
 import scalafx.scene.control.ListView.sfxListView2jfx
 import scalafx.scene.control._
@@ -486,12 +484,30 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
         KeyCombination("e") -> (() => alignEquallyButton.fire()),
         KeyCombination("delete") -> (() => removeButton.fire())
       )
+      val digitKeyCodes = (Seq(KeyCode.Digit1, KeyCode.Digit2, KeyCode.Digit3, KeyCode.Digit4, KeyCode.Digit5,
+        KeyCode.Digit6, KeyCode.Digit7, KeyCode.Digit8, KeyCode.Digit9, KeyCode.Digit0).zipWithIndex).toMap
+
       addEventFilter(KeyEvent.KeyPressed, (e: input.KeyEvent) => {
         shortcuts.find(_._1.`match`(e)) match {
           case Some((_, f)) =>
             f()
             e.consume()
           case None =>
+            if (e.isControlDown) {
+              digitKeyCodes.get(e.getCode).foreach { i =>
+                val j = beats.indexWhere(_ >= positionSlider.value())
+                println(j)
+                if (beats.size - j >= i + 1) {
+                  println(i+j)
+                  if (beatsView.selectionModel().isSelected(j+i)) {
+                    beatsView.selectionModel().clearSelection(j + i)
+                  } else {
+                    beatsView.selectionModel().select(j + i)
+                  }
+                }
+                e.consume()
+              }
+            }
         }
       })
       root = new VBox {
