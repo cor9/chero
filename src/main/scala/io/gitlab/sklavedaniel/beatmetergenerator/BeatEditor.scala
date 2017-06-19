@@ -360,7 +360,6 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                       new Button {
                         text = "Play"
                         onAction = handle {
-                          println("play")
                           playerRunning = true
                           player.beats.set(beats.toList)
                           player.play()
@@ -375,7 +374,6 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                       new Button {
                         text = "Pause"
                         onAction = handle {
-                          println("pause")
                           player.pause()
                           playerRunning = false
                         }

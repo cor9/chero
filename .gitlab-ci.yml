@@ -1,4 +1,4 @@
-image: "hseeberger/scala-sbt"
+image: "registry.gitlab.com/sklavedaniel/scalasbtjavafxdocker"
 
 variables:
   SBT_VERSION: "0.13.15"
@@ -14,8 +14,8 @@ cache:
     - "sbt-cache/target"
 
 stages:
-  - test
+  - build
 
-test:
+build:
   script:
     - sbt assembly
