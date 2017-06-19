@@ -48,6 +48,26 @@ java -jar beatmeter-generator.jar audio -i mybeats.txt -d 60 -o output.wav
 
 You only have to supply the files and the duration. You can choose an alternative beat sound with the option --click or provide your own beat wav-file.
 
+## Shortcuts
+
+  - *b* play/pause
+  - *b* insert beat
+  - *ctrl+left* move marked beats left
+  - *ctrl+right* move marked beats right
+  - *left* one second left
+  - *right* one second right
+  - *alt+left* 0.05 seconds left
+  - *alt+right* 0.05 second right
+  - *shift+left* 10 seconds left
+  - *shift+right* 10 seconds right
+  - *n* move left side of selection to current position
+  - *shift+n* move right side of selection to current position
+  - *c* copy selected beats
+  - *v* insert selected beats to the left
+  - *shift+v* insert selected beats to the right
+  - *e* align selected beats equally
+  - *del* remove selected beats
+  
 ## Download
 The current binary can be downloaded:
 [beatmeter-generator.jar](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/builds/artifacts/master/raw/target/scala-2.12/beatmeter-generator.jar?job=build)
