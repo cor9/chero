@@ -10,7 +10,6 @@ import scalafx.Includes._
 import scalafx.animation.{KeyFrame, Timeline}
 import scalafx.application.JFXApp.PrimaryStage
 import scalafx.application.{JFXApp, Platform}
-import scalafx.beans.Observable
 import scalafx.beans.property.BooleanProperty
 import scalafx.collections.ObservableBuffer
 import scalafx.geometry.Pos
@@ -45,16 +44,17 @@ object BeatEditor {
 class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
 
   val player = new AudioPlayer(new BufferedInputStream(new FileInputStream(conf.input())), new BufferedInputStream(getClass.getResourceAsStream("/beats/click.wav")))
+  var playerRunning = false
+  var playerSuspended = false
+  var playerIgnore = false
 
-  var restartPlayer = false
   player.ratio.set(0.8)
   player.rate.set(0.5f)
   player.listener.set(Some((d, s) => {
     Platform.runLater {
-      restartPlayer = false
+      playerIgnore = true
       positionSlider.value() = d
-      if (s != AudioPlayer.Stopped)
-        restartPlayer = true
+      playerIgnore = false
     }
   }))
 
@@ -116,41 +116,89 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
     min = 0.1
     max = 1.0
     value = 0.5
+    blockIncrement = 0.1
   }
   rateSlider.value.onChange { (_, _, d) =>
-    val b = restartPlayer
-    if (b) player.pause()
+    if (playerRunning && !playerSuspended) player.pause()
     player.rate.set(d.floatValue())
-    if (b) player.play()
+    if (playerRunning && !playerSuspended) {
+      player.beats.set(beats.toList)
+      player.play()
+    }
+  }
+  rateSlider.onMousePressed() = handle {
+    if (playerRunning) {
+      player.pause()
+      playerSuspended = true
+    }
+  }
+  rateSlider.onMouseReleased() = handle {
+    if (playerRunning) {
+      playerSuspended = false
+      player.beats.set(beats.toList)
+      player.play()
+    }
   }
   val ratioSlider = new Slider {
     min = 0.0
     max = 1.0
     value = 0.8
+    blockIncrement = 0.1
   }
   ratioSlider.value.onChange { (_, _, d) =>
-    val b = restartPlayer
-    if (b) player.pause()
+    if (playerRunning && !playerSuspended) player.pause()
     player.ratio.set(d.floatValue())
-    if (b) player.play()
+    if (playerRunning && !playerSuspended) {
+      player.beats.set(beats.toList)
+      player.play()
+    }
+  }
+  ratioSlider.onMousePressed() = handle {
+    if (playerRunning) {
+      player.pause()
+      playerSuspended = true
+    }
+  }
+  ratioSlider.onMouseReleased() = handle {
+    if (playerRunning) {
+      playerSuspended = false
+      player.beats.set(beats.toList)
+      player.play()
+    }
   }
 
   val positionSlider = new Slider {
     min = 0
     max = player.duration
     value = 0
+    blockIncrement = 1
   }
   val secondWidth = 100
   val volumeHeight = 150
-  positionSlider.value.onChange { (_, _, d) =>
-    val b = restartPlayer
-    if (b) player.pause()
+  positionSlider.value.onChange { (a, _, d) =>
+    if (playerRunning && !playerSuspended && !playerIgnore) player.pause()
     player.position.set(d.doubleValue())
     position.text() = f"${d.doubleValue()}%07.2f s"
     positionLine.startX = 100 + d.doubleValue() * secondWidth
     positionLine.endX = 100 + d.doubleValue() * secondWidth
     waveView.layoutX = -(d.doubleValue() * secondWidth)
-    if (b) player.play()
+    if (playerRunning && !playerSuspended && !playerIgnore) {
+      player.beats.set(beats.toList)
+      player.play()
+    }
+  }
+  positionSlider.onMousePressed() = handle {
+    if (playerRunning) {
+      player.pause()
+      playerSuspended = true
+    }
+  }
+  positionSlider.onMouseReleased() = handle {
+    if (playerRunning) {
+      playerSuspended = false
+      player.beats.set(beats.toList)
+      player.play()
+    }
   }
 
   val waveGroup = new Group {
@@ -312,6 +360,8 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                       new Button {
                         text = "Play"
                         onAction = handle {
+                          println("play")
+                          playerRunning = true
                           player.beats.set(beats.toList)
                           player.play()
                         }
@@ -325,7 +375,9 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                       new Button {
                         text = "Pause"
                         onAction = handle {
+                          println("pause")
                           player.pause()
+                          playerRunning = false
                         }
 
                       }
