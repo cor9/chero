@@ -47,19 +47,19 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
   val player = new AudioPlayer(new BufferedInputStream(new FileInputStream(conf.input())), new BufferedInputStream(getClass.getResourceAsStream("/beats/click.wav")))
 
   var restartPlayer = false
-  player.ratio = 0.8
-  player.rate = 0.5f
-  player.listener = Some((d, s) => {
+  player.ratio.set(0.8)
+  player.rate.set(0.5f)
+  player.listener.set(Some((d, s) => {
     Platform.runLater {
       restartPlayer = false
       positionSlider.value() = d
       if (s != AudioPlayer.Stopped)
         restartPlayer = true
     }
-  })
+  }))
 
   override def stopApp(): Unit = {
-    player.pause()
+    player.terminate()
   }
 
   val duration = new Text {
@@ -120,7 +120,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
   rateSlider.value.onChange { (_, _, d) =>
     val b = restartPlayer
     if (b) player.pause()
-    player.rate = d.floatValue()
+    player.rate.set(d.floatValue())
     if (b) player.play()
   }
   val ratioSlider = new Slider {
@@ -131,7 +131,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
   ratioSlider.value.onChange { (_, _, d) =>
     val b = restartPlayer
     if (b) player.pause()
-    player.ratio = d.floatValue()
+    player.ratio.set(d.floatValue())
     if (b) player.play()
   }
 
@@ -145,7 +145,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
   positionSlider.value.onChange { (_, _, d) =>
     val b = restartPlayer
     if (b) player.pause()
-    player.position = d.doubleValue()
+    player.position.set(d.doubleValue())
     position.text() = f"${d.doubleValue()}%07.2f s"
     positionLine.startX = 100 + d.doubleValue() * secondWidth
     positionLine.endX = 100 + d.doubleValue() * secondWidth
@@ -312,7 +312,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                       new Button {
                         text = "Play"
                         onAction = handle {
-                          player.beats = beats.toSeq
+                          player.beats.set(beats.toList)
                           player.play()
                         }
                       },

@@ -2,6 +2,8 @@ package io.gitlab.sklavedaniel.beatmetergenerator
 
 import java.io.InputStream
 import java.nio.{ByteBuffer, ByteOrder}
+import java.util.concurrent.{CyclicBarrier, TimeUnit}
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import javax.sound.sampled._
 
 import org.apache.commons.io.IOUtils
@@ -35,95 +37,108 @@ class AudioPlayer(audioData: InputStream, beatData: InputStream) {
   val avgDuration = 0.05
   val avgFrames = (avgDuration * format.getFrameRate * format.getChannels).round.toInt
   val avgTimes = (0 to audio.length / avgFrames).map(_ * avgDuration) :+ duration
-  val avgs: Seq[(Double, Double)] = (Iterator.single(0.0) ++ audio.toIterable.grouped(avgFrames).map(l => l.map(_.abs.toDouble).sum/ l.size)).zip(avgTimes.toIterator).toSeq
+  val avgs: Seq[(Double, Double)] = (Iterator.single(0.0) ++ audio.toIterable.grouped(avgFrames).map(l => l.map(_.abs.toDouble).sum / l.size)).zip(avgTimes.toIterator).toSeq
 
-  var rate = 0.5f
-  var position = 0.0
-  var beats = Seq[Double]()
-  var ratio = 0.9
-  var listener: Option[(Double, AudioPlayer.EventState) => Unit] = None
+  var rate = new AtomicReference(0.5f)
+  var position = new AtomicReference(0.0)
+  var beats = new AtomicReference(Seq[Double]())
+  var ratio = new AtomicReference(0.9)
+  var listener: AtomicReference[Option[(Double, AudioPlayer.EventState) => Unit]] = new AtomicReference(None)
 
-  def currentPosition = {
-    audioThread.map {
-      thread =>
-        thread.startPosition + thread.rate * thread.sourceLine.getMicrosecondPosition / 1000000.0
-    }.getOrElse(position)
-  }
+  private var audioThread = new AudioThread()
+  audioThread.start()
+
+  def currentPosition =
+    if (audioThread.running.get()) {
+      audioThread.startPosition.get() + audioThread.rate.get() * audioThread.sourceLine.getMicrosecondPosition / 1000000.0
+    } else position.get()
 
   private class AudioThread extends Thread {
-    @volatile
-    var running = true
+    var available = new AtomicBoolean(true)
+    var running = new AtomicBoolean(false)
     val sourceLine = AudioSystem.getLine(new DataLine.Info(classOf[SourceDataLine], format)).asInstanceOf[SourceDataLine]
-    val startPosition = self.position
-    val ratio = self.ratio
-    val rate = self.rate
+    var startPosition = new AtomicReference(self.position.get())
+    var ratio = new AtomicReference(self.ratio.get())
+    var rate = new AtomicReference(self.rate.get())
 
     override def run(): Unit = {
-      var position = (startPosition * format.getFrameRate).round.toInt
-      val bufferSize = (format.getFrameRate * bufferDuration * rate).round.toInt
-      var beats: Seq[(Int, Int)] = (self.beats.map(b => (b * format.getFrameRate).ceil.toInt) :+ audioCount)
-        .sliding(2).filter(_.length == 2).map(x => (x(0), x(1))).dropWhile(_._2 <= position).toSeq
-      val bbuffer = ByteBuffer.allocate(bufferSize * format.getFrameSize).order(if (format.isBigEndian) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN)
+      while (available.get()) {
+        synchronized(wait())
+        startPosition.set(self.position.get())
+        ratio.set(self.ratio.get())
+        rate.set(self.rate.get())
+        var position = (startPosition.get() * format.getFrameRate).round.toInt
+        val bufferSize = (format.getFrameRate * bufferDuration * rate.get()).round.toInt
+        var beats: Seq[(Int, Int)] = (self.beats.get().map(b => (b * format.getFrameRate).ceil.toInt) :+ audioCount)
+          .sliding(2).filter(_.length == 2).map(x => (x(0), x(1))).dropWhile(_._2 <= position).toSeq
+        val bbuffer = ByteBuffer.allocate(bufferSize * format.getFrameSize).order(if (format.isBigEndian) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN)
 
-      sourceLine.open(rateFormat(format, rate))
-      listener.foreach(_ (startPosition, AudioPlayer.Playing))
-      sourceLine.start()
+        sourceLine.open(rateFormat(format, rate.get()))
+        sourceLine.start()
+        listener.get().foreach(_ (startPosition.get(), AudioPlayer.Playing))
 
-      while (running && position < audioCount) {
-        bbuffer.clear()
-        val l = bufferSize.min(audioCount - position)
-        for {
-          i <- 0 until l
-          j <- 0 until format.getChannels
-        } {
-          bbuffer.putShort(((1.0 - ratio) * audio((position + i) * format.getChannels + j)).toShort)
-        }
+        while (running.get() && position < audioCount) {
+          bbuffer.clear()
+          val l = bufferSize.min(audioCount - position)
+          for {
+            i <- 0 until l
+            j <- 0 until format.getChannels
+          } {
+            bbuffer.putShort(((1.0 - ratio.get()) * audio((position + i) * format.getChannels + j)).toShort)
+          }
 
-        beats = beats.dropWhile(_._2 < position)
-        for ((b1, b2) <- beats.takeWhile(_._1 <= position + bufferSize)) {
-          val targetStart = (b1 - position).max(0)
-          val sourceStart = (position - b1).max(0)
-          val len = (bufferSize - targetStart).min(beatCount - sourceStart)
-          if (len > 0) {
-            for {
-              i <- 0 until len
-              j <- 0 until format.getChannels
-            } {
-              val k = ((targetStart + i) * format.getChannels + j) * format.getFrameSize / format.getChannels
-              bbuffer.putShort(k,
-                (bbuffer.getShort(k) + ratio * beat((sourceStart + i) * format.getChannels + j)).toShort)
+          beats = beats.dropWhile(_._2 < position)
+          for ((b1, b2) <- beats.takeWhile(_._1 <= position + bufferSize)) {
+            val targetStart = (b1 - position).max(0)
+            val sourceStart = (position - b1).max(0)
+            val len = (bufferSize - targetStart).min(beatCount - sourceStart)
+            if (len > 0) {
+              for {
+                i <- 0 until len
+                j <- 0 until format.getChannels
+              } {
+                val k = ((targetStart + i) * format.getChannels + j) * format.getFrameSize / format.getChannels
+                bbuffer.putShort(k,
+                  (bbuffer.getShort(k) + ratio.get() * beat((sourceStart + i) * format.getChannels + j)).toShort)
+              }
             }
           }
+          position += sourceLine.write(bbuffer.array(), 0, l * format.getFrameSize) / format.getFrameSize
+          listener.get().foreach(_ (startPosition.get() + sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * rate.get(), AudioPlayer.Played))
         }
+        sourceLine.stop()
+        listener.get().foreach(_ (startPosition.get() + sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * rate.get(), AudioPlayer.Stopped))
+        sourceLine.close()
 
-        position += sourceLine.write(bbuffer.array(), 0, l * format.getFrameSize) / format.getFrameSize
-        listener.foreach(_ (startPosition + sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * rate, AudioPlayer.Played))
+        self.synchronized {
+          self.notify()
+        }
       }
     }
   }
 
-  private var audioThread: Option[AudioThread] = None
 
-
-  def playing = audioThread.isDefined
+  def playing = audioThread.running.get()
 
   def play(): Unit = {
-    if (audioThread.isEmpty) {
-      val thread = new AudioThread()
-      thread.start()
-      audioThread = Some(thread)
+    if (!audioThread.running.getAndSet(true)) {
+      audioThread.synchronized(audioThread.notify())
     }
   }
 
   def pause(): Unit = {
-    audioThread.foreach { thread =>
-      thread.running = false
-      thread.sourceLine.stop()
-      listener.foreach(_ (thread.startPosition + thread.sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * thread.rate, AudioPlayer.Stopped))
-      thread.join()
-      thread.sourceLine.close()
+    self.synchronized {
+      if (audioThread.running.getAndSet(false)) {
+        wait(100)
+      }
     }
-    audioThread = None
+  }
+
+  def terminate(): Unit = {
+    audioThread.running.set(false)
+    audioThread.available.set(false)
+    audioThread.synchronized(audioThread.notify())
+    audioThread.join()
   }
 
   private def readData(data: InputStream, format: AudioFormat): Array[Short] = {
