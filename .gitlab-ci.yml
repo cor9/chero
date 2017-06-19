@@ -14,8 +14,8 @@ cache:
     - "sbt-cache/target"
 
 stages:
-  - assembly
+  - test
 
-assembly:
+test:
   script:
     - sbt assembly
