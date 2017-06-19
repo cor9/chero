@@ -66,7 +66,7 @@ You only have to supply the files and the duration. You can choose an alternativ
   - *v* insert selected beats to the left
   - *shift+v* insert selected beats to the right
   - *e* align selected beats equally
-  - *del* remove selected beats
+  - *delete* remove selected beats
   
 ## Download
 The current binary can be downloaded:

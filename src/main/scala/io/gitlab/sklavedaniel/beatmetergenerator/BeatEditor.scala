@@ -20,7 +20,7 @@ import scalafx.geometry.Pos
 import scalafx.scene.control.ListView.sfxListView2jfx
 import scalafx.scene.control._
 import scalafx.scene.control.cell.TextFieldListCell
-import scalafx.scene.input.{KeyCombination, KeyEvent, MouseButton, MouseEvent}
+import scalafx.scene.input._
 import scalafx.scene.layout._
 import scalafx.scene.paint.Color
 import scalafx.scene.shape.{Circle, Line}
@@ -484,7 +484,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
         KeyCombination("v") -> (() => insertLeftButton.fire()),
         KeyCombination("shift+v") -> (() => insertRightButton.fire()),
         KeyCombination("e") -> (() => alignEquallyButton.fire()),
-        KeyCombination("del") -> (() => removeButton.fire())
+        KeyCombination("delete") -> (() => removeButton.fire())
       )
       addEventFilter(KeyEvent.KeyPressed, (e: input.KeyEvent) => {
         shortcuts.find(_._1.`match`(e)) match {
