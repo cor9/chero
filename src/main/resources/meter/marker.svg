@@ -15,7 +15,7 @@
    id="svg2"
    version="1.1"
    inkscape:version="0.91 r13725"
-   sodipodi:docname="beatmeterMarker.svg">
+   sodipodi:docname="marker.svg">
   <defs
      id="defs4" />
   <sodipodi:namedview
@@ -26,8 +26,8 @@
      inkscape:pageopacity="0"
      inkscape:pageshadow="2"
      inkscape:zoom="15.839192"
-     inkscape:cx="-3.8975804"
-     inkscape:cy="14.464096"
+     inkscape:cx="25.873667"
+     inkscape:cy="14.696838"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -47,17 +47,13 @@
        orientation="0,1"
        id="guide4165" />
     <sodipodi:guide
-       position="-44.188781,24.526245"
+       position="26.011427,20.929097"
        orientation="0,1"
        id="guide4167" />
     <sodipodi:guide
        position="-33.582178,14.677258"
        orientation="0,1"
        id="guide4169" />
-    <sodipodi:guide
-       position="-36.612636,29.45074"
-       orientation="0,1"
-       id="guide4171" />
     <sodipodi:guide
        position="-35.728752,9.7527631"
        orientation="0,1"
@@ -80,11 +76,12 @@
      inkscape:groupmode="layer"
      id="layer1"
      transform="translate(-130.61172,-456.04006)">
-    <path class="marker fill"
-       style="opacity:1;fill:#313131;fill-opacity:1;stroke:#313131;stroke-width:1;stroke-linecap:round;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
-       d="m 132.0848,470.63576 0,25.48633 4.19843,0 0,-21.70561 11.39506,0 0,21.70561 4.19843,0 0,-25.48633 z"
+    <path
+       class="marker fill"
+       style="opacity:1;fill:#313131;fill-opacity:1;stroke:#313131;stroke-width:0;stroke-linecap:round;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       d="m 132.45435,496.12209 3.82888,0 0,-20.90971 c 0,-0.44589 0.38103,-0.7903 0.83279,-0.7903 l 9.72041,0 c 0.47587,0 0.83165,0.4017 0.83165,0.7903 l 0,20.90975 3.79872,0 0,-23.11164 c 0,-1.23799 -0.97601,-2.36021 -2.34045,-2.36021 -4.01523,-0.0279 -10.77193,-0.0468 -14.40638,0 -1.29485,0.0167 -2.25681,0.93392 -2.26562,2.32999 -0.0472,7.48142 0,15.66008 0,23.14186 z"
        id="rect4936-5"
        inkscape:connector-curvature="0"
-       sodipodi:nodetypes="ccccccccc" />
+       sodipodi:nodetypes="ccccccccccsscc" />
   </g>
 </svg>
