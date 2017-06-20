@@ -76,8 +76,8 @@
      inkscape:groupmode="layer"
      id="layer1"
      transform="translate(-111.07867,-456.63297)">
-    <rect
-       style="opacity:1;fill:#c90000;fill-opacity:1;stroke:none;stroke-width:3.20000005;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+    <rect class="foreground fill"
+       style="opacity:1;fill-opacity:1;stroke:none;stroke-width:3.20000005;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        id="rect4171"
        width="18.056479"
        height="41.147938"

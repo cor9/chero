@@ -18,9 +18,24 @@
 
 package io.gitlab.sklavedaniel.beatmetergenerator
 
-import org.rogach.scallop.{ScallopConf, Subcommand}
+import java.awt.Color
+
+import org.rogach.scallop.{ScallopConf, Subcommand, ValueConverter}
 
 object Main extends App {
+
+  val ColorRegex = "((?:[0-9a-fA-F]{2})?[0-9a-fA-F]{6})".r
+  val colorConverter = new ValueConverter[Color] {
+    override def parse(s: List[(String, List[String])]) = s match {
+      case List((_, List(ColorRegex(color)))) =>
+        val i = Integer.parseUnsignedInt(color, 16)
+        Right(Some(new Color(i, (i >>> 24) != 0)))
+      case Nil => Right(None)
+      case _ => Left("Not a correct color string")
+    }
+    val tag = scala.reflect.runtime.universe.typeTag[Color]
+    val argType = org.rogach.scallop.ArgType.SINGLE
+  }
 
   abstract class ExecutableSubcommand(name: String) extends Subcommand(name) {
     def execute(args: Array[String])

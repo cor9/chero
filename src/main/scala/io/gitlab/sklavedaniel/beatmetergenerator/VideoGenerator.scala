@@ -24,10 +24,10 @@ import java.io.File
 import java.net.URI
 import javax.imageio.ImageIO
 
-import org.apache.batik.anim.dom.SVGDOMImplementation
+import org.apache.batik.anim.dom.{SAXSVGDocumentFactory, SVGDOMImplementation}
 import org.apache.batik.transcoder._
 import org.apache.batik.transcoder.image.ImageTranscoder
-import org.apache.batik.util.SVGConstants
+import org.apache.batik.util.{SVGConstants, XMLResourceDescriptor}
 
 object VideoGenerator {
 
@@ -47,7 +47,10 @@ object VideoGenerator {
     val bmHeight = opt[Int](descr = "Height of the actual beatmeter").orElse(height.toOption.map(x => (x * 2 / 3.0).round.toInt))
     val fgHeight = opt[Int](descr = "Height of the forground decorations").orElse(height.toOption.map(x => (x * 14 / 15.0).round.toInt))
     val bgHeight = opt[Int](descr = "Height of the beatmeter background").orElse(bmHeight.toOption)
-    val bgColor = opt[Int](default = Some(0xB4FFFFFF), descr = "Color of the beatmeter background in ARGB")
+    val bgColor = opt[Color](default = Some(new Color(0xB4FFFFFF, true)), descr = "Color of the beatmeter background in ARGB")(Main.colorConverter)
+    val fgColor = opt[Color](default = Some(new Color(0xffc90000, true)), descr = "Color of the foreground decorations ARGB")(Main.colorConverter)
+    val wvColor = opt[Color](default = Some(new Color(0xffc90000, true)), descr = "Color of the wave in ARGB")(Main.colorConverter)
+    val mrColor = opt[Color](default = Some(new Color(0xFF000000, true)), descr = "Color of the marker in ARGB")(Main.colorConverter)
     val foregroundImg = opt[File](descr = "Foreground svg image clipped to beatmeter width").map(_.toURI)
       .orElse(Some(getClass.getResource("/meter/foreground.svg").toURI))
     val startImg = opt[File](descr = "Left decoration svg image").map(_.toURI)
@@ -74,7 +77,7 @@ object VideoGenerator {
 
 class VideoGenerator(conf: VideoGenerator.Conf) extends App {
 
-  println(s"Estimated heights: video: ${conf.height}, beatmeter: ${conf.bmHeight}, foreground: ${conf.bmHeight}, background: ${conf.bmHeight}")
+  println(s"Heights: video: ${conf.height()}, beatmeter: ${conf.bmHeight()}, foreground: ${conf.bmHeight()}, background: ${conf.bmHeight()}")
 
   val beatmeterForeground = getImage(conf.foregroundImg(), conf.fgHeight())
   val beatmeterMarker = getImage(conf.markerImg(), conf.fgHeight())
@@ -109,7 +112,7 @@ class VideoGenerator(conf: VideoGenerator.Conf) extends App {
   }.toStream
   if (!beatDistances.isEmpty) {
     println(s"Error: The following beats have distance below ${beatmeterBeat.getWidth / conf.speed() / conf.width()}:")
-    for((beat1, beat2, _) <- beatDistances) {
+    for ((beat1, beat2, _) <- beatDistances) {
       println(s"    $beat1 $beat2")
     }
     println("Increase beatmeter speed or beat distance")
@@ -136,7 +139,7 @@ class VideoGenerator(conf: VideoGenerator.Conf) extends App {
     val image = new BufferedImage(conf.width(), conf.height(), BufferedImage.TYPE_INT_ARGB)
     val g = image.getGraphics
 
-    g.setColor(new Color(conf.bgColor(), true))
+    g.setColor(conf.bgColor())
     g.fillRect((conf.width() * conf.end()).round.toInt, beatmeterBackgroundY, (conf.width() * conf.start()).round.toInt - (conf.width() * conf.end()).round.toInt, conf.bgHeight())
     g.setClip((conf.width() * conf.end()).round.toInt, beatmeterY, (conf.width() * conf.start()).round.toInt - (conf.width() * conf.end()).round.toInt, conf.bmHeight())
     val currentOffset = (currentTime * conf.speed() * conf.width()).round.toInt
@@ -158,6 +161,8 @@ class VideoGenerator(conf: VideoGenerator.Conf) extends App {
 
     ImageIO.write(image, "PNG", new File(conf.output(), f"frame-$i%010d.png"))
   }
+
+  println(s"Heights: video: ${conf.height()}, beatmeter: ${conf.bmHeight()}, foreground: ${conf.bmHeight()}, background: ${conf.bmHeight()}")
 
   def getImageLine(width: Int, pattern: (BufferedImage, BufferedImage, IndexedSeq[(BufferedImage, BufferedImage)])): Stream[BufferedImage] = {
     val patternWidth = pattern._3.map(_._1.getWidth).sum
@@ -202,7 +207,43 @@ class VideoGenerator(conf: VideoGenerator.Conf) extends App {
     hints.put(XMLAbstractTranscoder.KEY_DOCUMENT_ELEMENT_NAMESPACE_URI, SVGConstants.SVG_NAMESPACE_URI)
     hints.put(XMLAbstractTranscoder.KEY_DOCUMENT_ELEMENT, "svg")
 
-    val input = new TranscoderInput(uri.toURL.openStream())
+    val docfactory = new SAXSVGDocumentFactory(XMLResourceDescriptor.getXMLParserClassName())
+    val doc = docfactory.createDocument(uri.toString)
+    val style = doc.createElementNS("http://www.w3.org/2000/svg", "style")
+
+    val (wvA, wvRgb) = getColor(conf.wvColor())
+    val (fgA, fgRgb) = getColor(conf.fgColor())
+    val (mrA, mrRgb) = getColor(conf.mrColor())
+    style.setTextContent(
+      s"""
+        .wave.fill {
+          fill: #$wvRgb !important;
+          fill-opacity: $wvA !important;
+        }
+        .wave.stroke {
+          stroke: #$wvRgb !important;
+          stroke-opacity: $wvA !important;
+        }
+        .foreground.fill {
+          fill: #$fgRgb !important;
+          fill-opacity: $fgA !important;
+        }
+        .foreground.stroke {
+          stroke: #$fgRgb !important;
+          stroke-opacity: $fgA !important;
+        }
+        .marker.fill {
+          fill: #$mrRgb !important;
+          fill-opacity: $mrA !important;
+        }
+        .marker.stroke {
+          stroke: #$mrRgb !important;
+          stroke-opacity: $mrA !important;
+        }
+      """)
+    doc.getDocumentElement.appendChild(style)
+    val input = new TranscoderInput(doc)
+
 
     var image = None: Option[BufferedImage]
 
@@ -214,9 +255,16 @@ class VideoGenerator(conf: VideoGenerator.Conf) extends App {
       override def createImage(width: Int, height: Int) =
         new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
     }
+
     rasterizer.setTranscodingHints(hints)
     rasterizer.transcode(input, null)
 
     image.get
+  }
+
+  def getColor(color: Color) = {
+    val rgb = (color.getRGB & 0xffffff).toHexString
+    val a = color.getAlpha.toFloat / 0xff
+    (a.toString, "0" * (6 - rgb.length) + rgb)
   }
 }
