@@ -498,6 +498,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
         KeyCombination("v") -> (() => insertLeftButton.fire()),
         KeyCombination("shift+v") -> (() => insertRightButton.fire()),
         KeyCombination("e") -> (() => alignEquallyButton.fire()),
+        KeyCombination("d") -> (() => beatsView.selectionModel().clearSelection()),
         KeyCombination("delete") -> (() => removeButton.fire())
       )
       val digitKeyCodes = (Seq(KeyCode.Digit1, KeyCode.Digit2, KeyCode.Digit3, KeyCode.Digit4, KeyCode.Digit5,
@@ -512,13 +513,15 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
             if (e.isControlDown) {
               digitKeyCodes.get(e.getCode).foreach { i =>
                 val j = beats.indexWhere(_ >= positionSlider.value())
-                println(j)
                 if (beats.size - j >= i + 1) {
-                  println(i+j)
-                  if (beatsView.selectionModel().isSelected(j+i)) {
-                    beatsView.selectionModel().clearSelection(j + i)
+                  if (e.isAltDown) {
+                    positionSlider.value() = beats(j + i)
                   } else {
-                    beatsView.selectionModel().select(j + i)
+                    if (beatsView.selectionModel().isSelected(j + i)) {
+                      beatsView.selectionModel().clearSelection(j + i)
+                    } else {
+                      beatsView.selectionModel().select(j + i)
+                    }
                   }
                 }
                 e.consume()

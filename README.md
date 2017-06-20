@@ -66,8 +66,10 @@ You only have to supply the files and the duration. You can choose an alternativ
   - *v* insert selected beats to the left
   - *shift+v* insert selected beats to the right
   - *e* align selected beats equally
+  - *d* deselect all beats
   - *delete* remove selected beats
   - *ctrl+digit* select/deselect ith beat left of current position
+  - *ctrl+alt+digit* jump exactly to ith beat left of current position
   
 ## Download
 The current binary can be downloaded:
