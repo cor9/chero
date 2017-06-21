@@ -178,7 +178,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
     editable = true
     cellFactory = TextFieldListCell.forListView(new DoubleStringConverter())
     onEditCommit = (t: ListView.EditEvent[Double]) => {
-      changeBeats(remove = Seq(t.index), insert = Seq(t.getNewValue))
+      changeBeats(removeIdx = Seq(t.index), insert = Seq(t.getNewValue))
     }
   }
   beatsView.getSelectionModel.setSelectionMode(SelectionMode.Multiple)
