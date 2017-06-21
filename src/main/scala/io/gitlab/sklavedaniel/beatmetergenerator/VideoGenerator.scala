@@ -121,10 +121,10 @@ class VideoGenerator(conf: VideoGenerator.Conf) extends App {
 
   val imageSequence =
     getImageLine(((beats.head * conf.speed() + conf.target() - conf.end()) * conf.width() - beatmeterBeat.getWidth / 2.0).round.toInt, beatmeterWavePattern) ++
-      beats.sliding(2).flatMap {
+      beats.map(b => (b * conf.speed() * conf.width()).round.toInt).sliding(2).flatMap {
         case Seq(beat1, beat2) =>
-          assert((beat2 - beat1) * conf.speed() * conf.width() - beatmeterBeat.getWidth >= 0, s"Beat distance to low. Maybe increase speed bettwen beats at $beat1 and $beat2.")
-          beatmeterBeat +: getImageLine(((beat2 - beat1) * conf.speed() * conf.width() - beatmeterBeat.getWidth).round.toInt, beatmeterWavePattern)
+          assert((beat2 - beat1)  - beatmeterBeat.getWidth >= 0, s"Beat distance to low. Maybe increase speed bettwen beats at $beat1 and $beat2.")
+          beatmeterBeat +: getImageLine((beat2 - beat1 - beatmeterBeat.getWidth), beatmeterWavePattern)
       }.toStream ++
       Stream(beatmeterBeat) ++ getImageLine((conf.duration() * conf.width()).round.toInt, beatmeterWavePattern)
   val imagePositions = imageSequence.scanLeft((conf.end() * conf.width()).round.toInt) {
@@ -179,7 +179,7 @@ class VideoGenerator(conf: VideoGenerator.Conf) extends App {
     } else {
       val (endIdx, _, count) = counts.minBy(_._2)
       val imgs: Seq[BufferedImage] = for {
-        i <- 0 until count
+        _ <- 0 until count
         img <- pattern._3
       } yield img._1
       val endImgs = (pattern._3.slice(0, endIdx).map(x => x._1) :+ pattern._3(endIdx)._2).toStream
@@ -267,4 +267,5 @@ class VideoGenerator(conf: VideoGenerator.Conf) extends App {
     val a = color.getAlpha.toFloat / 0xff
     (a.toString, "0" * (6 - rgb.length) + rgb)
   }
+
 }
