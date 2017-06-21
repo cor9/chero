@@ -22,8 +22,10 @@ import java.io._
 import java.util
 import javafx.collections.{FXCollections, ObservableList}
 import javafx.scene.input
+
 import scala.collection.JavaConverters.asJavaCollection
 import scala.collection.mutable
+import scala.util.Try
 import scalafx.Includes._
 import scalafx.animation.{KeyFrame, Timeline}
 import scalafx.application.JFXApp.PrimaryStage
@@ -92,21 +94,71 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
   val beats: ObservableList[Double] = FXCollections.observableList(new util.ArrayList[Double](
     asJavaCollection(conf.beats.toOption.map(BeatFiles.load(_)).getOrElse(Seq[Double]()))
   ))
+  var beatsUndo: List[(Set[Double], Set[Double])] = Nil
+  var beatsRedo: List[(Set[Double], Set[Double])] = Nil
 
-  def insertBeat(beat: Double): Unit = {
+  def changeBeats(insert: Seq[Double] = Nil, remove: Seq[Double] = Nil, removeIdx: Seq[Int] = Nil, removeIdxInteger: Seq[Integer] = Nil): Unit = {
+    val removed = (for (b <- removeIdx.reverse) yield {
+      beats.remove(b)
+    }) ++ (for (b <- removeIdxInteger.reverse) yield {
+      beats.remove(b.toInt)
+    }) ++ (for {
+      b <- remove
+      if beats.remove(b)
+    } yield b)
+    val inserted = for {
+      b <- insert
+      if insertBeat(b)
+    } yield b
+    beatsUndo = (removed.toSet, inserted.toSet) :: beatsUndo
+    beatsRedo = Nil
+  }
+
+  def undo(): Unit = {
+    beatsUndo match {
+      case (insert, remove) :: tail =>
+        beatsUndo = tail
+        beatsRedo = (remove, insert) :: beatsRedo
+        for (b <- remove)
+          beats.remove(b)
+        for (b <- insert)
+          insertBeat(b)
+      case Nil =>
+    }
+  }
+
+  def redo(): Unit = {
+    beatsRedo match {
+      case (insert, remove) :: tail =>
+        beatsRedo = tail
+        beatsUndo = (remove, insert) :: beatsUndo
+        for (b <- remove)
+          beats.remove(b)
+        for (b <- insert)
+          insertBeat(b)
+      case Nil =>
+    }
+  }
+
+  def insertBeat(beat: Double): Boolean = {
     if (beats.isEmpty) {
       beats.insert(0, beat)
+      true
     } else {
       insertBeat(beat, 0, beats.size - 1)
     }
   }
 
-  def insertBeat(beat: Double, first: Int, last: Int): Unit = {
+  def insertBeat(beat: Double, first: Int, last: Int): Boolean = {
     if (first == last) {
       if (beats(first) < beat) {
         beats.add(beat)
+        true
       } else if (beat < beats(first)) {
         beats.insert(first, beat)
+        true
+      } else {
+        false
       }
     } else {
       val pos = (first + last) / 2
@@ -114,6 +166,8 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
         insertBeat(beat, pos + 1, last)
       } else if (beat < beats(pos)) {
         insertBeat(beat, first, pos)
+      } else {
+        false
       }
     }
   }
@@ -124,8 +178,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
     editable = true
     cellFactory = TextFieldListCell.forListView(new DoubleStringConverter())
     onEditCommit = (t: ListView.EditEvent[Double]) => {
-      beats.remove(t.index)
-      insertBeat(t.getNewValue)
+      changeBeats(remove = Seq(t.index), insert = Seq(t.getNewValue))
     }
   }
   beatsView.getSelectionModel.setSelectionMode(SelectionMode.Multiple)
@@ -356,15 +409,13 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
       val beatButton = new Button {
         text = "Beat"
         armed.onChange((_, _, x) => {
-          if (x) insertBeat(player.currentPosition)
+          if (x) changeBeats(insert = Seq(player.currentPosition))
         })
       }
       val removeButton = new Button {
         text = "Remove"
         onAction = handle {
-          for (i <- beatsView.getSelectionModel.getSelectedIndices.reverse) {
-            beats.remove(i, i + 1)
-          }
+          changeBeats(removeIdxInteger = beatsView.selectionModel().getSelectedIndices.toList)
         }
       }
       val positionField = new TextField {
@@ -373,7 +424,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
       val addButton = new Button {
         text = "Add"
         onAction = handle {
-          insertBeat(positionField.getText.toDouble)
+          Try(positionField.getText.toDouble).foreach(b => changeBeats(insert = Seq(b)))
         }
       }
       val alignEquallyButton = new Button {
@@ -383,12 +434,10 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
           if (beatsView.getSelectionModel.getSelectedIndices.size >= 3) {
             val distance = (bs.last - bs.head) / (bs.length - 1)
             beatsView.getSelectionModel.clearSelection()
-            beats.removeAll(bs: _*)
-            for (i <- bs.indices) {
-              val b = i * distance + bs.head
-              insertBeat(b)
+            val nbs = (for (i <- bs.indices) yield i * distance + bs.head).toList
+            changeBeats(remove = bs, insert = nbs)
+            for (b <- nbs)
               beatsView.getSelectionModel.select(b)
-            }
           }
         }
       }
@@ -400,11 +449,10 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
       def moveSelected(delta: Double): Unit = {
         val bs = beatsView.getSelectionModel.getSelectedItems.toList
         beatsView.getSelectionModel.clearSelection()
-        beats.removeAll(bs: _*)
-        for (b <- bs) {
-          insertBeat(b + delta)
-          beatsView.getSelectionModel.select(b + delta)
-        }
+        val nbs = for (b <- bs) yield b + delta
+        changeBeats(remove = bs, insert = nbs)
+        for (b <- nbs)
+          beatsView.getSelectionModel.select(b)
       }
 
       val moveLeftButton = new Button {
@@ -450,14 +498,13 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
       val insertLeftButton = new Button {
         text = "Insert Left"
         onAction = handle {
-          if (!copiedBeats.isEmpty)
+          if (copiedBeats.nonEmpty)
             for (_ <- 1 to repetitionSpinner.value()) {
               beatsView.getSelectionModel.clearSelection()
-              for (b <- copiedBeats) {
-                val tmp = b - copiedBeats.head + positionSlider.value()
-                insertBeat(tmp)
-                beatsView.getSelectionModel.select(tmp)
-              }
+              val nbs = (for (b <- copiedBeats) yield b - copiedBeats.head + positionSlider.value()).toList
+              changeBeats(insert = nbs)
+              for (b <- nbs)
+                beatsView.getSelectionModel.select(b)
               positionSlider.value() = copiedBeats.last - copiedBeats.head + positionSlider.value()
             }
         }
@@ -465,14 +512,13 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
       val insertRightButton = new Button {
         text = "Insert Right"
         onAction = handle {
-          if (!copiedBeats.isEmpty)
+          if (copiedBeats.nonEmpty)
             for (_ <- 1 to repetitionSpinner.value()) {
               beatsView.getSelectionModel.clearSelection()
-              for (b <- copiedBeats) {
-                val tmp = b - copiedBeats.last + positionSlider.value()
-                insertBeat(tmp)
-                beatsView.getSelectionModel.select(tmp)
-              }
+              val nbs = (for (b <- copiedBeats) yield b - copiedBeats.last + positionSlider.value())
+              changeBeats(insert = nbs)
+              for (b <- nbs)
+                beatsView.getSelectionModel.select(b)
               positionSlider.value() = copiedBeats.head - copiedBeats.last + positionSlider.value()
             }
         }
@@ -499,7 +545,9 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
         KeyCombination("shift+v") -> (() => insertRightButton.fire()),
         KeyCombination("e") -> (() => alignEquallyButton.fire()),
         KeyCombination("d") -> (() => beatsView.selectionModel().clearSelection()),
-        KeyCombination("delete") -> (() => removeButton.fire())
+        KeyCombination("delete") -> (() => removeButton.fire()),
+        KeyCombination("z") -> (() => undo()),
+        KeyCombination("shift+z") -> (() => redo())
       )
       val digitKeyCodes = (Seq(KeyCode.Digit1, KeyCode.Digit2, KeyCode.Digit3, KeyCode.Digit4, KeyCode.Digit5,
         KeyCode.Digit6, KeyCode.Digit7, KeyCode.Digit8, KeyCode.Digit9, KeyCode.Digit0).zipWithIndex).toMap
@@ -549,7 +597,15 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                     spacing = 5
                     children = Seq(
                       playButton,
-                      beatButton
+                      beatButton,
+                      new Button {
+                        text = "undo"
+                        onAction = handle(undo())
+                      },
+                      new Button {
+                        text = "redo"
+                        onAction = handle(redo())
+                      }
                     )
                   },
                   new HBox {
@@ -614,12 +670,11 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                               tmp.sum / tmp.size
                             }
                             beatsView.getSelectionModel.clearSelection()
-                            beats.removeAll(bs: _*)
-                            for (i <- bs.indices) {
-                              val b = (i / patternSize) * patternDuration + avgs(i % patternSize) + bs.head
-                              insertBeat(b)
+                            val nbs = (for (i <- bs.indices) yield
+                              (i / patternSize) * patternDuration + avgs(i % patternSize) + bs.head).toList
+                            changeBeats(remove = bs, insert = nbs)
+                            for (b <- nbs)
                               beatsView.getSelectionModel.select(b)
-                            }
                           }
                         }
                       },
@@ -665,7 +720,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                           fileChooser.setTitle("Open Beats File")
                           val file = fileChooser.showOpenDialog(stage)
                           if (file != null)
-                            beats.setAll(asJavaCollection(BeatFiles.load(file)))
+                            changeBeats(remove = beats.toList, insert = BeatFiles.load(file))
                         }
                       },
                       new Button {

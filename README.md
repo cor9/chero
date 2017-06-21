@@ -70,6 +70,8 @@ You only have to supply the files and the duration. You can choose an alternativ
   - *delete* remove selected beats
   - *ctrl+digit* select/deselect ith beat left of current position
   - *ctrl+alt+digit* jump exactly to ith beat left of current position
+  - *z* undo last change to beats
+  - *shift+z* redo last change to beats
   
 ## Download
 The current binary can be downloaded:
