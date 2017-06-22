@@ -19,6 +19,8 @@ stages:
 build:
   stage: build
   script:
+    - git submodule init
+    - git submodule update
     - sbt assembly
   artifacts:
     paths:
