@@ -49,7 +49,7 @@ import scalafx.util.converter.DoubleStringConverter
 object BeatEditor {
 
   class Conf extends Main.ExecutableSubcommand("editor") {
-    val input = opt[File](required = true, descr = "Audio or video file to play")
+    val input = opt[File](required = true, descr = "Audio file to play")
     val beats = opt[File](descr = "File containing beat definitions")
     validateFileExists(input)
     validateFileExists(beats)

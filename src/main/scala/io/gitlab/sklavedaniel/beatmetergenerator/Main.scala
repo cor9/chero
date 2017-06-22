@@ -20,8 +20,9 @@ package io.gitlab.sklavedaniel.beatmetergenerator
 
 import java.awt.Color
 
+import io.gitlab.sklavedaniel.beatmetergenerator.bpmdetection.BPMDetector
 import org.rogach.scallop.{ArgType, ScallopConf, Subcommand, ValueConverter}
-import shapeless.{HNil, :: => :::, HList}
+import shapeless.{HList, HNil, :: => :::}
 
 import scala.annotation.tailrec
 import scala.reflect.runtime.universe.TypeTag
@@ -174,7 +175,8 @@ object Main extends App {
   val commands: Seq[ExecutableSubcommand] = Seq(
     new BeatEditor.Conf(),
     new AudioGenerator.Conf(),
-    new VideoGenerator.Conf()
+    new VideoGenerator.Conf(),
+    new BPMDetector.Conf()
   )
 
   object Conf extends ScallopConf(args) {

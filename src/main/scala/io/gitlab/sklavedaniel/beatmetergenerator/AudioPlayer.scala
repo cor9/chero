@@ -36,10 +36,24 @@ object AudioPlayer {
 
   case object Stopped extends EventState
 
+  def readData(data: InputStream, format: AudioFormat): Array[Short] = {
+    (for {
+      ais2 <- managed(AudioSystem.getAudioInputStream(format, AudioSystem.getAudioInputStream(data)))
+    } yield {
+      val array = IOUtils.toByteArray(ais2)
+      val buffer = ByteBuffer.allocate(array.length).order(if (format.isBigEndian) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN)
+      buffer.put(array)
+      buffer.rewind()
+      val result = new Array[Short](buffer.limit() / 2)
+      buffer.asShortBuffer().get(result)
+      result
+    }).tried.get
+  }
 }
-
 class AudioPlayer(audioData: InputStream, beatData: InputStream) {
   self =>
+
+  import AudioPlayer.readData
 
   val bufferDuration = 0.1
 
@@ -156,20 +170,6 @@ class AudioPlayer(audioData: InputStream, beatData: InputStream) {
     audioThread.available.set(false)
     audioThread.synchronized(audioThread.notify())
     audioThread.join()
-  }
-
-  private def readData(data: InputStream, format: AudioFormat): Array[Short] = {
-    (for {
-      ais2 <- managed(AudioSystem.getAudioInputStream(format, AudioSystem.getAudioInputStream(data)))
-    } yield {
-      val array = IOUtils.toByteArray(ais2)
-      val buffer = ByteBuffer.allocate(array.length).order(if (format.isBigEndian) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN)
-      buffer.put(array)
-      buffer.rewind()
-      val result = new Array[Short](buffer.limit() / 2)
-      buffer.asShortBuffer().get(result)
-      result
-    }).tried.get
   }
 
   private def rateFormat(format: AudioFormat, rate: Float) =
