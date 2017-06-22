@@ -19,6 +19,7 @@
 package io.gitlab.sklavedaniel.beatmetergenerator
 
 import java.awt.Color
+import java.util.Locale
 
 import io.gitlab.sklavedaniel.beatmetergenerator.bpmdetection.BPMDetector
 import org.rogach.scallop.{ArgType, ScallopConf, Subcommand, ValueConverter}
@@ -28,6 +29,8 @@ import scala.annotation.tailrec
 import scala.reflect.runtime.universe.TypeTag
 
 object Main extends App {
+
+  Locale.setDefault(Locale.ROOT)
 
   abstract class ExecutableSubcommand(name: String) extends Subcommand(name) {
 

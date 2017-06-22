@@ -418,13 +418,13 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
           changeBeats(removeIdxInteger = beatsView.selectionModel().getSelectedIndices.toList)
         }
       }
-      val positionField = new TextField {
-        prefWidth = 50
+      val positionField = new Spinner(0.0, player.duration, 0.0, 1.0) {
+        prefWidth = 80
       }
       val addButton = new Button {
         text = "Add"
         onAction = handle {
-          Try(positionField.getText.toDouble).foreach(b => changeBeats(insert = Seq(b)))
+          changeBeats(insert = Seq(positionField.value()))
         }
       }
       val alignEquallyButton = new Button {
@@ -634,6 +634,31 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                       insertLeftButton,
                       insertRightButton,
                       repetitionSpinner
+                    )
+                  },
+                  new HBox {
+                    spacing = 5
+                    alignment = Pos.BaselineLeft
+                    val bpmSpinner = new Spinner[Double](10.0, 600.0, 120.0, 1.0) {
+                      prefWidth = 80
+                    }
+                    val durationSpinner = new Spinner[Double](0.0, player.duration, 60.0, 10.0) {
+                      prefWidth = 80
+                    }
+                    children = Seq(
+                      new Button {
+                        text = "Add"
+                        onAction = handle {
+                          val count = (durationSpinner.value() * bpmSpinner.value() / 60.0).toInt
+                          val nbs = for (i <- 0 until count) yield positionSlider.value() + i * 60.0 / bpmSpinner.value()
+                          changeBeats(insert = nbs)
+                        }
+                      },
+                      new Text(" bpm "),
+                      bpmSpinner,
+                      new Text(" for "),
+                      durationSpinner
+
                     )
                   },
                   new HBox {
