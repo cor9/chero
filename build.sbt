@@ -22,7 +22,7 @@ libraryDependencies ++= Seq(
   "com.chuusai" %% "shapeless" % "2.3.2"
 )
 
-unmanagedSourceDirectories in Compile += (baseDirectory / "lib/JWave/src").value
+unmanagedSourceDirectories in Compile += baseDirectory.value / "lib/JWave/src"
 
 fork := true
 
