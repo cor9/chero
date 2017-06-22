@@ -22,9 +22,12 @@ libraryDependencies ++= Seq(
   "com.chuusai" %% "shapeless" % "2.3.2"
 )
 
+unmanagedSourceDirectories in Compile += (baseDirectory / "lib/JWave/src").value
+
 fork := true
 
 mainClass in assembly := Some("io.gitlab.sklavedaniel.beatmetergenerator.Main")
+mainClass in (Compile, run) := Some("io.gitlab.sklavedaniel.beatmetergenerator.Main")
 
 assemblyMergeStrategy in assembly := {
   case PathList("META-INF", xs @ _*) => MergeStrategy.discard
