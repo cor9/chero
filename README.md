@@ -30,6 +30,16 @@ You can copy and paste beats (even multiple times at once). They will get insert
 
 There are also two aligment tools, align equally will spead the selected beats such that their distance is equal. Align pattern requires you to select a number of pattern repetitions plus one additional beat. Then it will distribute the pattern euqaly adjusting the beats within a pattern to their average positions. For example if you have a pattern 123 123 123 123, set repetition to 3 and rest to 2 as you have 3 repetitions of the 123 pattern with two additional beats. (The last 123 is not a full pattern, as there is no beat to mark the end of the break after the last 3-beat).
 
+### BPM detection
+
+The tool can detect the beats per minute of a song. It uses an algorithm based on wavelet transformations that works very well at least for music with a constant (but not necessarily always clearly audible) beat. The implementation is taken from [here](https://github.com/mziccard/scala-audio-file/). To analyze some audio file run:
+
+```
+java -jar beatmeter-generator.jar bpm -i myaudio.wav
+```
+
+There are command line options to analyze only part of a file and fine-tune the algorithm but just running it on the hole file should usually work. Use the Add-bpm-button in the edior to add beats at the detected bpm rate. The tool outputs intermediate results, the end result can often be accurate even if many intermediate results are not.
+
 ### Generating image sequences
 Once you are satisfied with your beat pattern you can generate a sequence of images for the beatmeter animation:
 
@@ -76,6 +86,12 @@ You only have to supply the files and the duration. You can choose an alternativ
 ## Download
 The current binary can be downloaded:
 [beatmeter-generator.jar](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/builds/artifacts/master/raw/target/scala-2.12/beatmeter-generator.jar?job=build)
+
+You will need the Java 8 Runtime Environment (JRE) to run the application. You can download it at:
+(Oracle Java 8)[http://www.oracle.com/technetwork/java/javase/downloads/index.html]
+
+If you are using Linux, your distribution will usually include OpenJDK 8 which works fine as well.
+Note, that under Linux you usually have to install OpenJFX as a separate package.
 
 ## Notes
 - The tools do not do much error handling yet. If you provide unreasonable options like a duration shorter than the list of beats you might get strange output or internal error messages.
