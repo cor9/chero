@@ -28,6 +28,8 @@ import org.apache.batik.anim.dom.{SAXSVGDocumentFactory, SVGDOMImplementation}
 import org.apache.batik.transcoder._
 import org.apache.batik.transcoder.image.ImageTranscoder
 import org.apache.batik.util.{SVGConstants, XMLResourceDescriptor}
+import org.rogach.scallop.ScallopOption
+import shapeless.{HNil, :: => :::}
 
 object VideoGenerator {
 
@@ -47,28 +49,27 @@ object VideoGenerator {
     val bmHeight = opt[Int](descr = "Height of the actual beatmeter").orElse(height.toOption.map(x => (x * 2 / 3.0).round.toInt))
     val fgHeight = opt[Int](descr = "Height of the forground decorations").orElse(height.toOption.map(x => (x * 14 / 15.0).round.toInt))
     val bgHeight = opt[Int](descr = "Height of the beatmeter background").orElse(bmHeight.toOption)
-    val bgColor = opt[Color](default = Some(new Color(0xbbaaaaaa, true)), descr = "Color of the beatmeter background in ARGB")(Main.colorConverter)
-    val fgColor = opt[Color](default = Some(new Color(0xbb4d4d4d, true)), descr = "Color of the foreground decorations ARGB")(Main.colorConverter)
-    val wvColor = opt[Color](default = Some(new Color(0xffff0980, true)), descr = "Color of the wave in ARGB")(Main.colorConverter)
-    val mrColor = opt[Color](default = Some(new Color(0xbb4d4d4d, true)), descr = "Color of the marker in ARGB")(Main.colorConverter)
-    val foregroundImg = opt[File](descr = "Foreground svg image clipped to beatmeter width").map(_.toURI)
-      .orElse(Some(getClass.getResource("/meter/foreground.svg").toURI))
-    val startImg = opt[File](descr = "Left decoration svg image").map(_.toURI)
-      .orElse(Some(getClass.getResource("/meter/start.svg").toURI))
-    val endImg = opt[File](descr = "End decoration svg image").map(_.toURI)
-      .orElse(Some(getClass.getResource("/meter/end.svg").toURI))
-    val markerImg = opt[File](descr = "Target marker decoration svg image").map(_.toURI)
-      .orElse(Some(getClass.getResource("/meter/marker.svg").toURI))
+    val bgColor = opt[Color](default = Some(new Color(0xbbaaaaaa, true)), descr = "Color of the beatmeter background in ARGB")
+    val fgColor = opt[Color](default = Some(new Color(0xbb4d4d4d, true)), descr = "Color of the foreground decorations ARGB")
+    val wvColor = opt[Color](default = Some(new Color(0xffff0980, true)), descr = "Color of the wave in ARGB")
+    val mrColor = opt[Color](default = Some(new Color(0xbb4d4d4d, true)), descr = "Color of the marker in ARGB")
+    val foregroundImg = opt[Option[File]](descr = "Foreground svg image clipped to beatmeter width").map(_.map(_.toURI))
+      .orElse(Some(Some(getClass.getResource("/meter/foreground.svg").toURI)))
+    val startImg = opt[Option[File]](descr = "Left decoration svg image").map(_.map(_.toURI))
+      .orElse(Some(Some(getClass.getResource("/meter/start.svg").toURI)))
+    val endImg = opt[Option[File]](descr = "End decoration svg image").map(_.map(_.toURI))
+      .orElse(Some(Some(getClass.getResource("/meter/end.svg").toURI)))
+    val markerImg = opt[Option[File]](descr = "Target marker decoration svg image").map(_.map(_.toURI))
+      .orElse(Some(Some(getClass.getResource("/meter/marker.svg").toURI)))
     val beatImg = opt[File](descr = "Beat svg image").map(_.toURI)
       .orElse(Some(getClass.getResource("/meter/beat.svg").toURI))
-    val waveStraightImg = opt[File](descr = "Straight wave svg image").map(_.toURI)
-      .orElse(Some(getClass.getResource("/meter/waveStraight.svg").toURI))
-    val waveStartImg = opt[File](descr = "Start wave svg image").map(_.toURI)
-      .orElse(Some(getClass.getResource("/meter/waveStart.svg").toURI))
-    val waveEndImg = opt[File](descr = "End wave svg image").map(_.toURI)
-      .orElse(Some(getClass.getResource("/meter/waveEnd.svg").toURI))
-    val waveMiddleImg = opt[File](descr = "Middle wave svg image").map(_.toURI)
-      .orElse(Some(getClass.getResource("/meter/waveMiddle.svg").toURI))
+    val wavePattern = opt[Option[File ::: File ::: File ::: File ::: HNil]](descr = "Images for the wave line between beets given as --wave-pattern straightLine.svg waveStart.svg waveMiddle.Svg waveEnd.svg")
+      .map(_.map(t => t.head.toURI :: t.tail.head.toURI :: t.tail.tail.head.toURI :: t.tail.tail.tail.head.toURI :: HNil))
+      .orElse(Some(Some(getClass.getResource("/meter/waveStraight.svg").toURI ::
+        getClass.getResource("/meter/waveStart.svg").toURI ::
+        getClass.getResource("/meter/waveEnd.svg").toURI ::
+        getClass.getResource("/meter/waveMiddle.svg").toURI :: HNil
+      )))
 
     override def execute(args: Array[String]) = new VideoGenerator(this).main(args)
   }
@@ -79,21 +80,20 @@ class VideoGenerator(conf: VideoGenerator.Conf) extends App {
 
   println(s"Heights: video: ${conf.height()}, beatmeter: ${conf.bmHeight()}, foreground: ${conf.bmHeight()}, background: ${conf.bmHeight()}")
 
-  val beatmeterForeground = getImage(conf.foregroundImg(), conf.fgHeight())
-  val beatmeterMarker = getImage(conf.markerImg(), conf.fgHeight())
-  val beatmeterStart = getImage(conf.startImg(), conf.fgHeight())
-  val beatmeterEnd = getImage(conf.endImg(), conf.fgHeight())
+  val emptyWave = new BufferedImage(conf.bmHeight(), 1000, BufferedImage.TYPE_INT_ARGB)
+  val beatmeterForeground = conf.foregroundImg().map(getImage(_, conf.fgHeight()))
+  val beatmeterMarker = conf.markerImg().map(getImage(_, conf.fgHeight()))
+  val beatmeterStart = conf.startImg().map(getImage(_, conf.fgHeight()))
+  val beatmeterEnd = conf.endImg().map(getImage(_, conf.fgHeight()))
   val beatmeterBeat = getImage(conf.beatImg(), conf.bmHeight())
-  val beatmeterWaveStart = getImage(conf.waveStartImg(), conf.bmHeight())
-  val beatmeterWaveMiddle = getImage(conf.waveMiddleImg(), conf.bmHeight())
-  val beatmeterWaveEnd = getImage(conf.waveEndImg(), conf.bmHeight())
-  val beatmeterWaveStraight = getImage(conf.waveStraightImg(), conf.bmHeight())
-  val beatmeterWavePattern = (beatmeterWaveStraight, beatmeterWaveStart,
-    IndexedSeq((beatmeterWaveMiddle, beatmeterWaveEnd)))
+  val beatmeterWavePattern = conf.wavePattern().map(t => (
+    getImage(t.head, conf.bmHeight()),
+      getImage(t.tail.head, conf.bmHeight()), IndexedSeq((
+        getImage(t.tail.tail.head, conf.bmHeight()),
+          getImage(t.tail.tail.tail.head, conf.bmHeight())))))
 
 
   val beats: Seq[Double] = BeatFiles.load(conf.input())
-
   val beatmeterMiddle = conf.height() / 2.0
   val beatmeterWidth = ((conf.start() - conf.end()) * conf.width()).round.toInt
   val beatmeterY = (beatmeterMiddle - conf.bmHeight() / 2.0).round.toInt
@@ -120,15 +120,17 @@ class VideoGenerator(conf: VideoGenerator.Conf) extends App {
   }
 
   val imageSequence =
-    getImageLine(((beats.head * conf.speed() + conf.target() - conf.end()) * conf.width() - beatmeterBeat.getWidth / 2.0).round.toInt, beatmeterWavePattern) ++
+    getImageLine(((beats.head * conf.speed() + conf.target() - conf.end()) * conf.width() - beatmeterBeat.getWidth / 2.0).round.toInt,
+      beatmeterWavePattern) ++
       beats.map(b => (b * conf.speed() * conf.width()).round.toInt).sliding(2).flatMap {
         case Seq(beat1, beat2) =>
-          assert((beat2 - beat1)  - beatmeterBeat.getWidth >= 0, s"Beat distance to low. Maybe increase speed bettwen beats at $beat1 and $beat2.")
-          beatmeterBeat +: getImageLine((beat2 - beat1 - beatmeterBeat.getWidth), beatmeterWavePattern)
+          assert((beat2 - beat1) - beatmeterBeat.getWidth >= 0, s"Beat distance to low. Maybe increase speed bettwen beats at $beat1 and $beat2.")
+          Left(beatmeterBeat) +: getImageLine((beat2 - beat1 - beatmeterBeat.getWidth), beatmeterWavePattern)
       }.toStream ++
-      Stream(beatmeterBeat) ++ getImageLine((conf.duration() * conf.width()).round.toInt, beatmeterWavePattern)
+      Stream(Left(beatmeterBeat)) ++ getImageLine((conf.duration() * conf.width()).round.toInt, beatmeterWavePattern)
   val imagePositions = imageSequence.scanLeft((conf.end() * conf.width()).round.toInt) {
-    case (pos, img) => pos + img.getWidth
+    case (pos, Left(img)) => pos + img.getWidth
+    case (pos, Right(delta)) => pos + delta
   }
   var remainingImages = imageSequence.zip(imagePositions)
 
@@ -144,53 +146,65 @@ class VideoGenerator(conf: VideoGenerator.Conf) extends App {
     g.setClip((conf.width() * conf.end()).round.toInt, beatmeterY, (conf.width() * conf.start()).round.toInt - (conf.width() * conf.end()).round.toInt, conf.bmHeight())
     val currentOffset = (currentTime * conf.speed() * conf.width()).round.toInt
     remainingImages = remainingImages.dropWhile {
-      case (img, pos) => pos - currentOffset + img.getWidth < 0
+      case (Left(img), pos) => pos - currentOffset + img.getWidth < 0
+      case (Right(delta), pos) => pos - currentOffset + delta < 0
     }
     val currentImages = remainingImages.takeWhile {
       case (_, pos) => pos - currentOffset <= conf.width()
     }.map(x => (x._1, x._2 - currentOffset))
-    for ((img, pos) <- currentImages) {
+    for ((tmp, pos) <- currentImages; img <- tmp.left) {
       g.drawImage(img, pos, beatmeterY, null)
     }
     g.setClip(null)
 
-    g.drawImage(beatmeterMarker, (conf.target() * conf.width() - beatmeterMarker.getWidth / 2.0).round.toInt, beatmeterForegroundY, null)
-    g.drawImage(clipImage(beatmeterForeground, beatmeterWidth).get, (conf.end() * conf.width()).round.toInt, beatmeterForegroundY, null)
-    g.drawImage(beatmeterStart, (conf.start() * conf.width() - beatmeterStart.getWidth / 2.0).round.toInt, beatmeterForegroundY, null)
-    g.drawImage(beatmeterEnd, (conf.end() * conf.width() - beatmeterEnd.getWidth / 2.0).round.toInt, beatmeterForegroundY, null)
+    beatmeterMarker.foreach(img =>
+      g.drawImage(img, (conf.target() * conf.width() - img.getWidth / 2.0).round.toInt, beatmeterForegroundY, null)
+    )
+    beatmeterForeground.foreach(img =>
+      g.drawImage(clipImage(img, beatmeterWidth).get, (conf.end() * conf.width()).round.toInt, beatmeterForegroundY, null)
+    )
+    beatmeterStart.foreach(img =>
+      g.drawImage(img, (conf.start() * conf.width() - img.getWidth / 2.0).round.toInt, beatmeterForegroundY, null))
+    beatmeterEnd.foreach(img =>
+      g.drawImage(img, (conf.end() * conf.width() - img.getWidth / 2.0).round.toInt, beatmeterForegroundY, null)
+    )
 
     ImageIO.write(image, "PNG", new File(conf.output(), f"frame-$i%010d.png"))
   }
 
   println(s"Heights: video: ${conf.height()}, beatmeter: ${conf.bmHeight()}, foreground: ${conf.bmHeight()}, background: ${conf.bmHeight()}")
 
-  def getImageLine(width: Int, pattern: (BufferedImage, BufferedImage, IndexedSeq[(BufferedImage, BufferedImage)])): Stream[BufferedImage] = {
-    val patternWidth = pattern._3.map(_._1.getWidth).sum
-    val counts = for {
-      i <- pattern._3.indices
-      endWidth = pattern._3.slice(0, i).map(_._1.getWidth).sum + pattern._3(i)._2.getWidth + pattern._2.getWidth
-      if endWidth <= width
-    } yield {
-      val tmp = width - endWidth
-      (i, tmp % patternWidth, tmp / patternWidth)
+  def getImageLine(width: Int, pattern: Option[(BufferedImage, BufferedImage, IndexedSeq[(BufferedImage, BufferedImage)])]): Stream[Either[BufferedImage, Int]] = {
+    pattern match {
+      case Some(pattern) =>
+        val patternWidth = pattern._3.map(_._1.getWidth).sum
+        val counts = for {
+          i <- pattern._3.indices
+          endWidth = pattern._3.slice(0, i).map(_._1.getWidth).sum + pattern._3(i)._2.getWidth + pattern._2.getWidth
+          if endWidth <= width
+        } yield {
+          val tmp = width - endWidth
+          (i, tmp % patternWidth, tmp / patternWidth)
+        }
+        val result = if (counts.isEmpty) {
+          clipImage(pattern._1, width).map(Left(_)).toStream
+        } else {
+          val (endIdx, _, count) = counts.minBy(_._2)
+          val imgs: Seq[Either[BufferedImage, Int]] = for {
+            _ <- 0 until count
+            img <- pattern._3
+          } yield Left(img._1)
+          val endImgs = (pattern._3.slice(0, endIdx).map(x => x._1) :+ pattern._3(endIdx)._2).toStream
+          val restWidth = width - patternWidth * count - endImgs.map(_.getWidth).sum - pattern._2.getWidth
+          assert(restWidth >= 0, s"Expected >= 0 but was $restWidth")
+          val extraImgStart = clipImage(pattern._1, restWidth / 2).map(Left(_))
+          val extraImgEnd = clipImage(pattern._1, restWidth - restWidth / 2).map(Left(_))
+          extraImgStart.toStream ++ Stream(Left(pattern._2)) ++ imgs ++ endImgs.map(Left(_)) ++ extraImgEnd.toStream
+        }
+        // would break laziness. assert(result.map(_.getWidth).sum - width == 0, s"Expected $width but was ${result.map(_.getWidth).sum}")
+        result
+      case None => Stream(Right(width))
     }
-    val result = if (counts.isEmpty) {
-      clipImage(pattern._1, width).toStream
-    } else {
-      val (endIdx, _, count) = counts.minBy(_._2)
-      val imgs: Seq[BufferedImage] = for {
-        _ <- 0 until count
-        img <- pattern._3
-      } yield img._1
-      val endImgs = (pattern._3.slice(0, endIdx).map(x => x._1) :+ pattern._3(endIdx)._2).toStream
-      val restWidth = width - patternWidth * count - endImgs.map(_.getWidth).sum - pattern._2.getWidth
-      assert(restWidth >= 0, s"Expected >= 0 but was $restWidth")
-      val extraImgStart = clipImage(beatmeterWaveStraight, restWidth / 2)
-      val extraImgEnd = clipImage(beatmeterWaveStraight, restWidth - restWidth / 2)
-      extraImgStart.toStream ++ Stream(pattern._2) ++ imgs ++ endImgs ++ extraImgEnd.toStream
-    }
-    // would break laziness. assert(result.map(_.getWidth).sum - width == 0, s"Expected $width but was ${result.map(_.getWidth).sum}")
-    result
   }
 
   def clipImage(image: BufferedImage, width: Int): Option[BufferedImage] = if (width > 0) {

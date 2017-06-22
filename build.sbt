@@ -6,13 +6,20 @@ scalaVersion := "2.12.2"
 
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-Xcheckinit", "-encoding", "utf8")
 
+resolvers ++= Seq(
+  Resolver.sonatypeRepo("releases"),
+  Resolver.sonatypeRepo("snapshots")
+)
+
 libraryDependencies ++= Seq(
   "org.scalafx" %% "scalafx" % "8.0.102-R11",
   "org.apache.xmlgraphics" % "batik-transcoder" % "1.9",
   "org.apache.xmlgraphics" % "batik-svg-dom" % "1.9",
   "commons-io" % "commons-io" % "2.5",
   "org.rogach" %% "scallop" % "2.1.3",
-  "com.jsuereth" %% "scala-arm" % "2.0"
+  "com.jsuereth" %% "scala-arm" % "2.0",
+  "org.scala-lang" % "scala-reflect" % "2.12.2",
+  "com.chuusai" %% "shapeless" % "2.3.2"
 )
 
 fork := true
