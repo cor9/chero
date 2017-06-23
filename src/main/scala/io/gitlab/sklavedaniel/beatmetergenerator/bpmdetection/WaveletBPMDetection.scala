@@ -20,7 +20,7 @@
  *    https://github.com/mziccard/scala-audio-file/
  *  where it is available under a less restrictive license.
  *
- * /
+ */
 
 package io.gitlab.sklavedaniel.beatmetergenerator.bpmdetection
 
