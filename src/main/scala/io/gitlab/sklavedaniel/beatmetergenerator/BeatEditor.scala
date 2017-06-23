@@ -199,6 +199,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
   }
 
   val rateSlider = new Slider {
+    tooltip = new Tooltip("Playback rate")
     min = 0.1
     max = 1.0
     value = 0.5
@@ -216,6 +217,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
   }
 
   val ratioSlider = new Slider {
+    tooltip = new Tooltip("Volume ratio of beats")
     min = 0.0
     max = 1.0
     value = 0.8
@@ -408,27 +410,33 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
     scene = new Scene {
       val beatButton = new Button {
         text = "Beat"
+        tooltip = new Tooltip("Insert beat at current position")
         armed.onChange((_, _, x) => {
           if (x) changeBeats(insert = Seq(player.currentPosition))
         })
       }
       val removeButton = new Button {
         text = "Remove"
+        tooltip = new Tooltip("Remove selected beats")
         onAction = handle {
           changeBeats(removeIdxInteger = beatsView.selectionModel().getSelectedIndices.toList)
         }
       }
       val positionField = new Spinner(0.0, player.duration, 0.0, 1.0) {
+        tooltip = new Tooltip("Position of beat to add")
+        editable = true
         prefWidth = 80
       }
       val addButton = new Button {
         text = "Add"
+        tooltip = new Tooltip("Add beat at set position")
         onAction = handle {
           changeBeats(insert = Seq(positionField.value()))
         }
       }
       val alignEquallyButton = new Button {
         text = "Align equally"
+        tooltip = new Tooltip("Allign selected beats with equal distance")
         onAction = handle {
           val bs = beatsView.getSelectionModel.getSelectedItems.toList
           if (beatsView.getSelectionModel.getSelectedIndices.size >= 3) {
@@ -442,6 +450,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
         }
       }
       val stepSpinner = new Spinner[Double](0.01, 60, 0.05, 0.05) {
+        tooltip = new Tooltip("Distance to move selected beats by")
         prefWidth = 80
         editable = true
       }
@@ -457,18 +466,21 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
 
       val moveLeftButton = new Button {
         text = "-"
+        tooltip = new Tooltip("Move selected beats to the left by set distance")
         onAction = handle {
           moveSelected(-stepSpinner.value())
         }
       }
       val moveRightButton = new Button {
         text = "+"
+        tooltip = new Tooltip("Move selected beats to the right by set distance")
         onAction = handle {
           moveSelected(stepSpinner.value())
         }
       }
-      val leftToNowButton = new Button {
-        text = "Left to now"
+      val rightToNowButton = new Button {
+        text = "Right to now"
+        tooltip = new Tooltip("Move selected beats left of current position")
         onAction = handle {
           if (!beatsView.getSelectionModel.getSelectedIndices.isEmpty) {
             val offset = beatsView.getSelectionModel.getSelectedItems.head
@@ -476,8 +488,9 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
           }
         }
       }
-      val rightToNowButton = new Button {
-        text = "Right to now"
+      val leftToNowButton = new Button {
+        text = "Left to now"
+        tooltip = new Tooltip("Move selected beats right of current position")
         onAction = handle {
           if (!beatsView.getSelectionModel.getSelectedIndices.isEmpty) {
             val offset = beatsView.getSelectionModel.getSelectedItems.last
@@ -486,17 +499,21 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
         }
       }
       val repetitionSpinner = new Spinner[Int](1, Int.MaxValue, 1) {
+        tooltip = new Tooltip("Repetitons of copied beats")
         prefWidth = 80
         editable = true
       }
       val overwriteCheckbox = new CheckBox("overwrite") {
+        tooltip = new Tooltip("When inserting remove existing beats")
         selected = true
       }
       val snapCheckbox = new CheckBox("snap") {
+        tooltip = new Tooltip("When inserting snap to existing beats")
         selected = true
       }
       val copyButton = new Button {
         text = "Copy"
+        tooltip = new Tooltip("Copy selected beats")
         onAction = handle {
           copiedBeats = beatsView.getSelectionModel.getSelectedItems.toList
         }
@@ -524,8 +541,9 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
           beatsView.getSelectionModel.select(b)
         snbs
       }
-      val insertLeftButton = new Button {
-        text = "Insert Left"
+      val insertRightButton = new Button {
+        text = "Insert Right"
+        tooltip = new Tooltip("Insert copied beats, right of current position")
         onAction = handle {
           if (copiedBeats.nonEmpty)
             for (_ <- 1 to repetitionSpinner.value()) {
@@ -536,8 +554,9 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
             }
         }
       }
-      val insertRightButton = new Button {
-        text = "Insert Right"
+      val insertLeftButton = new Button {
+        text = "Insert Left"
+        tooltip = new Tooltip("Insert copied beats, left of current position")
         onAction = handle {
           if (copiedBeats.nonEmpty)
             for (_ <- 1 to repetitionSpinner.value()) {
@@ -563,11 +582,11 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
         KeyCombination("alt+right") -> (() => positionSlider.value() += 0.05),
         KeyCombination("shift+left") -> (() => positionSlider.value() -= 10),
         KeyCombination("shift+right") -> (() => positionSlider.value() += 10),
-        KeyCombination("n") -> (() => leftToNowButton.fire()),
-        KeyCombination("shift+n") -> (() => rightToNowButton.fire()),
+        KeyCombination("n") -> (() => rightToNowButton.fire()),
+        KeyCombination("shift+n") -> (() => leftToNowButton.fire()),
         KeyCombination("c") -> (() => copyButton.fire()),
-        KeyCombination("v") -> (() => insertLeftButton.fire()),
-        KeyCombination("shift+v") -> (() => insertRightButton.fire()),
+        KeyCombination("v") -> (() => insertRightButton.fire()),
+        KeyCombination("shift+v") -> (() => insertLeftButton.fire()),
         KeyCombination("e") -> (() => alignEquallyButton.fire()),
         KeyCombination("d") -> (() => beatsView.selectionModel().clearSelection()),
         KeyCombination("delete") -> (() => removeButton.fire()),
@@ -648,14 +667,18 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                     spacing = 5
                     alignment = Pos.BaselineLeft
                     val bpmSpinner = new Spinner[Double](10.0, 600.0, 120.0, 1.0) {
+                      tooltip = new Tooltip("Bpm to generate")
+                      editable = true
                       prefWidth = 80
                     }
                     val durationSpinner = new Spinner[Double](0.0, player.duration, 60.0, 10.0) {
+                      tooltip = new Tooltip("Duration to generate for")
                       prefWidth = 80
                     }
                     children = Seq(
                       new Button {
                         text = "Add bpm"
+                        tooltip = new Tooltip("Add beats at set bpm from current position")
                         onAction = handle {
                           val count = (durationSpinner.value() * bpmSpinner.value() / 60.0).toInt
                           val nbs = for (i <- 0 until count) yield positionSlider.value() + i * 60.0 / bpmSpinner.value()
@@ -707,14 +730,17 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                     val repetitionSpinner = new Spinner[Int](1, Int.MaxValue, 2) {
                       prefWidth = 80
                       editable = true
+                      tooltip = new Tooltip("Complete repetitions including an extra beat marking the end")
                     }
                     val restSpinner = new Spinner[Int](0, Int.MaxValue, 0) {
                       prefWidth = 80
                       editable = true
+                      tooltip = new Tooltip("Number of beats in incomplete pattern")
                     }
                     children = Seq(
                       new Button {
                         text = "Align Pattern"
+                        tooltip = new Tooltip("Align repeating pattern of beats")
                         onAction = handle {
                           val bs = beatsView.getSelectionModel.getSelectedItems.toVector
                           if (repetitionSpinner.value() + restSpinner.value() >= 2

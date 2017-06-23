@@ -73,13 +73,13 @@ You only have to supply the files and the duration. You can choose an alternativ
   - *n* move left side of selection to current position
   - *shift+n* move right side of selection to current position
   - *c* copy selected beats
-  - *v* insert selected beats to the left
-  - *shift+v* insert selected beats to the right
+  - *v* insert selected beats to the right
+  - *shift+v* insert selected beats to the left
   - *e* align selected beats equally
   - *d* deselect all beats
   - *delete* remove selected beats
-  - *ctrl+digit* select/deselect ith beat left of current position
-  - *ctrl+alt+digit* jump exactly to ith beat left of current position
+  - *ctrl+digit* select/deselect ith beat right of current position
+  - *ctrl+alt+digit* jump exactly to ith beat right of current position
   - *z* undo last change to beats
   - *shift+z* redo last change to beats
   
