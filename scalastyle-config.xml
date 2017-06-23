@@ -6,7 +6,7 @@
    <parameter name="maxFileLength"><![CDATA[2000]]></parameter>
   </parameters>
  </check>
- <check level="error" class="org.scalastyle.file.HeaderMatchesChecker" enabled="false">
+ <check level="error" class="org.scalastyle.file.HeaderMatchesChecker" enabled="true">
   <parameters>
    <parameter name="header"><![CDATA[/*
  *  This file is part of Beatmeter Generator.
