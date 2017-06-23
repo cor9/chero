@@ -489,6 +489,12 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
         prefWidth = 80
         editable = true
       }
+      val overwriteCheckbox = new CheckBox("overwrite") {
+        selected = true
+      }
+      val snapCheckbox = new CheckBox("snap") {
+        selected = true
+      }
       val copyButton = new Button {
         text = "Copy"
         onAction = handle {
@@ -498,14 +504,31 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
       val insertLeftButton = new Button {
         text = "Insert Left"
         onAction = handle {
+          val snap = 0.02
           if (copiedBeats.nonEmpty)
             for (_ <- 1 to repetitionSpinner.value()) {
               beatsView.getSelectionModel.clearSelection()
               val nbs = (for (b <- copiedBeats) yield b - copiedBeats.head + positionSlider.value()).toList
-              changeBeats(insert = nbs)
-              for (b <- nbs)
+              val sbs = beats.dropWhile(_ <= nbs.head - snap).takeWhile(_ <= nbs.last + snap)
+              val snbs = if (snapCheckbox.selected()) {
+                nbs.foldLeft((0.0, List[Double]())) { case ((shift, result), b) =>
+                  val beat = b + shift
+                  val min = sbs.minBy(b => (b - beat).abs)
+                  var delta = min - beat
+                  if (delta.abs <= snap) {
+                    (shift + delta, (beat + delta) :: result)
+                  } else {
+                    (shift, beat :: result)
+                  }
+                }._2.reverse
+              } else nbs
+              val rbs = if (overwriteCheckbox.selected()) {
+                beats.dropWhile(_ <= snbs.head).takeWhile(_ <= snbs.last)
+              } else Nil
+              changeBeats(remove = rbs, insert = snbs)
+              for (b <- snbs)
                 beatsView.getSelectionModel.select(b)
-              positionSlider.value() = copiedBeats.last - copiedBeats.head + positionSlider.value()
+              positionSlider.value() = snbs.last
             }
         }
       }
@@ -578,6 +601,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
         }
       })
       root = new VBox {
+        prefWidth = 800
         spacing = 5
         children = Seq(
           new Pane {
@@ -608,6 +632,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                       }
                     )
                   },
+                  new Separator(),
                   new HBox {
                     spacing = 5
                     children = Seq(
@@ -615,25 +640,6 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                       addButton,
                       positionField,
                       alignEquallyButton
-                    )
-                  },
-                  new HBox {
-                    spacing = 5
-                    children = Seq(
-                      moveLeftButton,
-                      stepSpinner,
-                      moveRightButton,
-                      leftToNowButton,
-                      rightToNowButton
-                    )
-                  },
-                  new HBox {
-                    spacing = 5
-                    children = Seq(
-                      copyButton,
-                      insertLeftButton,
-                      insertRightButton,
-                      repetitionSpinner
                     )
                   },
                   new HBox {
@@ -647,20 +653,52 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                     }
                     children = Seq(
                       new Button {
-                        text = "Add"
+                        text = "Add bpm"
                         onAction = handle {
                           val count = (durationSpinner.value() * bpmSpinner.value() / 60.0).toInt
                           val nbs = for (i <- 0 until count) yield positionSlider.value() + i * 60.0 / bpmSpinner.value()
                           changeBeats(insert = nbs)
                         }
                       },
-                      new Text(" bpm "),
                       bpmSpinner,
                       new Text(" for "),
                       durationSpinner
 
                     )
                   },
+                  new HBox {
+                    spacing = 5
+                    children = Seq(
+                      moveLeftButton,
+                      stepSpinner,
+                      moveRightButton,
+                      leftToNowButton,
+                      rightToNowButton
+                    )
+                  },
+                  new Separator(),
+                  new HBox {
+                    spacing = 5
+                    children = Seq(
+                      copyButton,
+                      insertLeftButton,
+                      insertRightButton,
+                      repetitionSpinner,
+                      snapCheckbox,
+                      overwriteCheckbox
+                    )
+                  },
+                  new HBox {
+                    spacing = 5
+                    alignment = Pos.BaselineLeft
+                    children = Seq(
+                      new Text("repeat"),
+                      repetitionSpinner,
+                      snapCheckbox,
+                      overwriteCheckbox
+                    )
+                  },
+                  new Separator(),
                   new HBox {
                     spacing = 5
                     alignment = Pos.BaselineLeft
@@ -713,6 +751,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                       restSpinner
                     )
                   },
+                  new Separator(),
                   new HBox {
                     spacing = 5
                     children = Seq(new Text {
@@ -732,6 +771,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                       }, duration
                     )
                   },
+                  new Separator(),
                   new HBox {
                     spacing = 5
                     children = Seq(
