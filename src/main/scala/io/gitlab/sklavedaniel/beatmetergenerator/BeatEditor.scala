@@ -501,33 +501,37 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
           copiedBeats = beatsView.getSelectionModel.getSelectedItems.toList
         }
       }
+      val snapDelta = 0.02
+      def computeBeats(nbs: Seq[Double]) = {
+        val sbs = beats.dropWhile(_ <= nbs.head - snapDelta).takeWhile(_ <= nbs.last + snapDelta)
+        val snbs = if (snapCheckbox.selected()) {
+          nbs.foldLeft((0.0, List[Double]())) { case ((shift, result), b) =>
+            val beat = b + shift
+            val min = sbs.minBy(b => (b - beat).abs)
+            var delta = min - beat
+            if (delta.abs <= snapDelta) {
+              (shift + delta, (beat + delta) :: result)
+            } else {
+              (shift, beat :: result)
+            }
+          }._2.reverse
+        } else nbs
+        val rbs = if (overwriteCheckbox.selected()) {
+          beats.dropWhile(_ <= snbs.head).takeWhile(_ <= snbs.last)
+        } else Nil
+        changeBeats(remove = rbs, insert = snbs)
+        for (b <- snbs)
+          beatsView.getSelectionModel.select(b)
+        snbs
+      }
       val insertLeftButton = new Button {
         text = "Insert Left"
         onAction = handle {
-          val snap = 0.02
           if (copiedBeats.nonEmpty)
             for (_ <- 1 to repetitionSpinner.value()) {
               beatsView.getSelectionModel.clearSelection()
               val nbs = (for (b <- copiedBeats) yield b - copiedBeats.head + positionSlider.value()).toList
-              val sbs = beats.dropWhile(_ <= nbs.head - snap).takeWhile(_ <= nbs.last + snap)
-              val snbs = if (snapCheckbox.selected()) {
-                nbs.foldLeft((0.0, List[Double]())) { case ((shift, result), b) =>
-                  val beat = b + shift
-                  val min = sbs.minBy(b => (b - beat).abs)
-                  var delta = min - beat
-                  if (delta.abs <= snap) {
-                    (shift + delta, (beat + delta) :: result)
-                  } else {
-                    (shift, beat :: result)
-                  }
-                }._2.reverse
-              } else nbs
-              val rbs = if (overwriteCheckbox.selected()) {
-                beats.dropWhile(_ <= snbs.head).takeWhile(_ <= snbs.last)
-              } else Nil
-              changeBeats(remove = rbs, insert = snbs)
-              for (b <- snbs)
-                beatsView.getSelectionModel.select(b)
+              val snbs = computeBeats(nbs)
               positionSlider.value() = snbs.last
             }
         }
@@ -539,10 +543,8 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
             for (_ <- 1 to repetitionSpinner.value()) {
               beatsView.getSelectionModel.clearSelection()
               val nbs = (for (b <- copiedBeats) yield b - copiedBeats.last + positionSlider.value())
-              changeBeats(insert = nbs)
-              for (b <- nbs)
-                beatsView.getSelectionModel.select(b)
-              positionSlider.value() = copiedBeats.head - copiedBeats.last + positionSlider.value()
+              val snbs = computeBeats(nbs)
+              positionSlider.value() = snbs.head
             }
         }
       }
