@@ -15,7 +15,7 @@
    id="svg2"
    version="1.1"
    inkscape:version="0.91 r13725"
-   sodipodi:docname="beatmeterLineStraight.svg">
+   sodipodi:docname="waveStraight.svg">
   <defs
      id="defs4" />
   <sodipodi:namedview
@@ -26,8 +26,8 @@
      inkscape:pageopacity="0"
      inkscape:pageshadow="2"
      inkscape:zoom="89.6"
-     inkscape:cx="37.873792"
-     inkscape:cy="18.92576"
+     inkscape:cx="31.440262"
+     inkscape:cy="17.097272"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -59,9 +59,10 @@
      inkscape:groupmode="layer"
      id="layer1"
      transform="translate(-118.86575,-456.58863)">
-    <path class="wave fill"
+    <path
+       class="wave fill"
        style="color:#000000;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:medium;line-height:normal;font-family:sans-serif;text-indent:0;text-align:start;text-decoration:none;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:#000000;letter-spacing:normal;word-spacing:normal;text-transform:none;direction:ltr;block-progression:tb;writing-mode:lr-tb;baseline-shift:baseline;text-anchor:start;white-space:normal;clip-rule:nonzero;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:#000000;solid-opacity:1;fill:#ff1800;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1.60000014;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto;enable-background:accumulate"
-       d="m 118.79297,477.24609 0,1.59961 38.98437,0 0,-1.59961 -38.98437,0 z"
+       d="m 118.79297,476.85549 0,1.59961 38.98437,0 0,-1.59961 -38.98437,0 z"
        id="path4794-3-6-2"
        inkscape:connector-curvature="0" />
   </g>

@@ -519,6 +519,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
         }
       }
       val snapDelta = 0.02
+
       def computeBeats(nbs: Seq[Double]) = {
         val sbs = beats.dropWhile(_ <= nbs.head - snapDelta).takeWhile(_ <= nbs.last + snapDelta)
         val snbs = if (snapCheckbox.selected()) {
@@ -541,6 +542,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
           beatsView.getSelectionModel.select(b)
         snbs
       }
+
       val insertRightButton = new Button {
         text = "Insert Right"
         tooltip = new Tooltip("Insert copied beats, right of current position")
@@ -806,9 +808,6 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                       new Button {
                         text = "Load"
                         onAction = handle {
-
-                          import scala.collection.JavaConverters._
-
                           val fileChooser = new FileChooser()
                           fileChooser.setTitle("Open Beats File")
                           val file = fileChooser.showOpenDialog(stage)
