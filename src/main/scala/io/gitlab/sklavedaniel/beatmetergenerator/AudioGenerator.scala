@@ -22,6 +22,7 @@ import java.io.{File, InputStream}
 import javax.sound.sampled._
 
 import org.apache.commons.io.IOUtils
+import org.rogach.scallop.ScallopConf
 
 object AudioGenerator {
 
@@ -34,7 +35,7 @@ object AudioGenerator {
     validateFileExists(beat)
     val duration = opt[Double](required = true, descr = "Duration of generated wav file in seconds")
     val click = opt[Boolean](default = Some(false), descr = "Use click sound")
-    override def execute(args: Array[String]) = new AudioGenerator(this).main(args)
+    override def execute(subcommands: List[ScallopConf], args: Array[String]) = new AudioGenerator(this).main(args)
   }
 
 }

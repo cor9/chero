@@ -23,6 +23,8 @@ import java.util
 import javafx.collections.{FXCollections, ObservableList}
 import javafx.scene.input
 
+import org.rogach.scallop.ScallopConf
+
 import scala.collection.JavaConverters.asJavaCollection
 import scala.collection.mutable
 import scala.util.Try
@@ -54,7 +56,7 @@ object BeatEditor {
     validateFileExists(input)
     validateFileExists(beats)
 
-    def execute(args: Array[String]): Unit = {
+    def execute(subcommands: List[ScallopConf], args: Array[String]): Unit = {
       new BeatEditor(this).main(args)
     }
   }

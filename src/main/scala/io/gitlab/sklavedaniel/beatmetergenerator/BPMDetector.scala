@@ -22,6 +22,7 @@ import java.io.{BufferedInputStream, File, FileInputStream}
 import javax.sound.sampled.AudioFormat
 
 import io.gitlab.sklavedaniel.beatmetergenerator.bpmdetection.WaveletBPMDetection
+import org.rogach.scallop.ScallopConf
 
 object BPMDetector {
 
@@ -34,7 +35,7 @@ object BPMDetector {
     val channel = opt[String](default = Some("both"), descr = "Channel to analyze: left, right, both")
     validateFileExists(input)
 
-    def execute(args: Array[String]): Unit = {
+    def execute(subcommands: List[ScallopConf], args: Array[String]): Unit = {
       new BPMDetector(this)
     }
   }

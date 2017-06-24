@@ -31,8 +31,7 @@ object Main extends App {
 
   Locale.setDefault(Locale.ROOT)
 
-  abstract class ExecutableSubcommand(name: String) extends Subcommand(name) {
-
+  trait Converters {
     trait StringParser[A] {
       def parse(s: String): A
     }
@@ -132,8 +131,11 @@ object Main extends App {
         val tag = scala.reflect.runtime.universe.typeTag[A ::: B]
         val argType = ArgType.LIST
       }
+  }
 
-    def execute(args: Array[String])
+  abstract class ExecutableSubcommand(name: String) extends Subcommand(name) with Converters {
+
+    def execute(subcommands: List[ScallopConf], args: Array[String])
   }
 
   def getGroup(list: List[String]): Either[String, (List[String], List[String])] = {
@@ -190,7 +192,7 @@ object Main extends App {
 
   Conf.subcommand match {
     case Some(c: ExecutableSubcommand) =>
-      c.execute(args)
+      c.execute(Conf.subcommands.tail, args)
     case _ => Conf.printHelp()
   }
 
