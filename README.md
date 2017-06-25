@@ -8,7 +8,7 @@ The file format used to store beats is compatible with the Audacity lable format
 
 ![example](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/example.png)
 
-![example](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/example.png)
+![example](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/example2.png)
 
 ## Basic usage
 ### Beat editing
