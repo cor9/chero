@@ -19,7 +19,7 @@
 package io.gitlab.sklavedaniel.beatmetergenerator.beatmeters
 
 import java.awt.geom.AffineTransform
-import java.awt.{Color, Graphics2D, Shape}
+import java.awt.{AlphaComposite, Color, Composite, Graphics2D, Shape}
 import java.awt.image.BufferedImage
 import java.io.File
 import java.net.URI
@@ -32,6 +32,8 @@ import org.apache.batik.util.{SVGConstants, XMLResourceDescriptor}
 import org.rogach.scallop.{ScallopConf, Subcommand}
 import shapeless.{HNil, :: => :::}
 
+import scala.io.Source
+
 object Beatmeter {
 
   abstract class BeatmeterSubcommand(name: String, val base: BeatmeterBaseConf) extends Subcommand(name) with Converters {
@@ -39,14 +41,15 @@ object Beatmeter {
     def beatmeter(): Beatmeter
   }
 
-  trait BeatmeterBaseConf extends Converters {self: ScallopConf =>
+  trait BeatmeterBaseConf extends Converters {
+    self: ScallopConf =>
     val duration = opt[Double](required = true, descr = "Duration of generated image sequence in seconds")
     val frames = opt[Double](default = Some(25), descr = "Frames per second")
     val width = opt[Int](required = true, descr = "Width of generated video")
     val height = opt[Int](descr = "Width of generated video").orElse(width.toOption.map(x => (x / 42.66).round.toInt))
     val speed = opt[Double](default = Some(0.2), descr = "Speed of the beatmeter in video widths per second")
-    val start = opt[Double](default = Some(0.95), descr = "Left position of the beatmeter relative to width (Between 0 and 1)")
-    val end = opt[Double](default = Some(0.05), descr = "Right position of the beatmeter relative to width (Between 0 and 1)")
+    val start = opt[Double](descr = "Left position of the beatmeter relative to width (Between 0 and 1)")
+    val end = opt[Double](descr = "Right position of the beatmeter relative to width (Between 0 and 1)")
     val target = opt[Double](default = Some(0.2), descr = "Target position of the beatmeter relative to width (Between 0 and 1)")
     val bmHeight = opt[Int](descr = "Height of the actual beatmeter").orElse(height.toOption.map(x => (x * 2 / 3.0).round.toInt))
     val fgHeight = opt[Int](descr = "Height of the forground decorations").orElse(height.toOption.map(x => (x * 14 / 15.0).round.toInt))
@@ -75,15 +78,17 @@ object Beatmeter {
           }
         } else Stream())
 
-    def toTimed(pxPerFrame: Double, width: Int)(implicit ev: B =:= Positioned) =
+    def toTimed(pxPerFrame: Double, width: Double)(implicit ev: B =:= Positioned): ElementStream[A, Timed] = toTimed(pxPerFrame, 0.0, width)
+
+    def toTimed(pxPerFrame: Double, offset: Double, width: Double)(implicit ev: B =:= Positioned): ElementStream[A, Timed] =
       ElementStream(clip,
         stream.map { case Positioned((x, y), w, drawable) =>
-          val startFrame = (x - width) / pxPerFrame
+          val startFrame = (x - width - offset) / pxPerFrame
           val error = (startFrame.ceil - startFrame) * pxPerFrame
           Timed(startFrame.ceil.toInt,
-            ((x + w) / pxPerFrame).floor.toInt,
+            ((x + w - offset) / pxPerFrame).floor.toInt,
             PositionDrawable(
-              i => (width - i * pxPerFrame - error, y),
+              i => (width - i * pxPerFrame - error + offset, y),
               drawable))
         })
 
@@ -147,6 +152,41 @@ object Beatmeter {
     result.getGraphics.drawImage(image, 0, 0, null)
     Some(result)
   } else None
+
+  def getAnim(uri: URI, height: Float, frames: Double, css: String): (IndexedSeq[Double], IndexedSeq[BufferedImage]) = {
+    val framePositions: IndexedSeq[Double] = Source.fromURL(new URI(uri.toString + "/times.txt").toURL).getLines().map(_.toDouble).map(_ * frames).toIndexedSeq
+    val images = for (i <- 0 to framePositions.size) yield getImage(new URI(uri.toString + "/" + i.toString + ".svg"), height, css)
+    (framePositions, images)
+  }
+
+  case class AnimDrawable(offset: Double, anim: (IndexedSeq[Double], IndexedSeq[BufferedImage])) extends Drawable {
+    val (framePositions, images) = anim
+    val frameCount = framePositions.last.round.toInt
+
+    override def draw(frame: Int, g: Graphics2D): Unit = {
+      val i = frame + offset
+      if (i < 0) {
+        g.drawImage(images.head, 0, 0, null)
+      } else if (i < frameCount) {
+        val j = framePositions.indexWhere(i < _)
+        val distanceNext = (framePositions(j) - i)
+        val positionLast = if (j == 0) 0.0 else framePositions(j - 1)
+        val distanceLast = i - positionLast
+        val duration = framePositions(j) - positionLast
+        val ratioLast = 1.0 - distanceLast / duration
+        val ratioNext = 1.0 - distanceNext / duration
+        val img = new BufferedImage(images.head.getWidth, images.head.getHeight(), BufferedImage.TYPE_INT_ARGB)
+        val g2 = img.createGraphics()
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, ratioLast.toFloat))
+        g2.drawImage(images(j), 0, 0, null)
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, ratioNext.toFloat))
+        g2.drawImage(images(j + 1), 0, 0, null)
+        g.drawImage(img, 0, 0, null)
+      } else {
+        g.drawImage(images.last, 0, 0, null)
+      }
+    }
+  }
 
   def getImage(uri: URI, height: Float, css: String): BufferedImage = {
     val hints = new TranscodingHints()

@@ -18,17 +18,15 @@
 
 package io.gitlab.sklavedaniel.beatmetergenerator
 
+import java.awt.Shape
 import java.awt.image.BufferedImage
-import java.awt.{Color, Shape}
 import java.io.File
 import javax.imageio.ImageIO
 
-import io.gitlab.sklavedaniel.beatmetergenerator.Main.Conf.addSubcommand
-import io.gitlab.sklavedaniel.beatmetergenerator.Main.{ExecutableSubcommand, args}
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.Beatmeter._
-import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.WaveformBeatmeter
+import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters._
 import org.rogach.scallop.ScallopConf
-import shapeless.{HNil, :: => :::}
+import shapeless.{:: => :::}
 
 import scala.collection.immutable.Queue
 
@@ -41,7 +39,8 @@ object VideoGenerator {
     validateFileDoesNotExist(output)
 
     val beatmeters: Seq[BeatmeterSubcommand] = Seq(
-      new WaveformBeatmeter.Conf(this)
+      new WaveformBeatmeter.Conf(this),
+      new FlyingBeatmeter.Conf(this)
     )
     for (bm <- beatmeters)
       addSubcommand(bm)

@@ -28,21 +28,21 @@ import shapeless.{HNil, :: => :::}
 object WaveformBeatmeter {
   class Conf(base: BeatmeterBaseConf) extends BeatmeterSubcommand("waveform", base) {
     val foregroundImg = opt[Option[File]](descr = "Foreground svg image clipped to beatmeter width").map(_.map(_.toURI))
-      .orElse(Some(Some(getClass.getResource("/meter/foreground.svg").toURI)))
+      .orElse(Some(Some(getClass.getResource("/meter/waveform/foreground.svg").toURI)))
     val startImg = opt[Option[File]](descr = "Left decoration svg image").map(_.map(_.toURI))
-      .orElse(Some(Some(getClass.getResource("/meter/start.svg").toURI)))
+      .orElse(Some(Some(getClass.getResource("/meter/waveform/start.svg").toURI)))
     val endImg = opt[Option[File]](descr = "End decoration svg image").map(_.map(_.toURI))
-      .orElse(Some(Some(getClass.getResource("/meter/end.svg").toURI)))
+      .orElse(Some(Some(getClass.getResource("/meter/waveform/end.svg").toURI)))
     val markerImg = opt[Option[File]](descr = "Target marker decoration svg image").map(_.map(_.toURI))
-      .orElse(Some(Some(getClass.getResource("/meter/marker.svg").toURI)))
+      .orElse(Some(Some(getClass.getResource("/meter/waveform/marker.svg").toURI)))
     val beatImg = opt[File](descr = "Beat svg image").map(_.toURI)
-      .orElse(Some(getClass.getResource("/meter/beat.svg").toURI))
+      .orElse(Some(getClass.getResource("/meter/waveform/beat.svg").toURI))
     val wavePattern = opt[Option[File ::: File ::: File ::: File ::: HNil]](descr = "Images for the wave line between beets given as --wave-pattern straightLine.svg waveStart.svg waveMiddle.Svg waveEnd.svg")
       .map(_.map(t => t.head.toURI :: t.tail.head.toURI :: t.tail.tail.head.toURI :: t.tail.tail.tail.head.toURI :: HNil))
-      .orElse(Some(Some(getClass.getResource("/meter/waveStraight.svg").toURI ::
-        getClass.getResource("/meter/waveStart.svg").toURI ::
-        getClass.getResource("/meter/waveMiddle.svg").toURI ::
-        getClass.getResource("/meter/waveEnd.svg").toURI :: HNil
+      .orElse(Some(Some(getClass.getResource("/meter/waveform/waveStraight.svg").toURI ::
+        getClass.getResource("/meter/waveform/waveStart.svg").toURI ::
+        getClass.getResource("/meter/waveform/waveMiddle.svg").toURI ::
+        getClass.getResource("/meter/waveform/waveEnd.svg").toURI :: HNil
       )))
 
     override def beatmeter(): Beatmeter = new WaveformBeatmeter(this)
@@ -50,8 +50,11 @@ object WaveformBeatmeter {
 }
 class WaveformBeatmeter(conf: WaveformBeatmeter.Conf) extends Beatmeter {
 
+  val startPos: Double = conf.base.start.getOrElse(0.95)
+  val endPos: Double = conf.base.end.getOrElse(0.05)
+
   val beatmeterMiddle = conf.base.height() / 2.0
-  val beatmeterWidth = (conf.base.start() - conf.base.end()) * conf.base.width()
+  val beatmeterWidth = (startPos - endPos) * conf.base.width()
   val beatmeterY = beatmeterMiddle - conf.base.bmHeight() / 2.0
   val beatmeterBackgroundY = beatmeterMiddle - conf.base.bgHeight() / 2.0
   val beatmeterForegroundY = beatmeterMiddle - conf.base.fgHeight() / 2.0
@@ -96,7 +99,7 @@ class WaveformBeatmeter(conf: WaveformBeatmeter.Conf) extends Beatmeter {
     getImage(t.tail.tail.head, conf.base.bmHeight(), imageCSS),
     getImage(t.tail.tail.tail.head, conf.base.bmHeight(), imageCSS)))))
 
-  override val minimalBeatDistance: Double = 0.0
+  override val minimalBeatDistance: Double = beatmeterBeat.getWidth
 
   override def getElementStreams(beats: Seq[Double], frameCount: Int): List[TimedStream] = {
     val beatmeterStream = {
@@ -108,7 +111,7 @@ class WaveformBeatmeter(conf: WaveformBeatmeter.Conf) extends Beatmeter {
 
       val bs = beats.map(b => (b * conf.base.speed() + conf.base.target()) * conf.base.width() - beatmeterBeat.getWidth / 2)
 
-      val start = line(conf.base.end() * conf.base.width(), (beats.head * conf.base.speed() + conf.base.target() - conf.base.end()) * conf.base.width() - beatmeterBeat.getWidth / 2.0)
+      val start = line(endPos * conf.base.width(), (beats.head * conf.base.speed() + conf.base.target() - endPos) * conf.base.width() - beatmeterBeat.getWidth / 2.0)
       val middle = bs.sliding(2).map {
         case Seq(beat1, beat2) =>
           ElementStream(Positioned((beat1, beatmeterY), beatmeterBeat)) ++
@@ -123,25 +126,25 @@ class WaveformBeatmeter(conf: WaveformBeatmeter.Conf) extends Beatmeter {
     List(
       ElementStream(Fixed((0.0, 0.0), (_, g) => {
         g.setColor(conf.base.bgColor())
-        g.fill(new geom.Rectangle2D.Double(conf.base.width() * conf.base.end(), beatmeterBackgroundY, conf.base.width() * conf.base.start() - conf.base.width() * conf.base.end(), conf.base.bgHeight()))
+        g.fill(new geom.Rectangle2D.Double(conf.base.width() * endPos, beatmeterBackgroundY, conf.base.width() * startPos - conf.base.width() * endPos, conf.base.bgHeight()))
       }
       )).toTimed(),
       beatmeterStream.toTimed(conf.base.speed() * conf.base.width() / conf.base.frames(), conf.base.width())
-        .clip(new geom.Rectangle2D.Double(conf.base.width() * conf.base.end(), beatmeterY, beatmeterWidth, conf.base.bmHeight())),
+        .clip(new geom.Rectangle2D.Double(conf.base.width() * endPos, beatmeterY, beatmeterWidth, conf.base.bmHeight())),
       ElementStream(
         beatmeterMarker.map(img =>
           Fixed((conf.base.target() * conf.base.width() - img.getWidth / 2.0, beatmeterForegroundY), img)
         ).toStream ++ beatmeterStart.map(img =>
-          Fixed((conf.base.start() * conf.base.width() - img.getWidth / 2.0, beatmeterForegroundY), img)
+          Fixed((startPos * conf.base.width() - img.getWidth / 2.0, beatmeterForegroundY), img)
         ).toStream ++ beatmeterEnd.map(img =>
-          Fixed((conf.base.end() * conf.base.width() - img.getWidth / 2.0, beatmeterForegroundY), img)
+          Fixed((endPos * conf.base.width() - img.getWidth / 2.0, beatmeterForegroundY), img)
         ).toStream
       ).toTimed(),
       ElementStream(
         beatmeterForeground.map(img =>
-          Fixed((conf.base.end() * conf.base.width(), beatmeterForegroundY), img)
+          Fixed((endPos * conf.base.width(), beatmeterForegroundY), img)
         ).toStream
-      ).toTimed().clip(new geom.Rectangle2D.Double(conf.base.end() * conf.base.width(), beatmeterForegroundY, beatmeterWidth, conf.base.fgHeight()))
+      ).toTimed().clip(new geom.Rectangle2D.Double(endPos * conf.base.width(), beatmeterForegroundY, beatmeterWidth, conf.base.fgHeight()))
     )
   }
 
