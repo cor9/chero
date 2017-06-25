@@ -4,7 +4,9 @@ A set of tools to generate so called beat meters for videos, i.e. a visual indic
 The set comprises a visual editor to edit beat sequences matching an audio file, a command line tool to generate a sequence of images at a selected frame rate, suitable to generate the animated beat meter, and a command line tool to generate a audio file playing a beat sound for every beat.
 The file format used to store beats is compatible with the Audacity lable format.
 
-## Example Image
+## Example Images
+
+![example](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/example.png)
 
 ![example](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/example.png)
 
@@ -48,6 +50,14 @@ java -jar beatmeter-generator.jar video -i mybeats.txt -d 60 -w 1280 -o outputDi
 ```
 
 The command has a lot of options that allows you to style your beatmeter. There are reasonable defaults though, you just have to set the duration of your video in seconds with -d, the width of your video in pixels with -w, and usually the framerate in frames per second (unless the default of 25 is appropriate).
+
+If you prefer the "flying bubbles" style instead of the classic waveform, you can do this:
+
+```
+java -jar beatmeter-generator.jar video -i mybeats.txt -d 60 -w 1280 -o outputDirectory -f 29.97 flying
+```
+
+Run the programm without any options to see all available options, e.g to change beatmeter colors.
 
 ### Generating audio
 You can also generate an audio file to underline the beats.
