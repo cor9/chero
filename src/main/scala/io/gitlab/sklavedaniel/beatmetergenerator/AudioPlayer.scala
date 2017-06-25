@@ -65,10 +65,11 @@ class AudioPlayer(audioData: InputStream, beatData: InputStream) {
   val audioCount = audio.length / format.getChannels
   val duration = audioCount.toDouble / format.getFrameRate
 
-  val avgDuration = 0.05
+  val avgDuration = 0.01
   val avgFrames = (avgDuration * format.getFrameRate * format.getChannels).round.toInt
   val avgTimes = (0 to audio.length / avgFrames).map(_ * avgDuration) :+ duration
   val avgs: Seq[(Double, Double)] = (Iterator.single(0.0) ++ audio.toIterable.grouped(avgFrames).map(l => l.map(_.abs.toDouble).sum / l.size)).zip(avgTimes.toIterator).toSeq
+  val maxs: Seq[(Double, Double)] = (Iterator.single(0.0) ++ audio.toIterable.grouped(avgFrames).map(l => l.map(_.abs.toDouble).max)).zip(avgTimes.toIterator).toSeq
 
   var rate = new AtomicReference(0.5f)
   var position = new AtomicReference(0.0)

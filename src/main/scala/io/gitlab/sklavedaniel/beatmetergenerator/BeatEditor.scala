@@ -264,7 +264,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
   val waveGroup = new Group {
     layoutX = 0
     layoutY = 0
-    children = (for (Seq((avg1, time1), (avg2, time2)) <- player.avgs.sliding(2)) yield {
+    children = (for (Seq((avg1, time1), (avg2, time2)) <- player.maxs.sliding(2)) yield {
       new Line {
         startX = 100 + time1 * secondWidth
         startY = volumeHeight + 10 - avg1 / Short.MaxValue * volumeHeight
