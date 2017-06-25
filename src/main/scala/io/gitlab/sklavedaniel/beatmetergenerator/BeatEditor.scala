@@ -535,13 +535,18 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
               (shift, beat :: result)
             }
           }._2.reverse
-        } else nbs
+        } else {
+          nbs
+        }
         val rbs = if (overwriteCheckbox.selected()) {
           beats.dropWhile(_ <= snbs.head).takeWhile(_ <= snbs.last)
-        } else Nil
+        } else {
+          Nil
+        }
         changeBeats(remove = rbs, insert = snbs)
-        for (b <- snbs)
+        for (b <- snbs) {
           beatsView.getSelectionModel.select(b)
+        }
         snbs
       }
 
@@ -549,26 +554,28 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
         text = "Insert Right"
         tooltip = new Tooltip("Insert copied beats, right of current position")
         onAction = handle {
-          if (copiedBeats.nonEmpty)
+          if (copiedBeats.nonEmpty) {
             for (_ <- 1 to repetitionSpinner.value()) {
               beatsView.getSelectionModel.clearSelection()
               val nbs = (for (b <- copiedBeats) yield b - copiedBeats.head + positionSlider.value()).toList
               val snbs = computeBeats(nbs)
               positionSlider.value() = snbs.last
             }
+          }
         }
       }
       val insertLeftButton = new Button {
         text = "Insert Left"
         tooltip = new Tooltip("Insert copied beats, left of current position")
         onAction = handle {
-          if (copiedBeats.nonEmpty)
+          if (copiedBeats.nonEmpty) {
             for (_ <- 1 to repetitionSpinner.value()) {
               beatsView.getSelectionModel.clearSelection()
               val nbs = (for (b <- copiedBeats) yield b - copiedBeats.last + positionSlider.value())
               val snbs = computeBeats(nbs)
               positionSlider.value() = snbs.head
             }
+          }
         }
       }
       val shortcuts = Seq[(KeyCombination, () => Unit)](
@@ -813,8 +820,9 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                           val fileChooser = new FileChooser()
                           fileChooser.setTitle("Open Beats File")
                           val file = fileChooser.showOpenDialog(stage)
-                          if (file != null)
+                          if (file != null) { // scalastyle:ignore null
                             changeBeats(remove = beats.toList, insert = BeatFiles.load(file))
+                          }
                         }
                       },
                       new Button {
@@ -823,8 +831,9 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
                           val fileChooser = new FileChooser()
                           fileChooser.setTitle("Save Beats File")
                           val file = fileChooser.showSaveDialog(stage)
-                          if (file != null)
+                          if (file != null) { // scalastyle:ignore null
                             BeatFiles.store(file, beats)
+                          }
                         }
                       }
                     )

@@ -83,7 +83,9 @@ class AudioPlayer(audioData: InputStream, beatData: InputStream) {
   def currentPosition =
     if (audioThread.running.get()) {
       audioThread.startPosition.get() + audioThread.rate.get() * audioThread.sourceLine.getMicrosecondPosition / 1000000.0
-    } else position.get()
+    } else {
+      position.get()
+    }
 
   private class AudioThread extends Thread {
     var available = new AtomicBoolean(true)

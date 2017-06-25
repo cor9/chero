@@ -18,7 +18,6 @@
 
 package io.gitlab.sklavedaniel.beatmetergenerator.beatmeters
 
-import java.awt.geom
 import java.awt.image.BufferedImage
 import java.io.File
 

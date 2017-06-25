@@ -122,9 +122,9 @@ class WaveletBPMDetection(
     **/
   private def computeWindowBpm(data: Array[Double], sampleRate: Double): Double = {
 
-    var aC: Array[Double] = null
-    var dC: Array[Double] = null
-    var dCSum: Array[Double] = null
+    var aC: Array[Double] = null // scalastyle:ignore null
+    var dC: Array[Double] = null // scalastyle:ignore null
+    var dCSum: Array[Double] = null // scalastyle:ignore null
     var dCMinLength: Int = 0
     val levels = 4
     val maxDecimation = pow(2, levels - 1)
@@ -158,7 +158,7 @@ class WaveletBPMDetection(
       dC = dC - dC.mean
 
       // Recombine detail coeffients
-      if (dCSum == null) {
+      if (dCSum == null) { // scalastyle:ignore null
         dCSum = dC.slice(0, dCMinLength)
       } else {
         dCSum = dC.slice(0, min(dCMinLength, dC.length)) |+| dCSum

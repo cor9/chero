@@ -76,7 +76,9 @@ object Beatmeter {
             case (Positioned((pos, _), width, _), drawable) =>
               Positioned((pos + width, y), ev(drawable).width, ev(drawable).drawable)
           }
-        } else Stream())
+        } else {
+          Stream()
+        })
 
     def toTimed(pxPerFrame: Double, width: Double)(implicit ev: B =:= Positioned): ElementStream[A, Timed] = toTimed(pxPerFrame, 0.0, width)
 
@@ -143,15 +145,17 @@ object Beatmeter {
 
   case class ImageDrawable(image: BufferedImage) extends Drawable {
     def draw(frame: Int, g: Graphics2D): Unit = {
-      g.drawImage(image, 0, 0, null)
+      g.drawImage(image, 0, 0, null) // scalastyle:ignore null
     }
   }
 
   def clipImage(image: BufferedImage, width: Int): Option[BufferedImage] = if (width > 0) {
     val result = new BufferedImage(width, image.getHeight, image.getType)
-    result.getGraphics.drawImage(image, 0, 0, null)
+    result.getGraphics.drawImage(image, 0, 0, null) // scalastyle:ignore null
     Some(result)
-  } else None
+  } else {
+    None
+  }
 
   def getAnim(uri: URI, height: Float, frames: Double, css: String): (IndexedSeq[Double], IndexedSeq[BufferedImage]) = {
     val framePositions: IndexedSeq[Double] = Source.fromURL(new URI(uri.toString + "/times.txt").toURL).getLines().map(_.toDouble).map(_ * frames).toIndexedSeq
@@ -166,7 +170,7 @@ object Beatmeter {
     override def draw(frame: Int, g: Graphics2D): Unit = {
       val i = frame + offset
       if (i < 0) {
-        g.drawImage(images.head, 0, 0, null)
+        g.drawImage(images.head, 0, 0, null) // scalastyle:ignore null
       } else if (i < frameCount) {
         val j = framePositions.indexWhere(i < _)
         val distanceNext = (framePositions(j) - i)
@@ -178,12 +182,12 @@ object Beatmeter {
         val img = new BufferedImage(images.head.getWidth, images.head.getHeight(), BufferedImage.TYPE_INT_ARGB)
         val g2 = img.createGraphics()
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, ratioLast.toFloat))
-        g2.drawImage(images(j), 0, 0, null)
+        g2.drawImage(images(j), 0, 0, null) // scalastyle:ignore null
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, ratioNext.toFloat))
-        g2.drawImage(images(j + 1), 0, 0, null)
-        g.drawImage(img, 0, 0, null)
+        g2.drawImage(images(j + 1), 0, 0, null) // scalastyle:ignore null
+        g.drawImage(img, 0, 0, null) // scalastyle:ignore null
       } else {
-        g.drawImage(images.last, 0, 0, null)
+        g.drawImage(images.last, 0, 0, null) // scalastyle:ignore null
       }
     }
   }
@@ -217,7 +221,7 @@ object Beatmeter {
     }
 
     rasterizer.setTranscodingHints(hints)
-    rasterizer.transcode(input, null)
+    rasterizer.transcode(input, null) // scalastyle:ignore null
 
     image.get
   }

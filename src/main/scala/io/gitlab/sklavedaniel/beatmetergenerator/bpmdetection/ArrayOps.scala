@@ -23,6 +23,8 @@
  *
  */
 
+// scalastyle:off
+
 package io.gitlab.sklavedaniel.beatmetergenerator.bpmdetection
 
 import scala.reflect.ClassTag

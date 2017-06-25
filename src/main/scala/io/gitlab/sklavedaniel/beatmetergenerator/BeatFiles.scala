@@ -37,10 +37,11 @@ object BeatFiles {
     val result = Source.fromFile(file).getLines().flatMap { l =>
       val parts = "\\s+".r.split(l)
       val time = parts(0).replace(",", ".").toDouble
-      if (parts(2) == "beat")
+      if (parts(2) == "beat") {
         Some(time)
-      else
+      } else {
         None
+      }
     }.toList
     assert(result == result.sorted, "Input file must be sorted.")
     result

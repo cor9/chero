@@ -101,7 +101,7 @@ class VideoGenerator(subcommands: List[ScallopConf], conf: VideoGenerator.Conf) 
         drawable.draw(offset, g)
       }
 
-      g.setClip(null)
+      g.setClip(null) // scalastyle:ignore null
 
     }
 
