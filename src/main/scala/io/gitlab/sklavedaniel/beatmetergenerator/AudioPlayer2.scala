@@ -69,12 +69,12 @@ class AudioPlayer2(audioData: InputStream, beatData: InputStream) {
   val audioCount = audio.length / format.getChannels
   val duration = audioCount.toDouble / format.getFrameRate
 
-  val avgDuration = 0.01
-  val avgFrames = (avgDuration * format.getFrameRate * format.getChannels).round.toInt
-  val avgTimes = (0 to audio.length / avgFrames).map(_ * avgDuration) :+ duration
-  val avgs: Seq[(Double, Double)] = (Iterator.single(0.0) ++ audio.toIterable.grouped(avgFrames).map(l => l.map(_.abs.toDouble).sum / l.size)).zip(avgTimes.toIterator).toSeq
-  val maxs: Seq[(Double, Double)] = (Iterator.single(0.0) ++ audio.toIterable.grouped(avgFrames).map(l => l.map(_.abs.toDouble).max)).zip(avgTimes.toIterator).toSeq
-
+  val maximaDuration = 0.025
+  val maximaFrames = (maximaDuration * format.getFrameRate * format.getChannels).round.toInt
+  val maximaTimes = (0 to audio.length / maximaFrames).map(_ * maximaDuration) :+ duration
+  val maxima: Seq[((Double, Double), Double)] = (Iterator.single((0.0, 0.0)) ++ audio.toIterable.grouped(maximaFrames).map {
+    l => (l.grouped(2).map(_.head.abs.toDouble).max, l.grouped(2).map(_.last.abs.toDouble).max)
+  }).zip(maximaTimes.toIterator).toSeq
 
   private val sync = new LinkedBlockingQueue[Unit]()
   private val syncChange = (_: Any, _: Any, _: Any) => if (sync.isEmpty) {
@@ -84,8 +84,8 @@ class AudioPlayer2(audioData: InputStream, beatData: InputStream) {
   val rate = FloatProperty(0.5f)
   rate.onChange(syncChange)
   val position = ObjectProperty((0.0, true))
-  position.onChange {(_,_,x) =>
-    if(x._2 && sync.isEmpty) {
+  position.onChange { (_, _, x) =>
+    if (x._2 && sync.isEmpty) {
       sync.offer(())
     }
   }
@@ -101,8 +101,16 @@ class AudioPlayer2(audioData: InputStream, beatData: InputStream) {
   private class AudioThread extends Thread {
     setDaemon(true)
 
-    def updatePosition(pos: Double): Unit = {
-      Platform.runLater(self.position() =(pos, false))
+    def updatePosition(pos: Double, overwrite: Boolean): Unit = {
+      if (overwrite) {
+        Platform.runLater(self.position() = (pos, false))
+      } else {
+        Platform.runLater {
+          if (!self.position()._2) {
+            self.position() = (pos, false)
+          }
+        }
+      }
     }
 
     override def run(): Unit = {
@@ -114,7 +122,7 @@ class AudioPlayer2(audioData: InputStream, beatData: InputStream) {
         Platform.runLater(task)
         val (currentPosition, currentRatio, currentRate, currentPlaying, currentBeats) = task.get
 
-        if(currentPlaying) {
+        if (currentPlaying) {
           var position = (currentPosition * format.getFrameRate).round.toInt
           val bufferSize = (format.getFrameRate * bufferDuration * currentRate).round.toInt
           var bs: Seq[(Int, Int)] = (currentBeats.map(b => (b * format.getFrameRate).ceil.toInt) :+ audioCount)
@@ -123,7 +131,7 @@ class AudioPlayer2(audioData: InputStream, beatData: InputStream) {
 
           sourceLine.open(rateFormat(format, currentRate))
           sourceLine.start()
-          updatePosition(currentPosition + sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * currentRate)
+          updatePosition(currentPosition + sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * currentRate, true)
 
           while (sync.isEmpty && position < audioCount) {
             bbuffer.clear()
@@ -152,9 +160,9 @@ class AudioPlayer2(audioData: InputStream, beatData: InputStream) {
               }
             }
             position += sourceLine.write(bbuffer.array(), 0, l * format.getFrameSize) / format.getFrameSize
-            updatePosition(currentPosition + sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * currentRate)
+            updatePosition(currentPosition + sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * currentRate, false)
           }
-          updatePosition(currentPosition + sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * currentRate)
+          updatePosition(currentPosition + sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * currentRate, false)
           sourceLine.stop()
           sourceLine.close()
         }

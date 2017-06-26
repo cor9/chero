@@ -21,32 +21,26 @@ package io.gitlab.sklavedaniel.beatmetergenerator
 import java.io._
 import java.util
 import javafx.collections.{FXCollections, ObservableList}
-import javafx.scene.input
+import javafx.scene.{Cursor, input}
 
 import org.rogach.scallop.ScallopConf
 
 import scala.collection.JavaConverters.asJavaCollection
 import scala.collection.mutable
-import scala.util.Try
 import scalafx.Includes._
 import scalafx.animation.{KeyFrame, Timeline}
-import scalafx.application.JFXApp.PrimaryStage
 import scalafx.application.{JFXApp, Platform}
-import scalafx.beans.property.BooleanProperty
-import scalafx.collections.ObservableBuffer
-import scalafx.geometry.Pos
-import scalafx.scene.control.ListView.sfxListView2jfx
+import scalafx.application.JFXApp.PrimaryStage
+import scalafx.beans.binding.Bindings
+import scalafx.beans.property._
 import scalafx.scene.control._
-import scalafx.scene.control.cell.TextFieldListCell
 import scalafx.scene.input._
 import scalafx.scene.layout._
 import scalafx.scene.paint.Color
-import scalafx.scene.shape.{Circle, Line}
-import scalafx.scene.text.Text
+import scalafx.scene.shape.{Circle, Line, Rectangle}
+import scalafx.scene.transform.Scale
 import scalafx.scene.{Group, Scene}
-import scalafx.stage.FileChooser
 import scalafx.util.Duration
-import scalafx.util.converter.DoubleStringConverter
 
 object BeatEditor2 {
 
@@ -83,60 +77,187 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     value = 0
     blockIncrement = 1
 
-    player.position.onChange {(_,_,d) =>
-      if(!d._2) {
+    player.position.onChange { (_, _, d) =>
+      if (!d._2) {
         value() = d._1
       }
     }
   }
 
-  val waveGroup = new Group {
-    layoutX = 0
-    layoutY = 0
-    children = (for (Seq((avg1, time1), (avg2, time2)) <- player.maxs.sliding(2)) yield {
-      new Line {
-        startX = 100 + time1 * secondWidth
-        startY = volumeHeight + 10 - avg1 / Short.MaxValue * volumeHeight
-        endX = 100 + time2 * secondWidth
-        endY = volumeHeight + 10 - avg2 / Short.MaxValue * volumeHeight
-      }
-    }).toSeq
+  class WaveView(initPoints: Seq[((Double, Double), Double)], initPxPerSec: Double, initMaxVolume: Double, initHeight: Double) extends Group {
+    val points = ObjectProperty(initPoints)
+    val pxPerSec = DoubleProperty(initPxPerSec)
+    val maxVolume = DoubleProperty(initMaxVolume)
+    val height = DoubleProperty(initHeight)
+
+    private def update() = {
+      children = (for (Seq((value1, time1), (value2, time2)) <- points().sliding(2)) yield {
+        new Line {
+          startX <== pxPerSec * time1
+          startY <== height * (maxVolume + value1._2) / maxVolume / 2
+          endX <== pxPerSec * time2
+          endY <== height * (maxVolume + value2._2) / maxVolume / 2
+        }
+      }).toIterable ++ (for (Seq((value1, time1), (value2, time2)) <- points().sliding(2)) yield {
+        new Line {
+          startX <== pxPerSec * time1
+          startY <== height * (maxVolume - value1._1) / maxVolume / 2
+          endX <== pxPerSec * time2
+          endY <== height * (maxVolume - value2._1) / maxVolume / 2
+        }
+      })
+    }
+
+    update()
+
+    points.onChange(update())
+
+    val scale = {
+      val s = new Scale(1.0, 1.0, 0.0, 0.0)
+      transforms = Seq(s)
+      s.x
+    }
   }
-  val beatsGroup = new Group {
-    layoutX = 0
-    layoutY = 0
-  }
-  val positionLine = new Line {
-    startX = 100
-    startY = 0
-    endX = 100
-    endY = 200
-    stroke = Color.Red
-  }
-  val waveView = new Pane {
-    pane =>
-    layoutX = 0
-    layoutY = 0
-    style = "-fx-background: blue"
-    prefHeight = 160
+
+  class PositionLineView(initPxPerSec: Double, initHeight: Double, initWidth: Double, sceeneToContextX: Double => Double) extends Group {
+    self =>
+    val position = ObjectProperty((0.0, true))
+    val pxPerSec = DoubleProperty(initPxPerSec)
+    val scale = DoubleProperty(1.0)
+    val height = DoubleProperty(initHeight)
+    val width = DoubleProperty(initWidth)
+    val duration = DoubleProperty(0.0)
+    private val pxPosition_ = ReadOnlyDoubleWrapper(0.0)
+    pxPosition_ <== pxPerSec * scale * Bindings.createDoubleBinding(() => position()._1, position)
+    val pxPosition = pxPosition_.readOnlyProperty
+
     children = Seq(
-      waveGroup,
-      beatsGroup,
-      new Line {
-        startX = 0
-        startY = 160
-        endX = player.duration * secondWidth + 10000
-        endY = 160
-        stroke = Color.DarkGray
-        strokeWidth = 0.5
+      new Rectangle {
+        x <== pxPosition - self.width / 2
+        y = 0
+        width <== self.width
+        height <== self.height
+        fill = Color.Transparent
       },
-      positionLine
+      new Line {
+        startX <== pxPosition
+        startY = 0
+        endX <== startX
+        endY <== height
+        stroke = Color.Red
+      }
     )
-    onMouseClicked = e => {
-      if (MouseButton.Primary.equals(e.getButton) && e.getClickCount == 2) {
-        positionSlider.value() = ((e.getX - 100) / secondWidth).max(0).min(player.duration)
+
+    private val dragging_ = ReadOnlyBooleanWrapper(false)
+    val dragging =dragging_.getReadOnlyProperty
+
+    onMouseEntered = e => {
+      if (!dragging_()) {
+        self.setCursor(Cursor.HAND)
       }
     }
+    onMousePressed = e => {
+      if (e.isPrimaryButtonDown) {
+        self.setCursor(Cursor.MOVE)
+        dragging_() = true
+      }
+    }
+    onMouseReleased = e => {
+      self.setCursor(Cursor.HAND)
+      dragging_() = false
+    }
+    onMouseExited = e => {
+      if (!dragging_()) {
+        self.setCursor(Cursor.DEFAULT)
+      }
+    }
+    private var dragTimeline: Option[Timeline] = None
+    onMouseDragged = e => {
+      def drag(): Unit = {
+        if (dragging()) {
+          val v = sceeneToContextX(e.getSceneX)
+          if ((pxPosition() - v).abs >= 5.0) {
+            position() = ((v / pxPerSec() / scale()).max(0.0).min(duration()), true)
+            val tl = Timeline(KeyFrame(time = Duration(50), onFinished = _ => {
+              drag()
+            }))
+            tl.play()
+            dragTimeline = Some(tl)
+          } else {
+            position() = ((v / pxPerSec() / scale()).max(0.0).min(duration()), true)
+          }
+        }
+      }
+
+      dragTimeline.foreach(_.stop())
+      dragTimeline = None
+
+      drag()
+    }
+
+
+  }
+
+  val mainView = new ScrollPane {
+    val waveView = new WaveView(player.maxima, 20, player.maxima.map(v => v._1._1 max v._1._2).max, 200)
+    val sceeneToContextX = (x: Double) => sceneToLocal(x, 0.0).getX + scrollX
+    val positionLineView = new PositionLineView(20, 300, 8, sceeneToContextX) {
+      position <==> player.position
+      scale <== waveView.scale
+      duration <== player.duration
+    }
+    content = new Group {
+      children = Seq(
+        waveView,
+        positionLineView
+      )
+    }
+
+    def scrollX = hvalue() * (content().boundsInLocal().getWidth - viewportBounds().getWidth)
+
+    def scrollX_=(x: Double): Unit = {
+      hvalue() = x / (content().boundsInLocal().getWidth - viewportBounds().getWidth)
+    }
+
+    def scrollY = vvalue() * (content().boundsInLocal().getHeight - viewportBounds().getHeight)
+
+    def scrollY_=(x: Double): Unit = {
+      vvalue() = x / (content().boundsInLocal().getHeight - viewportBounds().getHeight)
+    }
+
+    private var delta = 0.0
+    private var timeout: Option[Timeline] = None
+    addEventFilter(ScrollEvent.Scroll, (e: input.ScrollEvent) => {
+      e.consume()
+      if (e.isControlDown) {
+        timeout.foreach(_.stop())
+        delta += e.getDeltaY
+        val to = Timeline(KeyFrame(time = Duration(25), onFinished = _ => {
+          val oldPosition = (scrollX + e.getX) / waveView.scale()
+          waveView.scale() = (waveView.scale() * (1 + delta / 400)).max(0.5).min(10.0)
+          scrollX = oldPosition * waveView.scale() - e.getX()
+          delta = 0.0
+        }))
+        to.play()
+        timeout = Some(to)
+      } else if (e.isShiftDown) {
+        scrollY += e.getDeltaY()
+      } else {
+        scrollX += e.getDeltaY()
+      }
+    })
+
+    val minX = DoubleProperty(0.05)
+    val maxX = DoubleProperty(0.95)
+
+    positionLineView.pxPosition.onChange { (_, _, v) =>
+      if (v.doubleValue() < scrollX + minX() * viewportBounds().getWidth) {
+        scrollX = v.doubleValue() - minX() * viewportBounds().getWidth
+      } else if (v.doubleValue() > scrollX + maxX() * viewportBounds().getWidth) {
+        scrollX = v.doubleValue() - maxX() * viewportBounds().getWidth
+      }
+    }
+
   }
 
   class Beat(val time: Double, initSelected: Boolean) extends Circle {
@@ -166,28 +287,20 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
   val beatIcons = mutable.Map[Double, Beat]()
 
-  for (beat <- beats) {
-    val b = new Beat(beat, false)
-    beatIcons.put(beat, b)
-    beatsGroup.children.add(b)
-  }
 
   stage = new PrimaryStage {
     self =>
     scene = new Scene {
-      root = new VBox {
+      root = new BorderPane {
         prefWidth = 800
-        spacing = 5
-        children = Seq(
-          new Pane {
-            minHeight = 200
-            children = Seq(waveView)
-          },
-          positionSlider,
-          new ToggleButton("play") {
-            selected <==> player.playing
-          }
-        )
+        center = mainView
+        bottom = new VBox {
+          children = Seq(
+            new ToggleButton("play") {
+              selected <==> player.playing
+            }
+          )
+        }
       }
     }
   }
