@@ -59,6 +59,7 @@ object BeatEditor2 {
 
 class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
+  println("starting...")
   val player = new AudioPlayer2(new BufferedInputStream(new FileInputStream(conf.input())), new BufferedInputStream(getClass.getResourceAsStream("/beats/click.wav")))
 
   player.ratio.set(0.8)
@@ -68,44 +69,39 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     asJavaCollection(conf.beats.toOption.map(BeatFiles.load(_)).getOrElse(Seq[Double]()))
   ))
 
-
-  val secondWidth = 100
-  val volumeHeight = 150
-  val positionSlider: Slider = new Slider {
-    min = 0
-    max = player.duration
-    value = 0
-    blockIncrement = 1
-
-    player.position.onChange { (_, _, d) =>
-      if (!d._2) {
-        value() = d._1
-      }
-    }
-  }
-
   class WaveView(initPoints: Seq[((Double, Double), Double)], initPxPerSec: Double, initMaxVolume: Double, initHeight: Double) extends Group {
+    self =>
     val points = ObjectProperty(initPoints)
     val pxPerSec = DoubleProperty(initPxPerSec)
     val maxVolume = DoubleProperty(initMaxVolume)
     val height = DoubleProperty(initHeight)
 
     private def update() = {
-      children = (for (Seq((value1, time1), (value2, time2)) <- points().sliding(2)) yield {
-        new Line {
-          startX <== pxPerSec * time1
-          startY <== height * (maxVolume + value1._2) / maxVolume / 2
-          endX <== pxPerSec * time2
-          endY <== height * (maxVolume + value2._2) / maxVolume / 2
+      children = Seq(
+        new Rectangle {
+          x = 0.0
+          y = 0.0
+          width <== pxPerSec * points().last._2
+          height <== self.height
+          fill = Color.Transparent
         }
-      }).toIterable ++ (for (Seq((value1, time1), (value2, time2)) <- points().sliding(2)) yield {
-        new Line {
-          startX <== pxPerSec * time1
-          startY <== height * (maxVolume - value1._1) / maxVolume / 2
-          endX <== pxPerSec * time2
-          endY <== height * (maxVolume - value2._1) / maxVolume / 2
-        }
-      })
+      ) ++ (
+        for (Seq((value1, time1), (value2, time2)) <- points().sliding(2)) yield {
+          new Line {
+            startX <== pxPerSec * time1
+            startY <== height * (maxVolume + value1._2) / maxVolume / 2
+            endX <== pxPerSec * time2
+            endY <== height * (maxVolume + value2._2) / maxVolume / 2
+          }
+        }).toIterable ++ (
+        for (Seq((value1, time1), (value2, time2)) <- points().sliding(2)) yield {
+          new Line {
+            startX <== pxPerSec * time1
+            startY <== height * (maxVolume - value1._1) / maxVolume / 2
+            endX <== pxPerSec * time2
+            endY <== height * (maxVolume - value2._1) / maxVolume / 2
+          }
+        })
     }
 
     update()
@@ -117,6 +113,12 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       transforms = Seq(s)
       s.x
     }
+
+    val onAction = ObjectProperty((p: Double) => ())
+
+    onMouseClicked = mouseHandler(_ => (), e => {
+      onAction()(e.getX / pxPerSec() / scale())
+    })
   }
 
   class PositionLineView(initPxPerSec: Double, initHeight: Double, initWidth: Double, sceeneToContextX: Double => Double) extends Group {
@@ -127,15 +129,19 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     val height = DoubleProperty(initHeight)
     val width = DoubleProperty(initWidth)
     val duration = DoubleProperty(0.0)
+    private val pxDuration_ = ReadOnlyDoubleWrapper(0.0)
+    pxDuration_ <== pxPerSec * scale * duration
+    val pxDuration = pxDuration_.getReadOnlyProperty
     private val pxPosition_ = ReadOnlyDoubleWrapper(0.0)
     pxPosition_ <== pxPerSec * scale * Bindings.createDoubleBinding(() => position()._1, position)
     val pxPosition = pxPosition_.readOnlyProperty
 
     children = Seq(
       new Rectangle {
-        x <== pxPosition - self.width / 2
+        x <== when(pxPosition < self.width / 2) choose 0.0 otherwise pxPosition - self.width / 2
         y = 0
-        width <== self.width
+        width <== when(pxPosition < self.width / 2) choose pxPosition + self.width / 2 otherwise (
+          when(pxDuration - pxPosition < self.width / 2) choose pxDuration - pxPosition + self.width / 2 otherwise self.width)
         height <== self.height
         fill = Color.Transparent
       },
@@ -149,7 +155,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     )
 
     private val dragging_ = ReadOnlyBooleanWrapper(false)
-    val dragging =dragging_.getReadOnlyProperty
+    val dragging = dragging_.getReadOnlyProperty
 
     onMouseEntered = e => {
       if (!dragging_()) {
@@ -199,9 +205,11 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
   }
 
   val mainView = new ScrollPane {
+    println("generating waveform...")
     val waveView = new WaveView(player.maxima, 20, player.maxima.map(v => v._1._1 max v._1._2).max, 200)
+    println("waveform generated.")
     val sceeneToContextX = (x: Double) => sceneToLocal(x, 0.0).getX + scrollX
-    val positionLineView = new PositionLineView(20, 300, 8, sceeneToContextX) {
+    val positionLineView = new PositionLineView(20, 300, 10, sceeneToContextX) {
       position <==> player.position
       scale <== waveView.scale
       duration <== player.duration
@@ -258,30 +266,33 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       }
     }
 
+    waveView.onAction() = p => {
+      positionLineView.position() = (p, true)
+    }
+
   }
 
   class Beat(val time: Double, initSelected: Boolean) extends Circle {
     radius = 4
     centerY = 170
-    centerX = 100 + time * secondWidth
     val selected = BooleanProperty(initSelected)
     fill <== when(selected) choose Color.Blue otherwise Color.Red
+  }
+
+  def mouseHandler(single: MouseEvent => Unit, double: MouseEvent => Unit) = {
     var clickDelay: Option[Timeline] = None
-    onMouseClicked = e => {
+    (e: MouseEvent) => {
       clickDelay.foreach(_.stop())
       clickDelay = None
-      if (MouseButton.Primary.equals(e.getButton)) {
-        if (e.getClickCount == 1) {
-          val t = Timeline(KeyFrame(Duration(300), onFinished = _ => {
-
-          }))
-          t.play()
-          clickDelay = Some(t)
-        } else if (e.getClickCount == 2) {
-          positionSlider.value() = time
-        }
+      if (e.getClickCount == 1) {
+        val t = Timeline(KeyFrame(Duration(300), onFinished = _ => {
+          single(e)
+        }))
+        t.play()
+        clickDelay = Some(t)
+      } else if (e.getClickCount == 2) {
+        double(e)
       }
-      e.consume()
     }
   }
 
@@ -305,5 +316,6 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     }
   }
 
+  println("started.")
 }
 

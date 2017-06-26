@@ -65,9 +65,11 @@ class AudioPlayer2(audioData: InputStream, beatData: InputStream) {
 
   val beat = readData(beatData, format)
   val beatCount = beat.length / format.getChannels
+  println("loading audio file...")
   val audio = readData(audioData, format)
   val audioCount = audio.length / format.getChannels
   val duration = audioCount.toDouble / format.getFrameRate
+  println("audio file loaded.")
 
   val maximaDuration = 0.025
   val maximaFrames = (maximaDuration * format.getFrameRate * format.getChannels).round.toInt
