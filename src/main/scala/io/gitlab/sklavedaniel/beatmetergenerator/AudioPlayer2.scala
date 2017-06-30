@@ -73,10 +73,14 @@ class AudioPlayer2(audioData: InputStream, beatData: InputStream) {
 
   val maximaDuration = 0.025
   val maximaFrames = (maximaDuration * format.getFrameRate * format.getChannels).round.toInt
-  val maximaTimes = (0 to audio.length / maximaFrames).map(_ * maximaDuration) :+ duration
-  val maxima: Seq[((Double, Double), Double)] = (Iterator.single((0.0, 0.0)) ++ audio.toIterable.grouped(maximaFrames).map {
-    l => (l.grouped(2).map(_.head.abs.toDouble).max, l.grouped(2).map(_.last.abs.toDouble).max)
-  }).zip(maximaTimes.toIterator).toSeq
+
+  val maxima = new Array[((Double, Double), Double)](audio.length / maximaFrames)
+  for (i <- 0 until audio.length / maximaFrames) {
+    val maxLeft = (for (j <- 0 until maximaFrames / 2) yield audio(maximaFrames * i + 2 * j)).max
+    val maxRight = (for (j <- 0 until maximaFrames / 2) yield audio(maximaFrames * i + 2 * j + 1)).max
+    val time = i * maximaDuration
+    maxima(i) = ((maxLeft, maxRight), time)
+  }
 
   private val sync = new LinkedBlockingQueue[Unit]()
   private val syncChange = (_: Any, _: Any, _: Any) => if (sync.isEmpty) {
@@ -86,10 +90,11 @@ class AudioPlayer2(audioData: InputStream, beatData: InputStream) {
   val rate = FloatProperty(0.5f)
   rate.onChange(syncChange)
   val position = ObjectProperty((0.0, true))
-  position.onChange { (_, _, x) =>
-    if (x._2 && sync.isEmpty) {
-      sync.offer(())
-    }
+  position.onChange {
+    (_, _, x) =>
+      if (x._2 && sync.isEmpty) {
+        sync.offer(())
+      }
   }
   val beats = ObjectProperty(List[Double]())
   val ratio = DoubleProperty(0.9)

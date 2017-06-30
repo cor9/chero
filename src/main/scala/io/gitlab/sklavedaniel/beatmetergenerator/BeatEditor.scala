@@ -19,7 +19,6 @@
 package io.gitlab.sklavedaniel.beatmetergenerator
 
 import java.io._
-import java.util
 import javafx.collections.{FXCollections, ObservableList}
 import javafx.scene.input
 
@@ -27,7 +26,6 @@ import org.rogach.scallop.ScallopConf
 
 import scala.collection.JavaConverters.asJavaCollection
 import scala.collection.mutable
-import scala.util.Try
 import scalafx.Includes._
 import scalafx.animation.{KeyFrame, Timeline}
 import scalafx.application.JFXApp.PrimaryStage
@@ -93,7 +91,7 @@ class BeatEditor(conf: BeatEditor.Conf) extends JFXApp {
       0.0
     }%07.2f s"
   }
-  val beats: ObservableList[Double] = FXCollections.observableList(new util.ArrayList[Double](
+  val beats: ObservableList[Double] = FXCollections.observableList(new java.util.ArrayList[Double](
     asJavaCollection(conf.beats.toOption.map(BeatFiles.load(_)).getOrElse(Seq[Double]()))
   ))
   var beatsUndo: List[(Set[Double], Set[Double])] = Nil

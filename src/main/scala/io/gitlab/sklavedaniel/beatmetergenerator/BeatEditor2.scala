@@ -19,25 +19,29 @@
 package io.gitlab.sklavedaniel.beatmetergenerator
 
 import java.io._
-import java.util
-import javafx.collections.{FXCollections, ObservableList}
+import javafx.beans.{InvalidationListener, WeakInvalidationListener}
+import javafx.beans.value.{ChangeListener, WeakChangeListener}
+import javafx.geometry.VPos
 import javafx.scene.{Cursor, input}
 
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap
 import org.rogach.scallop.ScallopConf
 
-import scala.collection.JavaConverters.asJavaCollection
 import scala.collection.mutable
+import scala.math.Ordering._
 import scalafx.Includes._
 import scalafx.animation.{KeyFrame, Timeline}
-import scalafx.application.{JFXApp, Platform}
+import scalafx.application.JFXApp
 import scalafx.application.JFXApp.PrimaryStage
 import scalafx.beans.binding.Bindings
 import scalafx.beans.property._
+import scalafx.collections.ObservableBuffer
 import scalafx.scene.control._
 import scalafx.scene.input._
 import scalafx.scene.layout._
 import scalafx.scene.paint.Color
 import scalafx.scene.shape.{Circle, Line, Rectangle}
+import scalafx.scene.text.{Font, Text}
 import scalafx.scene.transform.Scale
 import scalafx.scene.{Group, Scene}
 import scalafx.util.Duration
@@ -65,11 +69,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
   player.ratio.set(0.8)
   player.rate.set(0.5f)
 
-  val beats: ObservableList[Double] = FXCollections.observableList(new util.ArrayList[Double](
-    asJavaCollection(conf.beats.toOption.map(BeatFiles.load(_)).getOrElse(Seq[Double]()))
-  ))
-
-  class WaveView(initPoints: Seq[((Double, Double), Double)], initPxPerSec: Double, initMaxVolume: Double, initHeight: Double) extends Group {
+  class WaveView(initPoints: Seq[((Double, Double), Double)], initPxPerSec: Double, initMaxVolume: Double, initHeight: Double, sceneToContextX: Double => Double) extends Group {
     self =>
     val points = ObjectProperty(initPoints)
     val pxPerSec = DoubleProperty(initPxPerSec)
@@ -77,31 +77,31 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     val height = DoubleProperty(initHeight)
 
     private def update() = {
-      children = Seq(
-        new Rectangle {
-          x = 0.0
-          y = 0.0
-          width <== pxPerSec * points().last._2
-          height <== self.height
-          fill = Color.Transparent
-        }
-      ) ++ (
-        for (Seq((value1, time1), (value2, time2)) <- points().sliding(2)) yield {
-          new Line {
-            startX <== pxPerSec * time1
-            startY <== height * (maxVolume + value1._2) / maxVolume / 2
-            endX <== pxPerSec * time2
-            endY <== height * (maxVolume + value2._2) / maxVolume / 2
-          }
-        }).toIterable ++ (
-        for (Seq((value1, time1), (value2, time2)) <- points().sliding(2)) yield {
-          new Line {
-            startX <== pxPerSec * time1
-            startY <== height * (maxVolume - value1._1) / maxVolume / 2
-            endX <== pxPerSec * time2
-            endY <== height * (maxVolume - value2._1) / maxVolume / 2
-          }
-        })
+      children += new Rectangle {
+        x = 0.0
+        y = 0.0
+        width <== pxPerSec * points().last._2
+        height <== self.height
+        fill = Color.Transparent
+      }.delegate
+      for (Seq((value1, time1), (value2, time2)) <- points().sliding(2)) {
+        children += new Line {
+          startX <== pxPerSec * time1
+          startY <== height * (maxVolume + value1._1) / maxVolume / 2
+          endX <== pxPerSec * time2
+          endY <== height * (maxVolume + value2._1) / maxVolume / 2
+          strokeWidth = 0.5
+        }.delegate
+      }
+      for (Seq((value1, time1), (value2, time2)) <- points().sliding(2)) {
+        children += new Line {
+          startX <== pxPerSec * time1
+          startY <== height * (maxVolume - value1._2) / maxVolume / 2
+          endX <== pxPerSec * time2
+          endY <== height * (maxVolume - value2._2) / maxVolume / 2
+          strokeWidth = 0.5
+        }.delegate
+      }
     }
 
     update()
@@ -117,16 +117,16 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     val onAction = ObjectProperty((p: Double) => ())
 
     onMouseClicked = mouseHandler(_ => (), e => {
-      onAction()(e.getX / pxPerSec() / scale())
+      onAction()(sceneToContextX(e.getSceneX) / pxPerSec() / scale())
     })
   }
 
-  class PositionLineView(initPxPerSec: Double, initHeight: Double, initWidth: Double, sceeneToContextX: Double => Double) extends Group {
+  class PositionLineView(initPxPerSec: Double, initWidth: Double, sceeneToContextX: Double => Double) extends Group {
     self =>
     val position = ObjectProperty((0.0, true))
     val pxPerSec = DoubleProperty(initPxPerSec)
     val scale = DoubleProperty(1.0)
-    val height = DoubleProperty(initHeight)
+    val height = DoubleProperty(0.0)
     val width = DoubleProperty(initWidth)
     val duration = DoubleProperty(0.0)
     private val pxDuration_ = ReadOnlyDoubleWrapper(0.0)
@@ -204,79 +204,442 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
   }
 
-  val mainView = new ScrollPane {
-    println("generating waveform...")
-    val waveView = new WaveView(player.maxima, 20, player.maxima.map(v => v._1._1 max v._1._2).max, 200)
-    println("waveform generated.")
-    val sceeneToContextX = (x: Double) => sceneToLocal(x, 0.0).getX + scrollX
-    val positionLineView = new PositionLineView(20, 300, 10, sceeneToContextX) {
-      position <==> player.position
-      scale <== waveView.scale
-      duration <== player.duration
-    }
-    content = new Group {
-      children = Seq(
-        waveView,
-        positionLineView
-      )
-    }
+  sealed trait TrackElement
 
-    def scrollX = hvalue() * (content().boundsInLocal().getWidth - viewportBounds().getWidth)
+  class Beat() extends TrackElement {
+    val name = ObjectProperty("")
+    val highlight = BooleanProperty(false)
+  }
 
-    def scrollX_=(x: Double): Unit = {
-      hvalue() = x / (content().boundsInLocal().getWidth - viewportBounds().getWidth)
-    }
+  class BPMGroup() extends TrackElement {
+    val bpm = DoubleProperty(0.0)
+    val beat = new Beat()
+  }
 
-    def scrollY = vvalue() * (content().boundsInLocal().getHeight - viewportBounds().getHeight)
+  class BeatsPattern() extends TrackElement {
+    val patternDuration = DoubleProperty(0.0)
+    val pattern = ObservableIntervalMap[Double, Beat](math.Ordering.Double)
+  }
 
-    def scrollY_=(x: Double): Unit = {
-      vvalue() = x / (content().boundsInLocal().getHeight - viewportBounds().getHeight)
-    }
+  class Message() extends TrackElement {
+    val text = ObjectProperty("")
+  }
 
-    private var delta = 0.0
-    private var timeout: Option[Timeline] = None
-    addEventFilter(ScrollEvent.Scroll, (e: input.ScrollEvent) => {
-      e.consume()
-      if (e.isControlDown) {
-        timeout.foreach(_.stop())
-        delta += e.getDeltaY
-        val to = Timeline(KeyFrame(time = Duration(25), onFinished = _ => {
-          val oldPosition = (scrollX + e.getX) / waveView.scale()
-          waveView.scale() = (waveView.scale() * (1 + delta / 400)).max(0.5).min(10.0)
-          scrollX = oldPosition * waveView.scale() - e.getX()
-          delta = 0.0
-        }))
-        to.play()
-        timeout = Some(to)
-      } else if (e.isShiftDown) {
-        scrollY += e.getDeltaY()
-      } else {
-        scrollX += e.getDeltaY()
+
+  class Track {
+    val title = ObjectProperty("")
+    val content = ObservableIntervalMap[Double, TrackElement](math.Ordering.Double)
+  }
+
+  class TrackHeaderView(val track: Track) extends Group {
+    self =>
+    val width = DoubleProperty(0.0)
+    children = Seq(
+      new Rectangle {
+        x <== 0.0
+        y = 0.0
+        height = 50.0
+        width <== self.width
+        fill = Color.LightGray
+      },
+      new Text {
+        x = 2.0
+        y = 2.0
+        textOrigin = VPos.TOP
+        text <== track.title
+      },
+      new HBox {
+        layoutY = 30
+        layoutX = 2.0
+        spacing = 2
+        children = Seq(
+          new Button {
+            text = "X"
+            font = Font(8)
+            focusTraversable = false
+          },
+          new ToggleButton {
+            text = "P"
+            font = Font(8)
+            focusTraversable = false
+          },
+          new ToggleButton {
+            text = "S"
+            font = Font(8)
+            focusTraversable = false
+          }
+        )
       }
+    )
+  }
+
+  class TrackView(initPxPerSec: Double, val track: Track) extends Group {
+    val duration = DoubleProperty(0.0)
+    val pxPerSec = DoubleProperty(initPxPerSec)
+    val scale = {
+      val s = new Scale(1.0, 1.0, 0.0, 0.0)
+      transforms = Seq(s)
+      s.x
+    }
+    val labelX = DoubleProperty(0.0)
+
+    val elementGroup = new Group {
+      layoutY = 25
+      layoutX = 0
+    }
+    private val element2view = mutable.Map[(Double, Double, TrackElement), TrackElementView]()
+
+    private def addElement(elem: (Double, Double, TrackElement)): Unit = {
+      val v = elem._3 match {
+        case beat: Beat =>
+          new BeatView(beat)
+        case beatsGroup: BeatsPattern =>
+          new BeatsPatternView(beatsGroup)
+        case bpmGroup: BPMGroup =>
+          new BPMGroupView(bpmGroup)
+        case message: Message =>
+          new MessageView(message)
+      }
+      v.layoutX <== pxPerSec * elem._1
+      v.pxPerSec <== pxPerSec
+      v.position() = (elem._1, elem._2)
+      v.position.onChange { (_, old, pos) =>
+        if (old != pos) track.content.move(old, pos)
+      }
+      element2view(elem) = v
+      elementGroup.children.add(v)
+    }
+
+    private val listener = ObservableIntervalMap.WeakChangeListner[Double, TrackElement] {
+      case (_, ObservableIntervalMap.AddChange(l: List[(Double, Double, TrackElement)])) =>
+        for (elem <- l) {
+          addElement(elem)
+        }
+      case (_, ObservableIntervalMap.MoveChange(from, to, b)) =>
+        if (from != to) element2view((from._1, from._2, b)).position() = to
+
+      case (_, ObservableIntervalMap.RemoveChange(l: List[(Double, Double, TrackElement)])) =>
+        for (elem <- l) {
+          element2view.remove(elem).foreach(elementGroup.children.remove)
+        }
+    }
+    track.content.addListener(listener)
+    for (elem <- track.content) {
+      addElement(elem)
+    }
+
+
+    children = Seq(
+      new Rectangle {
+        x = 0.0
+        y = 0.0
+        height = 50.0
+        width <== duration * pxPerSec
+        fill = Color.Transparent
+      },
+      new Line {
+        startY = 25
+        startX = 0
+        endY = 25
+        endX <== duration * pxPerSec
+      },
+      elementGroup
+    )
+  }
+
+  sealed class TrackElementView extends Group {
+    val pxPerSec = DoubleProperty(0.0)
+    val position = ObjectProperty((0.0, 0.0))
+    val duration = Bindings.createDoubleBinding(() => position()._2 - position()._1, position)
+    val width = pxPerSec * duration
+  }
+
+  final class BeatView(val beat: Beat) extends TrackElementView {
+    self =>
+    children = Seq(new Rectangle {
+      width <== self.width
+      height = 10
+      y = -5
+      fill = Color.DarkRed
     })
+  }
 
-    val minX = DoubleProperty(0.05)
-    val maxX = DoubleProperty(0.95)
+  final class BeatsPatternView(val beatsPattern: BeatsPattern) extends TrackElementView {
+    self =>
+    val beatsGroup = new Group
+    val repetitionsGroup = new Group
+    children = Seq(
+      new Rectangle {
+        width <== when(self.width < 5) choose 5 otherwise self.width
+        height = 20
+        y = -10
+        fill = Color.LightPink
+      },
+      beatsGroup,
+      repetitionsGroup,
+      new Line {
+        startX <== beatsPattern.patternDuration * pxPerSec
+        endX <== beatsPattern.patternDuration * pxPerSec
+        startY = -10.0
+        endY = 10.0
+        strokeWidth = 0.5
+      }
+    )
 
-    positionLineView.pxPosition.onChange { (_, _, v) =>
-      if (v.doubleValue() < scrollX + minX() * viewportBounds().getWidth) {
-        scrollX = v.doubleValue() - minX() * viewportBounds().getWidth
-      } else if (v.doubleValue() > scrollX + maxX() * viewportBounds().getWidth) {
-        scrollX = v.doubleValue() - maxX() * viewportBounds().getWidth
+    private def update(): Unit = {
+      beatsGroup.children = (for ((start, end, b) <- beatsPattern.pattern) yield {
+        val v = new BeatView(b)
+        v.position() = (start, end)
+        v.pxPerSec <== pxPerSec
+        v.layoutX <== pxPerSec * start
+        v
+      }).toSeq
+      repetitionsGroup.children = for {
+        i <- 0 until (duration.get() / beatsPattern.patternDuration()).floor.toInt
+        (start, end, b) <- beatsPattern.pattern
+      } yield {
+        val v = new BeatView(b)
+        v.position() = (i * beatsPattern.patternDuration() + start, end)
+        v.pxPerSec <== pxPerSec
+        v.layoutX <== pxPerSec * (i * beatsPattern.patternDuration() + start)
+        v
       }
     }
 
-    waveView.onAction() = p => {
-      positionLineView.position() = (p, true)
+    update()
+
+    val handler = weak(update())
+    duration.addListener(handler)
+    beatsPattern.pattern.addListener(handler)
+    beatsPattern.patternDuration.addListener(handler)
+  }
+
+  final class BPMGroupView(val bpmGroup: BPMGroup) extends TrackElementView {
+    private val binding = when(width < 5) choose 5 otherwise width
+    val beatsGroup = new Group
+    children = Seq(
+      new Rectangle {
+        width <== binding
+        height = 20
+        y = -10
+        fill = Color.LightBlue
+      },
+      beatsGroup
+    )
+
+    private def update(): Unit = {
+      beatsGroup.children = if (bpmGroup.bpm() > 0) {
+        for (i <- 0 to (duration.get() * 60 / bpmGroup.bpm()).floor.toInt) yield {
+          val v = new BeatView(bpmGroup.beat)
+          v.pxPerSec <== pxPerSec
+          val p = i * bpmGroup.bpm() / 60
+          v.position() = (p, p + 0.05)
+          v.layoutX <== pxPerSec * p
+          v
+        }
+      } else {
+        Seq()
+      }
     }
+
+    update()
+    private val handler = weak(update())
+    duration.addListener(handler)
+    bpmGroup.bpm.addListener(handler)
 
   }
 
-  class Beat(val time: Double, initSelected: Boolean) extends Circle {
-    radius = 4
-    centerY = 170
-    val selected = BooleanProperty(initSelected)
-    fill <== when(selected) choose Color.Blue otherwise Color.Red
+  final class MessageView(val message: Message) extends TrackElementView {
+    self =>
+    children = Seq(
+      new Rectangle {
+        width <== when(self.width < 5) choose 5 otherwise self.width
+        height = 20
+        y = -10
+        fill = Color.LightGreen
+      },
+      new Text {
+        x = 3.0
+        y = 0.0
+        clip = new Rectangle {
+          y = -8
+          width <== when(self.width < 5) choose 5 otherwise self.width
+          height = 16
+        }
+        text <== message.text
+        textOrigin = VPos.CENTER
+      }
+    )
+  }
+
+  val beats = conf.beats.toOption.map(BeatFiles.load(_).map(t => (t, t + 0.05, new Beat()))).getOrElse(Seq[(Double, Double, Beat)]())
+
+  val mainView = new HBox {
+
+    val tracks = new ObservableBuffer[Track]()
+
+    val headerBox = new VBox {
+      spacing = 5
+    }
+
+    object scrollPane extends ScrollPane {
+      self =>
+      val sceeneToContextX = (x: Double) => sceneToLocal(x, 0.0).getX + scrollX
+      println("generating waveform...")
+      val waveView = new WaveView(player.maxima, 20, player.maxima.toIterator.map(v => v._1._1 max v._1._2).max, 200, sceeneToContextX)
+      println("waveform generated.")
+
+      val tracksBox = new VBox {
+        spacing = 5
+      }
+
+      private val track2view = mutable.Map[Track, TrackView]()
+      private val track2headerView = mutable.Map[Track, TrackHeaderView]()
+
+      tracks.onChange { (_, cs) =>
+        for (c <- cs) {
+          c match {
+            case ObservableBuffer.Add(i, ts) =>
+              for (t <- ts) {
+                val v = new TrackView(20, t) {
+                  scale <== waveView.scale
+                  duration <== player.duration
+                }
+                val h = new TrackHeaderView(t) {
+                  width <== headerBox.width
+                }
+                track2view(t) = v
+                track2headerView(t) = h
+                tracksBox.children.add(i, v)
+                headerBox.children.add(i, h)
+              }
+            case ObservableBuffer.Remove(_, ts) =>
+              for (t <- ts) {
+                track2view.remove(t).foreach(tracksBox.children.remove)
+                track2headerView.remove(t).foreach(headerBox.children.remove)
+              }
+            case _ => assert(false)
+          }
+        }
+      }
+
+      val box = new VBox {
+        spacing = 5
+        children = Seq(
+          waveView,
+          tracksBox
+        )
+      }
+
+      val positionLineView = new PositionLineView(20, 10, sceeneToContextX) {
+        position <==> player.position
+        scale <== waveView.scale
+        duration <== player.duration
+        height <== box.height
+      }
+
+      content = new Group {
+        children = Seq(
+          box,
+          positionLineView
+        )
+      }
+
+      def scrollX = hvalue() * (content().boundsInLocal().getWidth - viewportBounds().getWidth).max(0.0)
+
+      def scrollX_=(x: Double): Unit = {
+        hvalue() = (x / (content().boundsInLocal().getWidth - viewportBounds().getWidth)).max(hmin()).min(hmax())
+      }
+
+      def scrollY = vvalue() * (content().boundsInLocal().getHeight - viewportBounds().getHeight).max(0.0)
+
+      def scrollY_=(x: Double): Unit = if ((content().boundsInLocal().getHeight - viewportBounds().getHeight) > 0) {
+        vvalue() = (x / (content().boundsInLocal().getHeight - viewportBounds().getHeight)).max(vmin()).min(vmax())
+      }
+
+      addEventFilter(ScrollEvent.Scroll, (e: input.ScrollEvent) => {
+        e.consume()
+        if (e.isControlDown) {
+          val oldPosition = (scrollX + e.getX) / waveView.scale()
+          waveView.scale() = (waveView.scale() * (1 + e.getDeltaY / 400)).max(1.0).min(10.0)
+          scrollX = oldPosition * waveView.scale() - e.getX()
+        } else if (e.isShiftDown) {
+          scrollY -= e.getDeltaY()
+        } else {
+          scrollX += e.getDeltaY()
+        }
+      })
+
+      val minX = DoubleProperty(0.05)
+      val maxX = DoubleProperty(0.95)
+
+      positionLineView.pxPosition.onChange { (_, _, v) =>
+        if (v.doubleValue() < scrollX + minX() * viewportBounds().getWidth) {
+          scrollX = v.doubleValue() - minX() * viewportBounds().getWidth
+        } else if (v.doubleValue() > scrollX + maxX() * viewportBounds().getWidth) {
+          scrollX = v.doubleValue() - maxX() * viewportBounds().getWidth
+        }
+      }
+
+      waveView.onAction() = p => {
+        positionLineView.position() = (p, true)
+      }
+
+    }
+
+    val headerGroup = new Pane {
+      self =>
+      val box = new Group {
+        layoutY <== Bindings.createDoubleBinding(() => -scrollPane.scrollY, scrollPane.vvalue, scrollPane.viewportBounds, scrollPane.content().boundsInLocal)
+        children = Seq(new VBox {
+          spacing = 5
+          children = Seq(
+            new Rectangle {
+              height = 203
+              width = 100
+              fill = Color.Transparent
+            },
+            headerBox
+          )
+        })
+      }
+      minWidth <== Bindings.createDoubleBinding(() => box.layoutBounds().getWidth, box.layoutBounds)
+      children = Seq(box)
+      clip = new Rectangle {
+        width <== Bindings.createDoubleBinding(() => self.layoutBounds().getWidth, self.layoutBounds)
+        height <== Bindings.createDoubleBinding(() => self.layoutBounds().getHeight, self.layoutBounds)
+      }
+    }
+    children = Seq(
+      headerGroup,
+      scrollPane
+    )
+
+    tracks.append(new Track() {
+      title() = "very long title"
+      content ++= beats
+    })
+    tracks.append(new Track() {
+      title() = "foo"
+      content ++= Seq(
+        (0.5, 10.0, new BPMGroup() {
+          bpm() = 120
+        }),
+        (20, 100.0, new BeatsPattern() {
+          pattern ++= Seq(
+            (0.5, 0.55, new Beat()),
+            (1.5, 1.55, new Beat()),
+            (3.5, 3.55, new Beat()),
+            (4.5, 4.55, new Beat())
+          )
+          patternDuration() = 10.0
+        }),
+        (150, 200.0, new Message() {
+          text() = "hello world"
+        })
+      )
+    })
+
   }
 
   def mouseHandler(single: MouseEvent => Unit, double: MouseEvent => Unit) = {
@@ -296,25 +659,43 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     }
   }
 
-  val beatIcons = mutable.Map[Double, Beat]()
-
 
   stage = new PrimaryStage {
     self =>
     scene = new Scene {
       root = new BorderPane {
         prefWidth = 800
+        top = new MenuBar {
+          menus = Seq(
+            new Menu("File") {
+              items = Seq(
+                new MenuItem("Open"),
+                new MenuItem("Import Beats"),
+                new MenuItem("Export Beats")
+              )
+            }
+          )
+        }
         center = mainView
-        bottom = new VBox {
-          children = Seq(
+        bottom = new ToolBar {
+          items = Seq(
             new ToggleButton("play") {
               selected <==> player.playing
+              focusTraversable = false
+            },
+            new ToggleButton("beat") {
+              tooltip = Tooltip("Insert beat at current position")
+              focusTraversable = false
             }
           )
         }
       }
     }
   }
+
+  def weak[A](listener: ChangeListener[A]): ChangeListener[A] = new WeakChangeListener[A](listener)
+
+  def weak(listener: => Unit): InvalidationListener = new WeakInvalidationListener(_ => listener)
 
   println("started.")
 }
