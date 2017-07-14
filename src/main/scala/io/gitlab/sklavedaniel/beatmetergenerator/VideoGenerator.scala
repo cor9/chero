@@ -25,6 +25,7 @@ import javax.imageio.ImageIO
 
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.Beatmeter._
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters._
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.BeatFiles
 import org.rogach.scallop.ScallopConf
 import shapeless.{:: => :::}
 

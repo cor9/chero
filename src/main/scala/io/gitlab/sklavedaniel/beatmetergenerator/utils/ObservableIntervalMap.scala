@@ -28,7 +28,7 @@ import scalafx.beans.Observable
 
 object ObservableIntervalMap {
 
-  def apply[A, B](implicit ordering: Ordering[A]) = new ObservableIntervalMap[A, B]()
+  def apply[A, B](implicit fractional: Fractional[A]) = new ObservableIntervalMap[A, B]()
 
   trait ChangeListener[A, B] {
     def onChange(map: ObservableIntervalMap[A, B], change: Change[A, B])
@@ -51,42 +51,34 @@ object ObservableIntervalMap {
 
   case class AddChange[A, B](added: List[(A, A, B)]) extends Change[A, B]
 
-  case class MoveChange[A, B](from: (A, A), to: (A, A), elem: B) extends Change[A, B]
-
+  case class MoveChange[A, B](from: (A, A), to: (A, A), moved: List[((A, A), (A, A), B)]) extends Change[A, B]
 
   case class RemoveChange[A, B](removed: List[(A, A, B)]) extends Change[A, B]
 
 }
 
-class ObservableIntervalMap[A, B](implicit ordering: Ordering[A]) extends Observable with Traversable[(A, A, B)] {
+class ObservableIntervalMap[A, B](implicit fractional: Fractional[A]) extends Observable with Traversable[(A, A, B)] {
+
+  import fractional.mkNumericOps
+  import fractional.mkOrderingOps
+
   private val starts: mutable.SortedMap[A, (A, A, B)] = mutable.TreeMap()
   private val ends: mutable.SortedMap[A, (A, A, B)] = mutable.TreeMap()
   private var invalidationListeners = Set[InvalidationListener]()
   private var listeners = Set[ObservableIntervalMap.ChangeListener[A, B]]()
 
-  def apply(a: A): Option[(A, A, B)] = {
-    val start = starts.to(a).lastOption.map(_._2)
-    val end = ends.from(a).headOption.map(_._2._2)
-    start.filter(s => end.contains(s._2))
-  }
+  def apply(a: A): Option[(A, A, B)] =
+    ends.from(a).headOption.map(_._2).filter(_._1 <= a)
 
-  def apply(startA: A, endA: A): List[(A, A, B)] = {
-    val start = starts.to(endA).iterator.map(_._2)
-    val end = ends.from(startA)
-    start.filter(s => end.contains(s._2)).toList
-  }
+  def apply(startA: A, endA: A): List[(A, A, B)] =
+    starts.from(startA).iterator.map(_._2).takeWhile(_._2 <= endA).toList
 
-  def starting(startA: A, endA: A): List[(A, A, B)] = {
-    val start = starts.to(endA).iterator.map(_._2)
-    val end = starts.from(startA)
-    start.filter(s => end.contains(s._2)).toList
-  }
 
-  def ending(startA: A, endA: A): List[(A, A, B)] = {
-    val start = starts.to(endA).iterator.map(_._2)
-    val end = starts.from(startA)
-    start.filter(s => end.contains(s._2)).toList
-  }
+  def starting(startA: A, endA: A): List[(A, A, B)] =
+    starts.from(startA).iterator.takeWhile(_._1 <= endA).map(_._2).toList
+
+  def ending(startA: A, endA: A): List[(A, A, B)] =
+    ends.from(startA).iterator.takeWhile(_._1 <= endA).map(_._2).toList
 
   def intersecting(startA: A, endA: A): List[(A, A, B)] = {
     val start = starting(startA, endA)
@@ -112,27 +104,46 @@ class ObservableIntervalMap[A, B](implicit ordering: Ordering[A]) extends Observ
     list
   }
 
-  def move(from: (A, A), to: (A, A)): Unit = {
-    require(intersecting(from._1, from._2).filterNot(e => e._1 == from._1).isEmpty)
-    val b = starts(from._1)._3
-    starts -= from._1
-    ends -= from._2
-    starts(to._1) = (from._1, from._2, b)
-    ends(to._2) = (from._1, from._2, b)
-    for (listener <- listeners) {
-      listener.onChange(this, ObservableIntervalMap.MoveChange(from, to, b))
-    }
-    for (listener <- invalidationListeners) {
-      listener.invalidated(this)
+  def move(from: (A, A), to: (A, A), scalable: B => Boolean = _ => true): Unit = {
+    require(intersecting(to._1, to._2).forall(e => from._1 <= e._1 && e._2 <= from._2))
+    if (from != to) {
+      val scale = (to._2 - to._1) / (from._2 - from._1)
+      val list = ListBuffer[((A, A), (A, A), B)]()
+      for (elem <- intersecting(from._1, from._2)) {
+        val b = starts(elem._1)._3
+        starts -= elem._1
+        ends -= elem._2
+        val toStart = to._1 + scale * (elem._1 - from._1)
+        val toEnd = if (scalable(b)) {
+          if (elem._2 == from._2) {
+            to._2
+          } else {
+            to._1 + scale * (elem._2 - from._1)
+          }
+        } else {
+          to._1 + scale * (elem._1 - from._1) + elem._2 - elem._1
+        }
+        starts(toStart) = (toStart, toEnd, b)
+        ends(toEnd) = (toStart, toEnd, b)
+        list += ((from, (toStart, toEnd), b))
+      }
+      for (listener <- listeners) {
+        listener.onChange(this, ObservableIntervalMap.MoveChange(from, to, list.toList))
+      }
+      for (listener <- invalidationListeners) {
+        listener.invalidated(this)
+      }
     }
   }
+
+  def contains(startA: A, endA: A) = starts.from(startA).headOption.exists(_ == endA)
 
   def ++=(elems: TraversableOnce[(A, A, B)]): Unit = {
     val list = elems.toList
     require(list.forall(e => intersecting(e._1, e._2).isEmpty))
     for ((startA, endA, b) <- elems) {
       starts(startA) = (startA, endA, b)
-      ends(startA) = (startA, endA, b)
+      ends(endA) = (startA, endA, b)
     }
     for (listener <- listeners) {
       listener.onChange(this, ObservableIntervalMap.AddChange(list))

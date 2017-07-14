@@ -16,18 +16,22 @@
  *
  */
 
-package io.gitlab.sklavedaniel.beatmetergenerator
+package io.gitlab.sklavedaniel.beatmetergenerator.editor
 
 import java.io.InputStream
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.concurrent.{FutureTask, LinkedBlockingQueue}
 import javax.sound.sampled._
 
+import io.gitlab.sklavedaniel.beatmetergenerator.AudioPlayer
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap
 import org.apache.commons.io.IOUtils
 import resource._
 
+import scala.collection.mutable.ListBuffer
 import scalafx.application.Platform
 import scalafx.beans.property._
+import scalafx.collections.ObservableBuffer
 
 object AudioPlayer2 {
 
@@ -87,7 +91,7 @@ class AudioPlayer2(audioData: InputStream, beatData: InputStream) {
     sync.offer(())
   }: Unit
 
-  val rate = FloatProperty(0.5f)
+  val rate = FloatProperty(1.0f)
   rate.onChange(syncChange)
   val position = ObjectProperty((0.0, true))
   position.onChange {
@@ -96,7 +100,7 @@ class AudioPlayer2(audioData: InputStream, beatData: InputStream) {
         sync.offer(())
       }
   }
-  val beats = ObjectProperty(List[Double]())
+  val beats = ObservableBuffer[(BooleanProperty, ObservableIntervalMap[Double, Beat])]()
   val ratio = DoubleProperty(0.9)
   ratio.onChange(syncChange)
   val playing = BooleanProperty(false)
@@ -125,15 +129,21 @@ class AudioPlayer2(audioData: InputStream, beatData: InputStream) {
       while (true) {
         sync.take()
 
-        val task = new FutureTask[(Double, Double, Float, Boolean, List[Double])](() => (self.position()._1, self.ratio(), self.rate(), self.playing(), self.beats()))
+        val task = new FutureTask[(Double, Double, Float, Boolean, Seq[(Int, Int)])](() => {
+          var position = (self.position()._1 * format.getFrameRate).round.toInt
+          val l = merge(self.beats.filter(_._1()).map(_._2.map(_._1)).toList, ListBuffer.empty)
+          val tmp = (l.map(b => (b * format.getFrameRate).ceil.toInt) :+ audioCount)
+            .sliding(2).filter(_.length == 2).map(x => (x(0), x(1))).dropWhile(_._2 <= position).toSeq
+          (self.position()._1, self.ratio(), self.rate(), self.playing(), tmp)
+        })
         Platform.runLater(task)
         val (currentPosition, currentRatio, currentRate, currentPlaying, currentBeats) = task.get
 
+        println("current: " + currentBeats)
         if (currentPlaying) {
           var position = (currentPosition * format.getFrameRate).round.toInt
           val bufferSize = (format.getFrameRate * bufferDuration * currentRate).round.toInt
-          var bs: Seq[(Int, Int)] = (currentBeats.map(b => (b * format.getFrameRate).ceil.toInt) :+ audioCount)
-            .sliding(2).filter(_.length == 2).map(x => (x(0), x(1))).dropWhile(_._2 <= position).toSeq
+          var bs = currentBeats
           val bbuffer = ByteBuffer.allocate(bufferSize * format.getFrameSize).order(if (format.isBigEndian) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN)
 
           sourceLine.open(rateFormat(format, currentRate))
@@ -180,4 +190,17 @@ class AudioPlayer2(audioData: InputStream, beatData: InputStream) {
   private def rateFormat(format: AudioFormat, rate: Float) =
     new AudioFormat(format.getEncoding, rate * format.getSampleRate, format.getSampleSizeInBits, format.getChannels, format.getFrameSize, rate * format.getFrameRate, format.isBigEndian)
 
+  private def merge[A: Ordering](seq: Seq[Traversable[A]], result: ListBuffer[A]): List[A] = {
+    if (seq.isEmpty) {
+      result.toList
+    } else {
+      val (trv, idx: Int) = seq.zipWithIndex.minBy(_._1.headOption)
+      if (trv.isEmpty) {
+        merge(seq.slice(0, idx) ++ seq.slice(idx + 1, seq.size), result)
+      } else {
+        result += trv.head
+        merge(seq.slice(0, idx) ++ (trv.tail +: seq.slice(idx + 1, seq.size)), result)
+      }
+    }
+  }
 }

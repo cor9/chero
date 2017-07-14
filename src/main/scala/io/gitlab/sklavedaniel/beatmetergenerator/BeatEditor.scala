@@ -22,6 +22,7 @@ import java.io._
 import javafx.collections.{FXCollections, ObservableList}
 import javafx.scene.input
 
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.BeatFiles
 import org.rogach.scallop.ScallopConf
 
 import scala.collection.JavaConverters.asJavaCollection

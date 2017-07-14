@@ -16,40 +16,44 @@
  *
  */
 
-package io.gitlab.sklavedaniel.beatmetergenerator
+package io.gitlab.sklavedaniel.beatmetergenerator.editor
 
 import java.io._
-import javafx.beans.{InvalidationListener, WeakInvalidationListener}
+import javafx.beans.binding.{DoubleBinding, DoubleExpression}
 import javafx.beans.value.{ChangeListener, WeakChangeListener}
+import javafx.beans.{InvalidationListener, WeakInvalidationListener}
 import javafx.geometry.VPos
 import javafx.scene.{Cursor, input}
 
-import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.{BeatFiles, ObservableIntervalMap}
+import io.gitlab.sklavedaniel.beatmetergenerator._
 import org.rogach.scallop.ScallopConf
 
 import scala.collection.mutable
-import scala.math.Ordering._
 import scalafx.Includes._
 import scalafx.animation.{KeyFrame, Timeline}
 import scalafx.application.JFXApp
 import scalafx.application.JFXApp.PrimaryStage
-import scalafx.beans.binding.Bindings
+import scalafx.beans.binding.{Bindings, ObjectExpression}
 import scalafx.beans.property._
 import scalafx.collections.ObservableBuffer
-import scalafx.scene.control._
+import scalafx.geometry.Insets
+import scalafx.scene.control.{MenuItem, _}
 import scalafx.scene.input._
 import scalafx.scene.layout._
 import scalafx.scene.paint.Color
-import scalafx.scene.shape.{Circle, Line, Rectangle}
+import scalafx.scene.shape.{Line, Rectangle}
 import scalafx.scene.text.{Font, Text}
 import scalafx.scene.transform.Scale
 import scalafx.scene.{Group, Scene}
+import scalafx.stage.FileChooser
+import scalafx.stage.FileChooser.ExtensionFilter
 import scalafx.util.Duration
 
 object BeatEditor2 {
 
   class Conf extends Main.ExecutableSubcommand("editor2") {
-    val input = opt[File](required = true, descr = "Audio file to play")
+    val input = opt[File](descr = "Audio file to play")
     val beats = opt[File](descr = "File containing beat definitions")
     validateFileExists(input)
     validateFileExists(beats)
@@ -63,8 +67,18 @@ object BeatEditor2 {
 
 class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
+  val audioFile = conf.input.orElse(Option({
+    val fc = new FileChooser()
+    fc.title = "Beatmeter Generator: Open audio file"
+    fc.getExtensionFilters += new ExtensionFilter("wav audio file (16bit unsigned)", "*.wav")
+    fc.showOpenDialog(null)
+  }))
+  if (audioFile.isEmpty) {
+    System.exit(1)
+  }
+
   println("starting...")
-  val player = new AudioPlayer2(new BufferedInputStream(new FileInputStream(conf.input())), new BufferedInputStream(getClass.getResourceAsStream("/beats/click.wav")))
+  val player = new AudioPlayer2(new BufferedInputStream(new FileInputStream(audioFile())), new BufferedInputStream(getClass.getResourceAsStream("/beats/click.wav")))
 
   player.ratio.set(0.8)
   player.rate.set(0.5f)
@@ -204,36 +218,18 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
   }
 
-  sealed trait TrackElement
-
-  class Beat() extends TrackElement {
-    val name = ObjectProperty("")
-    val highlight = BooleanProperty(false)
-  }
-
-  class BPMGroup() extends TrackElement {
-    val bpm = DoubleProperty(0.0)
-    val beat = new Beat()
-  }
-
-  class BeatsPattern() extends TrackElement {
-    val patternDuration = DoubleProperty(0.0)
-    val pattern = ObservableIntervalMap[Double, Beat](math.Ordering.Double)
-  }
-
-  class Message() extends TrackElement {
-    val text = ObjectProperty("")
-  }
-
-
-  class Track {
-    val title = ObjectProperty("")
-    val content = ObservableIntervalMap[Double, TrackElement](math.Ordering.Double)
-  }
 
   class TrackHeaderView(val track: Track) extends Group {
     self =>
     val width = DoubleProperty(0.0)
+    val active = new ToggleButton {
+      text = "P"
+      tooltip = new Tooltip("mute/unmute track") {
+        font = Font(10)
+      }
+      font = Font(8)
+      focusTraversable = false
+    }
     children = Seq(
       new Rectangle {
         x <== 0.0
@@ -255,16 +251,26 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         children = Seq(
           new Button {
             text = "X"
+            tooltip = new Tooltip("delete track") {
+              font = Font(10)
+            }
             font = Font(8)
             focusTraversable = false
           },
+          active,
           new ToggleButton {
-            text = "P"
+            text = "R"
+            tooltip = new Tooltip("record beats to track") {
+              font = Font(10)
+            }
             font = Font(8)
             focusTraversable = false
           },
           new ToggleButton {
             text = "S"
+            tooltip = new Tooltip("use track for snapping") {
+              font = Font(10)
+            }
             font = Font(8)
             focusTraversable = false
           }
@@ -276,6 +282,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
   class TrackView(initPxPerSec: Double, val track: Track) extends Group {
     val duration = DoubleProperty(0.0)
     val pxPerSec = DoubleProperty(initPxPerSec)
+    val beats = ObservableIntervalMap[Double, Beat]
     val scale = {
       val s = new Scale(1.0, 1.0, 0.0, 0.0)
       transforms = Seq(s)
@@ -289,22 +296,40 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     }
     private val element2view = mutable.Map[(Double, Double, TrackElement), TrackElementView]()
 
+    private def addGenerator(gen: BeatsGenerator, tmp: TrackElementView): Unit = {
+      beats ++= gen.beats().map(e => (e._1 + tmp.position()._1, e._2 + tmp.position()._1, e._3)).takeWhile(_._2 <= tmp.position()._2)
+
+      gen.beats.onInvalidate {
+        beats --= beats.intersecting(tmp.position()._1, tmp.position()._2).map(e => (e._1, e._2))
+        beats ++= gen.beats().map(e => (e._1 + tmp.position()._1, e._2 + tmp.position()._1, e._3)).takeWhile(_._2 <= tmp.position()._2)
+      }
+      tmp.position.onChange { (_, old, pos) =>
+        beats --= beats.intersecting(old._1, old._2).map(e => (e._1, e._2))
+        beats ++= gen.beats().map(e => (e._1 + tmp.position()._1, e._2 + tmp.position()._1, e._3)).takeWhile(_._2 <= tmp.position()._2)
+      }
+    }
+
     private def addElement(elem: (Double, Double, TrackElement)): Unit = {
       val v = elem._3 match {
         case beat: Beat =>
-          new BeatView(beat)
+          beats ++= Seq((elem._1, elem._2, beat))
+          new BeatView(beat, true, scale)
         case beatsGroup: BeatsPattern =>
-          new BeatsPatternView(beatsGroup)
-        case bpmGroup: BPMGroup =>
-          new BPMGroupView(bpmGroup)
+          val tmp = new BeatsPatternView(beatsGroup, scale)
+          addGenerator(beatsGroup, tmp)
+          tmp
+        case bpmGroup: BPMPattern =>
+          val tmp = new BPMGroupView(bpmGroup, scale)
+          addGenerator(bpmGroup, tmp)
+          tmp
         case message: Message =>
-          new MessageView(message)
+          new MessageView(message, scale)
       }
       v.layoutX <== pxPerSec * elem._1
       v.pxPerSec <== pxPerSec
       v.position() = (elem._1, elem._2)
       v.position.onChange { (_, old, pos) =>
-        if (old != pos) track.content.move(old, pos)
+        if (old != pos && !track.content.contains(pos._1, pos._2)) track.content.move(old, pos)
       }
       element2view(elem) = v
       elementGroup.children.add(v)
@@ -315,12 +340,18 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         for (elem <- l) {
           addElement(elem)
         }
-      case (_, ObservableIntervalMap.MoveChange(from, to, b)) =>
-        if (from != to) element2view((from._1, from._2, b)).position() = to
-
+      case (_, ObservableIntervalMap.MoveChange(from, to, l)) =>
+        if (from != to) {
+          for ((f, t, b) <- l) {
+            val v = element2view.remove((f._1, f._2, b)).get
+            element2view += (t._1, t._2, b) -> v
+            v.position() = t
+          }
+        }
       case (_, ObservableIntervalMap.RemoveChange(l: List[(Double, Double, TrackElement)])) =>
         for (elem <- l) {
           element2view.remove(elem).foreach(elementGroup.children.remove)
+          beats --= beats.intersecting(elem._1, elem._2).map(e => (e._1, e._2))
         }
     }
     track.content.addListener(listener)
@@ -347,27 +378,54 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     )
   }
 
-  sealed class TrackElementView extends Group {
+  sealed class TrackElementView(val scaled: DoubleExpression) extends Group {
     val pxPerSec = DoubleProperty(0.0)
     val position = ObjectProperty((0.0, 0.0))
     val duration = Bindings.createDoubleBinding(() => position()._2 - position()._1, position)
     val width = pxPerSec * duration
   }
 
-  final class BeatView(val beat: Beat) extends TrackElementView {
+  sealed class ResizableElementView(scaled: DoubleExpression) extends TrackElementView(scaled) {
+    self =>
+    onMouseMoved = e => {
+      if (e.getX > width.doubleValue() - 5 / scaled.doubleValue()) {
+        self.setCursor(Cursor.H_RESIZE)
+      } else {
+        self.setCursor(Cursor.DEFAULT)
+      }
+    }
+    onMouseDragged = e => {
+      if (resizeOffset.isDefined) {
+        val tmp = position()._1
+        position() = (tmp, tmp + (e.getX + resizeOffset.get).max(0.05) / pxPerSec())
+      }
+    }
+    private var resizeOffset: Option[Double] = None
+    onMousePressed = e => {
+      if (e.isPrimaryButtonDown && e.getX > width.doubleValue() - 5 / scaled.doubleValue()) {
+        resizeOffset = Some(width.doubleValue() - e.getX)
+      }
+    }
+    onMouseReleased = e => {
+      resizeOffset = None
+      if (e.getX < width.doubleValue() - 5 / scaled.doubleValue() || !contains(e.getX, e.getY))
+        self.setCursor(Cursor.DEFAULT)
+    }
+  }
+
+  final class BeatView(val beat: Beat, val editable: Boolean, scaled: DoubleExpression) extends TrackElementView(scaled) {
     self =>
     children = Seq(new Rectangle {
       width <== self.width
       height = 10
       y = -5
-      fill = Color.DarkRed
+      fill = if (editable) Color.DarkRed else Color.DarkGray
     })
   }
 
-  final class BeatsPatternView(val beatsPattern: BeatsPattern) extends TrackElementView {
+  final class BeatsPatternView(val beatsPattern: BeatsPattern, scaled: DoubleExpression) extends ResizableElementView(scaled) {
     self =>
     val beatsGroup = new Group
-    val repetitionsGroup = new Group
     children = Seq(
       new Rectangle {
         width <== when(self.width < 5) choose 5 otherwise self.width
@@ -376,7 +434,6 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         fill = Color.LightPink
       },
       beatsGroup,
-      repetitionsGroup,
       new Line {
         startX <== beatsPattern.patternDuration * pxPerSec
         endX <== beatsPattern.patternDuration * pxPerSec
@@ -387,34 +444,23 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     )
 
     private def update(): Unit = {
-      beatsGroup.children = (for ((start, end, b) <- beatsPattern.pattern) yield {
-        val v = new BeatView(b)
+      beatsGroup.children = for ((start, end, b) <- beatsPattern.beats().takeWhile(_._2 < duration.get())) yield {
+        val v = new BeatView(b, start < beatsPattern.patternDuration(), scaled)
         v.position() = (start, end)
         v.pxPerSec <== pxPerSec
         v.layoutX <== pxPerSec * start
-        v
-      }).toSeq
-      repetitionsGroup.children = for {
-        i <- 0 until (duration.get() / beatsPattern.patternDuration()).floor.toInt
-        (start, end, b) <- beatsPattern.pattern
-      } yield {
-        val v = new BeatView(b)
-        v.position() = (i * beatsPattern.patternDuration() + start, end)
-        v.pxPerSec <== pxPerSec
-        v.layoutX <== pxPerSec * (i * beatsPattern.patternDuration() + start)
         v
       }
     }
 
     update()
-
-    val handler = weak(update())
-    duration.addListener(handler)
-    beatsPattern.pattern.addListener(handler)
-    beatsPattern.patternDuration.addListener(handler)
+    private val handler: InvalidationListener = _ => update()
+    duration.addListener(weak(handler))
+    beatsPattern.beats.addListener(weak(handler))
   }
 
-  final class BPMGroupView(val bpmGroup: BPMGroup) extends TrackElementView {
+  final class BPMGroupView(val bpmGroup: BPMPattern, scaled: DoubleExpression) extends ResizableElementView(scaled) {
+    self =>
     private val binding = when(width < 5) choose 5 otherwise width
     val beatsGroup = new Group
     children = Seq(
@@ -428,28 +474,23 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     )
 
     private def update(): Unit = {
-      beatsGroup.children = if (bpmGroup.bpm() > 0) {
-        for (i <- 0 to (duration.get() * 60 / bpmGroup.bpm()).floor.toInt) yield {
-          val v = new BeatView(bpmGroup.beat)
-          v.pxPerSec <== pxPerSec
-          val p = i * bpmGroup.bpm() / 60
-          v.position() = (p, p + 0.05)
-          v.layoutX <== pxPerSec * p
-          v
-        }
-      } else {
-        Seq()
+      beatsGroup.children = for ((start, end, b) <- bpmGroup.beats().takeWhile(_._2 < duration.get())) yield {
+        val v = new BeatView(b, false, scaled)
+        v.pxPerSec <== pxPerSec
+        v.position() = (start, end)
+        v.layoutX <== pxPerSec * start
+        v
       }
     }
 
     update()
-    private val handler = weak(update())
-    duration.addListener(handler)
-    bpmGroup.bpm.addListener(handler)
+    private val handler: InvalidationListener = _ => update()
+    duration.addListener(weak(handler))
+    bpmGroup.beats.addListener(weak(handler))
 
   }
 
-  final class MessageView(val message: Message) extends TrackElementView {
+  final class MessageView(val message: Message, scaled: DoubleExpression) extends ResizableElementView(scaled) {
     self =>
     children = Seq(
       new Rectangle {
@@ -484,6 +525,12 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
     object scrollPane extends ScrollPane {
       self =>
+      override def requestFocus() {
+
+      }
+
+      focusTraversable = false
+
       val sceeneToContextX = (x: Double) => sceneToLocal(x, 0.0).getX + scrollX
       println("generating waveform...")
       val waveView = new WaveView(player.maxima, 20, player.maxima.toIterator.map(v => v._1._1 max v._1._2).max, 200, sceeneToContextX)
@@ -500,7 +547,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         for (c <- cs) {
           c match {
             case ObservableBuffer.Add(i, ts) =>
-              for (t <- ts) {
+              for (t <- ts) yield {
                 val v = new TrackView(20, t) {
                   scale <== waveView.scale
                   duration <== player.duration
@@ -512,11 +559,13 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                 track2headerView(t) = h
                 tracksBox.children.add(i, v)
                 headerBox.children.add(i, h)
+                player.beats.add(i, (h.active.selected, v.beats))
               }
-            case ObservableBuffer.Remove(_, ts) =>
+            case ObservableBuffer.Remove(i, ts) =>
               for (t <- ts) {
                 track2view.remove(t).foreach(tracksBox.children.remove)
                 track2headerView.remove(t).foreach(headerBox.children.remove)
+                player.beats.remove(i)
               }
             case _ => assert(false)
           }
@@ -622,7 +671,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     tracks.append(new Track() {
       title() = "foo"
       content ++= Seq(
-        (0.5, 10.0, new BPMGroup() {
+        (0.5, 10.0, new BPMPattern() {
           bpm() = 120
         }),
         (20, 100.0, new BeatsPattern() {
@@ -662,6 +711,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
   stage = new PrimaryStage {
     self =>
+    title = "Beatmeter Generator"
     scene = new Scene {
       root = new BorderPane {
         prefWidth = 800
@@ -670,14 +720,28 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
             new Menu("File") {
               items = Seq(
                 new MenuItem("Open"),
+                new MenuItem("Save"),
                 new MenuItem("Import Beats"),
                 new MenuItem("Export Beats")
+              )
+            },
+            new Menu("Edit") {
+              items = Seq(
+                new MenuItem("Undo"),
+                new MenuItem("Redo")
+              )
+            },
+            new Menu("Tools") {
+              items = Seq(
+                new MenuItem("Generate Audio"),
+                new MenuItem("Generate Beatmeter")
               )
             }
           )
         }
         center = mainView
         bottom = new ToolBar {
+          padding = Insets(0, 0, 0, 0)
           items = Seq(
             new ToggleButton("play") {
               selected <==> player.playing
@@ -686,6 +750,29 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
             new ToggleButton("beat") {
               tooltip = Tooltip("Insert beat at current position")
               focusTraversable = false
+            },
+            new HBox {
+              hgrow = Priority.Always
+            },
+            new GridPane {
+              scaleX = 0.8
+              scaleY = 0.8
+              hgap = 5
+              vgap = 5
+              addRow(0,
+                new Text("Speed"),
+                new Slider(0.2f, 1.0f, 1.0f) {
+                  blockIncrement = 0.1f
+                  value <==> player.rate
+                }.delegate
+              )
+              addRow(1,
+                new Text("Volume"),
+                new Slider(0.0, 1.0, 0.5) {
+                  blockIncrement = 0.1
+                  value <==> player.ratio
+                }.delegate
+              )
             }
           )
         }
@@ -695,7 +782,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
   def weak[A](listener: ChangeListener[A]): ChangeListener[A] = new WeakChangeListener[A](listener)
 
-  def weak(listener: => Unit): InvalidationListener = new WeakInvalidationListener(_ => listener)
+  def weak(listener: InvalidationListener): InvalidationListener = new WeakInvalidationListener(listener)
 
   println("started.")
 }

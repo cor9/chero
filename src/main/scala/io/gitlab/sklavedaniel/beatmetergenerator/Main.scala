@@ -178,7 +178,7 @@ object Main extends App {
 
   val commands: Seq[ExecutableSubcommand] = Seq(
     new BeatEditor.Conf(),
-    new BeatEditor2.Conf(),
+    new editor.BeatEditor2.Conf(),
     new AudioGenerator.Conf(),
     new VideoGenerator.Conf(),
     new BPMDetector.Conf()

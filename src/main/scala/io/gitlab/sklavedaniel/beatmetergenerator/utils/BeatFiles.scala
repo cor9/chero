@@ -16,7 +16,7 @@
  *
  */
 
-package io.gitlab.sklavedaniel.beatmetergenerator
+package io.gitlab.sklavedaniel.beatmetergenerator.utils
 
 import java.io.{BufferedWriter, File, FileWriter}
 

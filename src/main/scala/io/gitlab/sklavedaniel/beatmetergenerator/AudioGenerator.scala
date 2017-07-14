@@ -21,6 +21,7 @@ package io.gitlab.sklavedaniel.beatmetergenerator
 import java.io.{File, InputStream}
 import javax.sound.sampled._
 
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.BeatFiles
 import org.apache.commons.io.IOUtils
 import org.rogach.scallop.ScallopConf
 
