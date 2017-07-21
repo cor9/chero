@@ -315,21 +315,21 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
           beats ++= Seq((elem._1, elem._2, beat))
           new BeatView(beat, true, scale)
         case beatsGroup: BeatsPattern =>
-          val tmp = new BeatsPatternView(beatsGroup, scale)
+          val tmp = new BeatsPatternView(beatsGroup, scale, track.content)
           addGenerator(beatsGroup, tmp)
           tmp
         case bpmGroup: BPMPattern =>
-          val tmp = new BPMGroupView(bpmGroup, scale)
+          val tmp = new BPMGroupView(bpmGroup, scale, track.content)
           addGenerator(bpmGroup, tmp)
           tmp
         case message: Message =>
-          new MessageView(message, scale)
+          new MessageView(message, scale, track.content)
       }
       v.layoutX <== pxPerSec * elem._1
       v.pxPerSec <== pxPerSec
       v.position() = (elem._1, elem._2)
       v.position.onChange { (_, old, pos) =>
-        if (old != pos && !track.content.contains(pos._1, pos._2)) track.content.move(old, pos)
+        if (old != pos && !track.content.contains(pos._1, pos._2)) track.content.move(old, pos, !_.isInstanceOf[Beat])
       }
       element2view(elem) = v
       elementGroup.children.add(v)
@@ -385,7 +385,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     val width = pxPerSec * duration
   }
 
-  sealed class ResizableElementView(scaled: DoubleExpression) extends TrackElementView(scaled) {
+  sealed class ResizableElementView(scaled: DoubleExpression, context: ObservableIntervalMap[Double, TrackElement]) extends TrackElementView(scaled) {
     self =>
     onMouseMoved = e => {
       if (e.getX > width.doubleValue() - 5 / scaled.doubleValue()) {
@@ -397,9 +397,16 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     onMouseDragged = e => {
       if (resizeOffset.isDefined) {
         val tmp = position()._1
-        position() = (tmp, tmp + (e.getX + resizeOffset.get).max(0.05) / pxPerSec())
+        val newDuration = minDuration.max((e.getX + resizeOffset.get).max(0.05) / pxPerSec())
+        val tmp2 = tmp + newDuration
+        if (context.intersecting(tmp, tmp2).forall(p => tmp <= p._1 && p._2 <= position()._2)) {
+          position() = (tmp, tmp2)
+        }
       }
     }
+
+    def minDuration = 0.0
+
     private var resizeOffset: Option[Double] = None
     onMousePressed = e => {
       if (e.isPrimaryButtonDown && e.getX > width.doubleValue() - 5 / scaled.doubleValue()) {
@@ -423,7 +430,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     })
   }
 
-  final class BeatsPatternView(val beatsPattern: BeatsPattern, scaled: DoubleExpression) extends ResizableElementView(scaled) {
+  final class BeatsPatternView(val beatsPattern: BeatsPattern, scaled: DoubleExpression, context: ObservableIntervalMap[Double, TrackElement]) extends ResizableElementView(scaled, context) {
     self =>
     val beatsGroup = new Group
     children = Seq(
@@ -435,11 +442,25 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       },
       beatsGroup,
       new Line {
+        self =>
         startX <== beatsPattern.patternDuration * pxPerSec
         endX <== beatsPattern.patternDuration * pxPerSec
         startY = -10.0
         endY = 10.0
         strokeWidth = 0.5
+        onMouseMoved = e => {
+          self.delegate.setCursor(Cursor.H_RESIZE)
+        }
+        onMouseDragged = e => {
+          val old = beatsPattern.patternDuration()
+          beatsPattern.patternDuration() = e.getX.max(0.05) / pxPerSec()
+          if (e.isControlDown) {
+            beatsPattern.pattern.move((0, old), (0, beatsPattern.patternDuration()), !_.isInstanceOf[Beat])
+          }
+        }
+        onMouseReleased = e => {
+          self.delegate.setCursor(Cursor.DEFAULT)
+        }
       }
     )
 
@@ -457,9 +478,11 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     private val handler: InvalidationListener = _ => update()
     duration.addListener(weak(handler))
     beatsPattern.beats.addListener(weak(handler))
+
+    override def minDuration = beatsPattern.patternDuration()
   }
 
-  final class BPMGroupView(val bpmGroup: BPMPattern, scaled: DoubleExpression) extends ResizableElementView(scaled) {
+  final class BPMGroupView(val bpmGroup: BPMPattern, scaled: DoubleExpression, context: ObservableIntervalMap[Double, TrackElement]) extends ResizableElementView(scaled, context) {
     self =>
     private val binding = when(width < 5) choose 5 otherwise width
     val beatsGroup = new Group
@@ -490,7 +513,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
   }
 
-  final class MessageView(val message: Message, scaled: DoubleExpression) extends ResizableElementView(scaled) {
+  final class MessageView(val message: Message, scaled: DoubleExpression, context: ObservableIntervalMap[Double, TrackElement]) extends ResizableElementView(scaled, context) {
     self =>
     children = Seq(
       new Rectangle {
