@@ -81,11 +81,12 @@ class ObservableIntervalMap[A, B](implicit fractional: Fractional[A]) extends Ob
     ends.from(startA).iterator.takeWhile(_._1 <= endA).map(_._2).toList
 
   def intersecting(startA: A, endA: A): List[(A, A, B)] = {
-    val start = starting(startA, endA)
-    val end = ending(startA, endA).headOption.filterNot(e => start.headOption.exists(s => e._1 == s._1))
-    end.toList ++ start
+    ends.from(startA).iterator.map(_._2).takeWhile(_._1 <= endA).toList
   }
 
+  def within(startA: A, endA: A): List[(A, A, B)] = {
+    starts.from(startA).iterator.map(_._2).takeWhile(_._2 <= endA).toList
+  }
 
   def --=(elems: TraversableOnce[(A, A)]): List[(A, A, B)] = {
     val result = ListBuffer[(A, A, B)]()
@@ -104,8 +105,22 @@ class ObservableIntervalMap[A, B](implicit fractional: Fractional[A]) extends Ob
     list
   }
 
+  override def lastOption = starts.lastOption.map(_._2)
+
+  override def last = lastOption.get
+
+  def canMove(from: (A, A), to: (A, A), scalable: B => Boolean = _ => true) = {
+    val scale = (to._2 - to._1) / (from._2 - from._1)
+    intersecting(to._1, to._2).forall(e => from._1 <= e._1 && e._2 <= from._2) &&
+      intersecting(from._1, from._2).sliding(2).forall {
+        case List(first, second) if !scalable(first._3) =>
+          to._1 + scale * (first._1 - from._1) + first._2 - first._1 < to._1 + scale * (second._1 - from._1)
+        case _ => true
+      }
+  }
+
   def move(from: (A, A), to: (A, A), scalable: B => Boolean = _ => true): Unit = {
-    require(intersecting(to._1, to._2).forall(e => from._1 <= e._1 && e._2 <= from._2))
+    require(canMove(from, to))
     if (from != to) {
       val scale = (to._2 - to._1) / (from._2 - from._1)
       val list = ListBuffer[((A, A), (A, A), B)]()
