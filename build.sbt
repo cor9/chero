@@ -20,7 +20,7 @@ libraryDependencies ++= Seq(
   "com.jsuereth" %% "scala-arm" % "2.0",
   "org.scala-lang" % "scala-reflect" % "2.12.2",
   "com.chuusai" %% "shapeless" % "2.3.2",
-  "org.scala-lang" % "scala-reflect" % scalaVersion.value
+  "com.github.benhutchison" %% "prickle" % "1.1.13"
 )
 
 unmanagedSourceDirectories in Compile += baseDirectory.value / "lib/JWave/src"

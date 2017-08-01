@@ -23,9 +23,41 @@ import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap
 import scalafx.beans.binding.{Bindings, ObjectBinding}
 import scalafx.beans.property.{BooleanProperty, DoubleProperty, ObjectProperty}
 
+
+
 class Track {
   val title = ObjectProperty("")
+  val play = BooleanProperty(false)
+  val record = BooleanProperty(false)
+  val display = BooleanProperty(false)
+  val snap = BooleanProperty(false)
   val content = ObservableIntervalMap[Double, TrackElement]
+
+  def toImmutable() = {
+    new ImmutableTrack(title(), play(), record(), display(), snap(), content.toList.map { elem =>
+      (elem._1, elem._2, elem._3.toImmutable())
+    })
+  }
+}
+
+
+case class ImmutableTracks(content: List[ImmutableTrack]) {
+
+}
+
+case class ImmutableTrack(title: String, play: Boolean, record: Boolean, display: Boolean, snap: Boolean, content: List[(Double, Double, ImmutableTrackElement)]) {
+  def toMutable() = {
+    val tmp = new Track()
+    tmp.title() = title
+    tmp.play() = play
+    tmp.record() = record
+    tmp.display() = display
+    tmp.snap() = snap
+    tmp.content ++= content.map { elem =>
+      (elem._1, elem._2, elem._3.toMutable())
+    }
+    tmp
+  }
 }
 
 sealed trait TrackElement {
@@ -38,16 +70,14 @@ sealed trait ImmutableTrackElement {
 
 
 class Beat() extends TrackElement {
-  val name = ObjectProperty("")
   val highlight = BooleanProperty(false)
 
-  override def toImmutable() = ImmutableBeat(name(), highlight())
+  override def toImmutable() = ImmutableBeat(highlight())
 }
 
-case class ImmutableBeat(name: String, highlight: Boolean) extends ImmutableTrackElement {
+case class ImmutableBeat(highlight: Boolean) extends ImmutableTrackElement {
   override def toMutable() = {
     val b = new Beat()
-    b.name() = name
     b.highlight() = highlight
     b
   }
@@ -62,6 +92,7 @@ class BPMPattern(val beat: Beat) extends BeatsGenerator {
     this(new Beat())
   }
 
+  val highlightFirst = BooleanProperty(false)
   val bpm = DoubleProperty(0.0)
   val beats = Bindings.createObjectBinding(() => if (bpm() == 0) {
     Stream.empty
@@ -71,38 +102,48 @@ class BPMPattern(val beat: Beat) extends BeatsGenerator {
     }
   }, bpm)
 
-  override def toImmutable() = ImmutableBPMPattern(bpm(), beat.toImmutable())
+  override def toImmutable() = ImmutableBPMPattern(highlightFirst(), bpm(), beat.toImmutable())
 }
 
-case class ImmutableBPMPattern(bpm: Double, beat: ImmutableBeat) extends ImmutableTrackElement {
+case class ImmutableBPMPattern(highlightFirst: Boolean, bpm: Double, beat: ImmutableBeat) extends ImmutableTrackElement {
   override def toMutable() = {
     val b = new BPMPattern(beat.toMutable())
     b.bpm() = bpm
+    b.highlightFirst() = highlightFirst
     b
   }
 }
 
 class BeatsPattern() extends BeatsGenerator {
+  val highlightFirst = BooleanProperty(false)
   val patternDuration = DoubleProperty(0.0)
   val pattern = ObservableIntervalMap[Double, Beat]
   val beats = Bindings.createObjectBinding(() => {
     if (pattern.isEmpty) {
       Stream.empty
     } else {
-      Stream.from(0).flatMap { i =>
+      val tmp = Stream.from(0).flatMap { i =>
         pattern.map { b =>
           (i * patternDuration() + b._1, i * patternDuration() + b._2, b._3)
         }
       }
+      if (highlightFirst()) {
+        val b = pattern.head._3.toImmutable().toMutable()
+        b.highlight() = true
+        Stream((pattern.head._1, pattern.head._2, b)) ++ tmp.tail
+      } else {
+        tmp
+      }
     }
-  }, pattern, patternDuration)
+  }, pattern, patternDuration, highlightFirst)
 
-  override def toImmutable = ImmutableBeatsPattern(patternDuration(), pattern.toList.map(x => (x._1, x._2, x._3.toImmutable())))
+  override def toImmutable = ImmutableBeatsPattern(highlightFirst(), patternDuration(), pattern.toList.map(x => (x._1, x._2, x._3.toImmutable())))
 }
 
-case class ImmutableBeatsPattern(patternDuration: Double, pattern: List[(Double, Double, ImmutableBeat)]) extends ImmutableTrackElement {
+case class ImmutableBeatsPattern(highlightFirst: Boolean, patternDuration: Double, pattern: List[(Double, Double, ImmutableBeat)]) extends ImmutableTrackElement {
   override def toMutable = {
     val b = new BeatsPattern()
+    b.highlightFirst() = highlightFirst
     b.patternDuration() = patternDuration
     b.pattern ++= pattern.map(x => (x._1, x._2, x._3.toMutable()))
     b
@@ -128,3 +169,5 @@ case class ImmutableMessage(text: String) extends ImmutableTrackElement {
     b
   }
 }
+
+

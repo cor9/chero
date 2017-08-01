@@ -21,7 +21,7 @@ package io.gitlab.sklavedaniel.beatmetergenerator.editor
 import java.io._
 import javafx.beans.binding.{DoubleBinding, DoubleExpression}
 import javafx.beans.value.{ChangeListener, WeakChangeListener}
-import javafx.beans.{InvalidationListener, WeakInvalidationListener}
+import javafx.beans.{InvalidationListener, WeakInvalidationListener, property}
 import javafx.geometry.VPos
 import javafx.scene.{Cursor, input}
 
@@ -40,6 +40,7 @@ import scalafx.beans.property._
 import scalafx.collections.ObservableSet.{Add, Remove}
 import scalafx.collections.{ObservableBuffer, ObservableSet}
 import scalafx.geometry.{Insets, Pos, Side}
+import scalafx.scene.control.Alert.AlertType
 import scalafx.scene.control.{MenuItem, _}
 import scalafx.scene.input._
 import scalafx.scene.layout._
@@ -51,6 +52,10 @@ import scalafx.scene.{Group, Node, Scene}
 import scalafx.stage.FileChooser
 import scalafx.stage.FileChooser.ExtensionFilter
 import scalafx.util.Duration
+import resource._
+
+import scala.io.Source
+import scala.util.{Failure, Success}
 
 object BeatEditor2 {
 
@@ -228,13 +233,14 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
   class TrackHeaderView(val track: Track) extends Group {
     self =>
     val width = DoubleProperty(0.0)
-    val active = new ToggleButton {
+    val play = new ToggleButton {
       text = "P"
       tooltip = new Tooltip("mute/unmute track") {
         font = Font(10)
       }
       font = Font(8)
       focusTraversable = false
+      selected <==> track.play
     }
     val snap = new ToggleButton {
       text = "S"
@@ -243,13 +249,38 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       }
       font = Font(8)
       focusTraversable = false
+      selected <==> track.snap
     }
     val contextMenu = new ContextMenu(
-      new MenuItem("Rename"),
+      new CustomMenuItem(new TextField() {
+        text <==> track.title
+        editable = true
+
+      }, false),
       new MenuItem("Select Sound"),
-      new MenuItem("Move up"),
-      new MenuItem("Move down"),
-      new MenuItem("Delete")
+      new MenuItem("Move up") {
+        onAction = handle {
+          if (mainView.tracks.head != track) {
+            val index = mainView.tracks.indexOf(track)
+            mainView.tracks.remove(track)
+            mainView.tracks.add(index - 1, track)
+          }
+        }
+      },
+      new MenuItem("Move down") {
+        onAction = handle {
+          if (mainView.tracks.last != track) {
+            val index = mainView.tracks.indexOf(track)
+            mainView.tracks.remove(track)
+            mainView.tracks.add(index + 1, track)
+          }
+        }
+      },
+      new MenuItem("Delete") {
+        onAction = handle {
+          mainView.tracks.remove(track)
+        }
+      }
     )
     onMouseClicked = e => {
       if (MouseButton.Secondary.equals(e.getButton)) {
@@ -277,7 +308,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         layoutX = 2.0
         spacing = 2
         children = Seq(
-          active,
+          play,
           new ToggleButton {
             text = "R"
             tooltip = new Tooltip("record beats to track") {
@@ -285,15 +316,17 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
             }
             font = Font(8)
             focusTraversable = false
+            selected <==> track.record
           },
           snap,
           new ToggleButton {
-            text = "V"
-            tooltip = new Tooltip("use track for beatmeter") {
+            text = "D"
+            tooltip = new Tooltip("display track on beatmeter") {
               font = Font(10)
             }
             font = Font(8)
             focusTraversable = false
+            selected <==> track.display
           }
         )
       }
@@ -391,11 +424,45 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     }
 
     var contextMenuX = 0.0
-    val contextMenu = new ContextMenu(
-      new MenuItem("New Beat"),
-      new MenuItem("New BPM Pattern"),
-      new MenuItem("New Beat Pattern"),
-      new MenuItem("New Message"),
+
+    def newResizableElement(elem: TrackElement): Unit = {
+      val duration = content.starting(contextMenuX, contextMenuX + 5).headOption.map(x => 0.5.max(x._1 - contextMenuX - 0.5)).getOrElse(5.0)
+      if (content.intersecting(contextMenuX, contextMenuX + duration).isEmpty) {
+        content ++= Iterator((contextMenuX, contextMenuX + duration, elem))
+      }
+    }
+
+    val contextMenu: ContextMenu = new ContextMenu(
+      new MenuItem("New Beat") {
+        onAction = handle {
+          val b = new Beat()
+          if (content.intersecting(contextMenuX, contextMenuX + 0.05).isEmpty) {
+            content ++= Iterator((contextMenuX, contextMenuX + 0.05, b))
+          }
+        }
+      },
+      new MenuItem("New BPM Pattern") {
+        onAction = handle {
+          val b = new BPMPattern()
+          b.bpm() = 60
+          newResizableElement(b)
+        }
+      },
+      new MenuItem("New Beat Pattern") {
+        onAction = handle {
+          val b = new BeatsPattern()
+          b.pattern ++= Iterator((0.0, 0.05, new Beat()))
+          b.patternDuration() = 0.25
+          newResizableElement(b)
+        }
+      },
+      new MenuItem("New Message") {
+        onAction = handle {
+          val b = new Message()
+          b.text() = "Hello!"
+          newResizableElement(b)
+        }
+      },
       new MenuItem("Insert") {
         onAction = handle {
           insert(contextMenuX)
@@ -609,8 +676,9 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         children.add(rect)
       }
       selectionBox.foreach { rect =>
-        rect.x() = selectionPos.get.min(e.getX)
-        rect.width() = (selectionPos.get - e.getX).abs
+        val x = e.getX.max(0.0)
+        rect.x() = selectionPos.get.min(x)
+        rect.width() = (selectionPos.get - x).abs
       }
     }
     onMouseReleased = e => {
@@ -732,14 +800,15 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
   final class BeatView[B >: Beat <: TrackElement](val beat: Beat, val editable: Boolean, context: SelectionContainer[B]) extends TrackElementView[Beat, B](beat, context) {
     self =>
+    val highlight = BooleanProperty(false)
     children = Seq(new Rectangle {
       width <== self.width
       height = 10
       y = -5
       if (editable) {
-        fill <== when(selected).choose(Color.DarkBlue).otherwise(Color.DarkRed)
+        fill <== when(selected).choose(Color.DarkBlue).otherwise(when(highlight || beat.highlight).choose(Color.OrangeRed).otherwise(Color.DarkRed))
       } else {
-        fill = Color.DarkGray
+        fill <== when(highlight || beat.highlight).choose(Color.Black).otherwise(Color.DarkGray)
       }
     })
     val contextMenu = new ContextMenu(
@@ -753,7 +822,9 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
           context.delete(self)
         }
       },
-      new CheckMenuItem("Highlight")
+      new CheckMenuItem("Highlight") {
+        selected <==> beat.highlight
+      }
     )
     onMouseClicked = e => {
       if (editable && MouseButton.Secondary.equals(e.getButton)) {
@@ -833,14 +904,29 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
     private def update(): Unit = {
       element2view.clear()
-      beatsGroup.children = for ((start, end, b) <- beatsPattern.beats().takeWhile(_._2 < duration.get())) yield {
-        val v = new BeatView[Beat](b, start < beatsPattern.patternDuration(), self)
+      beatsGroup.children = beatsPattern.pattern.headOption.map { elem =>
+        val v = new BeatView[Beat](elem._3, true, self)
+        v.position() = (elem._1, elem._2)
+        v.pxPerSec <== pxPerSec
+        v.layoutX <== pxPerSec * elem._1
+        element2view.put((elem._1, elem._2, elem._3), v)
+        v.highlight <== beatsPattern.highlightFirst
+        v
+      }.toIterable ++ (for ((start, end, b) <- beatsPattern.pattern.tail) yield {
+        val v = new BeatView[Beat](b, true, self)
         v.position() = (start, end)
         v.pxPerSec <== pxPerSec
         v.layoutX <== pxPerSec * start
         element2view.put((start, end, b), v)
         v
-      }
+      }) ++ (for ((start, end, b) <- beatsPattern.beats().drop(beatsPattern.pattern.size).takeWhile(_._2 < duration.get())) yield {
+        val v = new BeatView[Beat](b, false, self)
+        v.position() = (start, end)
+        v.pxPerSec <== pxPerSec
+        v.layoutX <== pxPerSec * start
+        element2view.put((start, end, b), v)
+        v
+      })
     }
 
     update()
@@ -854,8 +940,15 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
 
     var contextMenuX = 0.0
-    lazy val contextMenu = new ContextMenu(
-      new MenuItem("New Beat"),
+    val contextMenu = new ContextMenu(
+      new MenuItem("New Beat") {
+        onAction = handle {
+          val b = new Beat()
+          if (content.intersecting(contextMenuX, contextMenuX + 0.05).isEmpty) {
+            content ++= Iterator((contextMenuX, contextMenuX + 0.05, b))
+          }
+        }
+      },
       new MenuItem("Copy") {
         onAction = handle {
           context.copy(self)
@@ -871,7 +964,9 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
           context.delete(self)
         }
       },
-      new CheckMenuItem("Highlight First")
+      new CheckMenuItem("Highlight First") {
+        selected <==> beatsPattern.highlightFirst
+      }
     )
 
     override def mouseClicked(e: MouseEvent) = {
@@ -903,13 +998,20 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     )
 
     private def update(): Unit = {
-      beatsGroup.children = for ((start, end, b) <- bpmPattern.beats().takeWhile(_._2 < duration.get())) yield {
+      beatsGroup.children = bpmPattern.beats().headOption.map { elem =>
+        val v = new BeatView[TrackElement](elem._3, false, context)
+        v.pxPerSec <== pxPerSec
+        v.position() = (elem._1, elem._2)
+        v.layoutX <== pxPerSec * elem._1
+        v.highlight <== bpmPattern.highlightFirst
+        v
+      }.toIterable ++ (for ((start, end, b) <- bpmPattern.beats().tail.takeWhile(_._2 < duration.get())) yield {
         val v = new BeatView[TrackElement](b, false, context)
         v.pxPerSec <== pxPerSec
         v.position() = (start, end)
         v.layoutX <== pxPerSec * start
         v
-      }
+      })
     }
 
     update()
@@ -917,7 +1019,39 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     duration.addListener(weak(handler))
     bpmPattern.beats.addListener(weak(handler))
 
+    val bpmSpinner = new Spinner[Double](1.0, 300.0, bpmPattern.bpm(), 1.0) {
+      editable = true
+
+      private def commitEditorText(): Unit = {
+        if (editable()) {
+          val text = editor().text()
+          if (valueFactory() != null) {
+            val converter = valueFactory().getConverter
+            if (converter != null) {
+              valueFactory().value = converter.fromString(text)
+            }
+          }
+        }
+      }
+
+      focused.onChange { (_, _, nv) =>
+        if (!nv) {
+          commitEditorText()
+        }
+      }
+    }
+    bpmSpinner.value.onChange { (_, old, now) =>
+      if (old != now) {
+        bpmPattern.bpm() = now
+      }
+    }
+    bpmPattern.bpm.onChange { (_, old, now) =>
+      if (old.doubleValue() != now.doubleValue()) {
+        bpmSpinner.valueFactory().value = now.doubleValue()
+      }
+    }
     val contextMenu = new ContextMenu(
+      new CustomMenuItem(bpmSpinner, false),
       new MenuItem("Copy") {
         onAction = handle {
           context.copy(self)
@@ -928,11 +1062,8 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
           context.delete(self)
         }
       },
-      new CheckMenuItem("Highlight First"),
-      new CustomMenuItem(new Spinner(1.0, 300.0, 60.0, 1.0) {
-        editable = true
-      }) {
-        hideOnClick = false
+      new CheckMenuItem("Highlight First") {
+        selected <==> bpmPattern.highlightFirst
       },
       new CheckMenuItem("Detect BPM")
     )
@@ -970,6 +1101,11 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       }
     )
     val contextMenu = new ContextMenu(
+      new CustomMenuItem(new TextField() {
+        text <==> message.text
+        editable = true
+
+      }, false),
       new MenuItem("Copy") {
         onAction = handle {
           context.copy(self)
@@ -979,11 +1115,6 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         onAction = handle {
           context.delete(self)
         }
-      },
-      new CustomMenuItem(new TextField() {
-        editable = true
-      }) {
-        hideOnClick = false
       }
     )
     onMouseClicked = e => {
@@ -1052,7 +1183,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                 track2headerView(t) = h
                 tracksBox.children.add(i, v)
                 headerBox.children.add(i, h)
-                player.beats.add(i, (h.active.selected, v.beats))
+                player.beats.add(i, (h.play.selected, v.beats))
                 h.snap.selected.onChange { (_, _, b) =>
                   if (b) {
                     track2headerView.values.foreach(h2 => if (h2 != h) {
@@ -1339,13 +1470,71 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
           menus = Seq(
             new Menu("File") {
               items = Seq(
-                new MenuItem("Open"),
-                new MenuItem("Save")
+                new MenuItem("Open") {
+                  onAction = handle {
+                    val fc = new FileChooser()
+                    fc.title = "Beatmeter Generator: Open"
+                    Option(fc.showOpenDialog(window())) match {
+                      case Some(file) =>
+                        try {
+                          JsonSerialization.load(Source.fromFile(file, "utf-8").mkString)  match {
+                            case Success(tracks) => {
+                              mainView.tracks.clear()
+                              for (track <- tracks.content) {
+                                mainView.tracks += track.toMutable()
+                              }
+                            }
+                            case Failure(_) =>
+                              val alert = new Alert(AlertType.Error) {
+                                title = "Beatmeter Generator"
+                                text = "File contains errors."
+                              }
+                              alert.showAndWait()
+                          }
+                        } catch {
+                          case _: Exception =>
+                            val alert = new Alert(AlertType.Error) {
+                              title = "Beatmeter Generator"
+                              text = "Could not open file."
+                            }
+                            alert.showAndWait()
+                        }
+                      case None =>
+                    }
+                  }
+                },
+                new MenuItem("Save") {
+                  onAction = handle {
+                    val fc = new FileChooser()
+                    fc.title = "Beatmeter Generator: Save"
+                    Option(fc.showSaveDialog(window())) match {
+                      case Some(file) =>
+                        val s = JsonSerialization.save(new ImmutableTracks(mainView.tracks.map(_.toImmutable()).toList))
+                        val r = for (out <- resource.managed(new OutputStreamWriter(new FileOutputStream(file), "utf-8"))) yield {
+                          out.write(s)
+                        }
+                        r.tried match {
+                          case Success(_) =>
+                          case Failure(_) =>
+                            val alert = new Alert(AlertType.Error) {
+                              title = "Beatmeter Generator"
+                              text = "Could not save file."
+                            }
+                            alert.showAndWait()
+                        }
+                      case None =>
+                    }
+                  }
+                }
               )
             },
             new Menu("Edit") {
               items = Seq(
-                new MenuItem("New Track"),
+                new MenuItem("New Track") {
+                  onAction = handle {
+                    mainView.tracks += new Track()
+                  }
+                },
                 new MenuItem("Undo"),
                 new MenuItem("Redo")
               )

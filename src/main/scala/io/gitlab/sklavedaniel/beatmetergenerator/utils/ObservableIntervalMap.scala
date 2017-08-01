@@ -156,7 +156,7 @@ class ObservableIntervalMap[A, B](implicit fractional: Fractional[A]) extends Ob
   def ++=(elems: TraversableOnce[(A, A, B)]): Unit = {
     val list = elems.toList
     require(list.forall(e => intersecting(e._1, e._2).isEmpty))
-    for ((startA, endA, b) <- elems) {
+    for ((startA, endA, b) <- list) {
       starts(startA) = (startA, endA, b)
       ends(endA) = (startA, endA, b)
     }
