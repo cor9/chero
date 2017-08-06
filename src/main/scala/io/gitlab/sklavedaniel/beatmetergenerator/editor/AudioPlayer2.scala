@@ -21,17 +21,20 @@ package io.gitlab.sklavedaniel.beatmetergenerator.editor
 import java.io.InputStream
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.concurrent.{FutureTask, LinkedBlockingQueue}
+import javafx.beans.InvalidationListener
 import javax.sound.sampled._
 
-import io.gitlab.sklavedaniel.beatmetergenerator.AudioPlayer
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap
 import org.apache.commons.io.IOUtils
 import resource._
 
 import scala.collection.mutable.ListBuffer
+import scala.util.Try
 import scalafx.application.Platform
+import scalafx.beans.binding.Bindings
 import scalafx.beans.property._
 import scalafx.collections.ObservableBuffer
+import scalafx.collections.ObservableBuffer.{Add, Remove}
 
 object AudioPlayer2 {
 
@@ -43,7 +46,9 @@ object AudioPlayer2 {
 
   case object Stopped extends EventState
 
-  def readData(data: InputStream, format: AudioFormat): Array[Short] = {
+  val format = new AudioFormat(44100, 16, 2, true, false)
+
+  def readData(data: InputStream): Try[Array[Short]] = {
     (for {
       ais2 <- managed(AudioSystem.getAudioInputStream(format, AudioSystem.getAudioInputStream(data)))
     } yield {
@@ -54,37 +59,40 @@ object AudioPlayer2 {
       val result = new Array[Short](buffer.limit() / 2)
       buffer.asShortBuffer().get(result)
       result
-    }).tried.get
+    }).tried
   }
 }
 
-class AudioPlayer2(audioData: InputStream, beatData: InputStream) {
+class AudioPlayer2(beatData: InputStream) {
   self =>
 
-  import AudioPlayer.readData
+  import AudioPlayer2.format
 
   val bufferDuration = 0.1
 
-  val format = new AudioFormat(44100, 16, 2, true, false)
 
-  val beat = readData(beatData, format)
+  val beat = AudioPlayer2.readData(beatData).get
   val beatCount = beat.length / format.getChannels
-  println("loading audio file...")
-  val audio = readData(audioData, format)
-  val audioCount = audio.length / format.getChannels
-  val duration = audioCount.toDouble / format.getFrameRate
-  println("audio file loaded.")
+  val beatDuration = beatCount.toDouble / format.getFrameRate
+
+  val audio = ObjectProperty[Option[Array[Short]]](None)
+  val audioCount = Bindings.createObjectBinding[Int](() => audio().map(_.length / format.getChannels()).getOrElse(0), audio)
+  val audioDuration = Bindings.createObjectBinding[Double](() => audioCount().toDouble / format.getFrameRate, audioCount)
 
   val maximaDuration = 0.025
   val maximaFrames = (maximaDuration * format.getFrameRate * format.getChannels).round.toInt
 
-  val maxima = new Array[((Double, Double), Double)](audio.length / maximaFrames)
-  for (i <- 0 until audio.length / maximaFrames) {
-    val maxLeft = (for (j <- 0 until maximaFrames / 2) yield audio(maximaFrames * i + 2 * j)).max
-    val maxRight = (for (j <- 0 until maximaFrames / 2) yield audio(maximaFrames * i + 2 * j + 1)).max
-    val time = i * maximaDuration
-    maxima(i) = ((maxLeft, maxRight), time)
-  }
+  val maxima = Bindings.createObjectBinding[Option[Array[((Double, Double), Double)]]](() => audio().map { a =>
+    val result = new Array[((Double, Double), Double)](a.length / maximaFrames)
+    for (i <- 0 until a.length / maximaFrames) {
+      val maxLeft = (for (j <- 0 until maximaFrames / 2) yield a(maximaFrames * i + 2 * j)).max
+      val maxRight = (for (j <- 0 until maximaFrames / 2) yield a(maximaFrames * i + 2 * j + 1)).max
+      val time = i * maximaDuration
+      result(i) = ((maxLeft, maxRight), time)
+    }
+    result
+  }, audio)
+
 
   private val sync = new LinkedBlockingQueue[Unit]()
   private val syncChange = (_: Any, _: Any, _: Any) => if (sync.isEmpty) {
@@ -101,6 +109,43 @@ class AudioPlayer2(audioData: InputStream, beatData: InputStream) {
       }
   }
   val beats = ObservableBuffer[(BooleanProperty, ObservableIntervalMap[Double, Beat])]()
+  private val beatsDuration_ = ReadOnlyDoubleWrapper(0.0)
+  val beatsDuration = beatsDuration_.readOnlyProperty
+
+  private def calcBeatsInfo(): Unit = {
+    beatsDuration_() = (Iterator(0.0) ++ (for {
+      (_, map) <- beats
+      (d, _, _) <- map.lastOption
+    } yield d + beatDuration)).max
+    beatsCount_() = (beatsDuration.doubleValue() * format.getFrameRate).ceil.toInt
+  }
+
+  private val beatsCount_ = ReadOnlyIntegerWrapper(0)
+  val beatsListener: InvalidationListener = _ => {
+    calcBeatsInfo()
+  }
+  val beatsCount = beatsCount_.readOnlyProperty
+  beats.onChange { (_, cs) =>
+    calcBeatsInfo()
+    for (c <- cs) {
+      c match {
+        case Add(i, as) =>
+          for (a <- as) {
+            a._2.addListener(beatsListener)
+          }
+        case Remove(i, rs) =>
+          for (r <- rs) {
+            r._2.removeListener(beatsListener)
+          }
+        case _ =>
+      }
+    }
+  }
+
+  val duration = Bindings.createObjectBinding[Double](() => audioDuration().max(beatsDuration()), audioDuration, beatsDuration)
+  val count = Bindings.createObjectBinding[Int](() => audioCount().max(beatsCount()), audioCount, beatsCount)
+
+
   val ratio = DoubleProperty(0.9)
   ratio.onChange(syncChange)
   val playing = BooleanProperty(false)
@@ -129,17 +174,16 @@ class AudioPlayer2(audioData: InputStream, beatData: InputStream) {
       while (true) {
         sync.take()
 
-        val task = new FutureTask[(Double, Double, Float, Boolean, Seq[(Int, Int)])](() => {
+        val task = new FutureTask[(Double, Double, Float, Boolean, Seq[(Int, Int)], Option[Array[Short]], Int, Int)](() => {
           var position = (self.position()._1 * format.getFrameRate).round.toInt
           val l = merge(self.beats.filter(_._1()).map(_._2.map(_._1)).toList, ListBuffer.empty)
-          val tmp = (l.map(b => (b * format.getFrameRate).ceil.toInt) :+ audioCount)
+          val tmp = (l.map(b => (b * format.getFrameRate).ceil.toInt) ++ l.lastOption.map(x => ((x * format.getFrameRate).ceil.toInt + beatCount)))
             .sliding(2).filter(_.length == 2).map(x => (x(0), x(1))).dropWhile(_._2 <= position).toSeq
-          (self.position()._1, self.ratio(), self.rate(), self.playing(), tmp)
+          (self.position()._1, self.ratio(), self.rate(), self.playing(), tmp, audio(), audioCount(), count())
         })
         Platform.runLater(task)
-        val (currentPosition, currentRatio, currentRate, currentPlaying, currentBeats) = task.get
+        val (currentPosition, currentRatio, currentRate, currentPlaying, currentBeats, currentAudio, currentAudioCount, currentCount) = task.get
 
-        println("current: " + currentBeats)
         if (currentPlaying) {
           var position = (currentPosition * format.getFrameRate).round.toInt
           val bufferSize = (format.getFrameRate * bufferDuration * currentRate).round.toInt
@@ -150,14 +194,18 @@ class AudioPlayer2(audioData: InputStream, beatData: InputStream) {
           sourceLine.start()
           updatePosition(currentPosition + sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * currentRate, true)
 
-          while (sync.isEmpty && position < audioCount) {
+          while (sync.isEmpty && position < currentCount) {
             bbuffer.clear()
-            val l = bufferSize.min(audioCount - position)
+            val l = bufferSize.min(currentCount - position)
             for {
               i <- 0 until l
               j <- 0 until format.getChannels
             } {
-              bbuffer.putShort(((1.0 - currentRatio) * audio((position + i) * format.getChannels + j)).toShort)
+              if (currentAudio.isDefined && position < currentAudioCount) {
+                bbuffer.putShort(((1.0 - currentRatio) * currentAudio.get((position + i) * format.getChannels + j)).toShort)
+              } else {
+                bbuffer.putShort(0)
+              }
             }
 
             bs = bs.dropWhile(_._2 < position)
@@ -179,9 +227,13 @@ class AudioPlayer2(audioData: InputStream, beatData: InputStream) {
             position += sourceLine.write(bbuffer.array(), 0, l * format.getFrameSize) / format.getFrameSize
             updatePosition(currentPosition + sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * currentRate, false)
           }
+          sourceLine.drain()
           updatePosition(currentPosition + sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * currentRate, false)
           sourceLine.stop()
           sourceLine.close()
+          if (position >= currentCount) {
+            Platform.runLater(playing() = false)
+          }
         }
       }
     }

@@ -21,6 +21,8 @@ package io.gitlab.sklavedaniel.beatmetergenerator.utils
 import javafx.beans
 import javafx.beans.{InvalidationListener, WeakListener}
 
+import io.gitlab.sklavedaniel.beatmetergenerator.editor.Unscalable
+
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.ref.WeakReference
@@ -105,21 +107,34 @@ class ObservableIntervalMap[A, B](implicit fractional: Fractional[A]) extends Ob
     list
   }
 
+  def clear(): List[(A, A, B)] = {
+    val list = starts.values.toList
+    starts.clear()
+    ends.clear()
+    for (listener <- listeners) {
+      listener.onChange(this, ObservableIntervalMap.RemoveChange(list))
+    }
+    for (listener <- invalidationListeners) {
+      listener.invalidated(this)
+    }
+    list
+  }
+
   override def lastOption = starts.lastOption.map(_._2)
 
   override def last = lastOption.get
 
-  def canMove(from: (A, A), to: (A, A), scalable: B => Boolean = _ => true) = {
+  def canMove(from: (A, A), to: (A, A)) = {
     val scale = (to._2 - to._1) / (from._2 - from._1)
     intersecting(to._1, to._2).forall(e => from._1 <= e._1 && e._2 <= from._2) &&
       intersecting(from._1, from._2).sliding(2).forall {
-        case List(first, second) if !scalable(first._3) =>
-          to._1 + scale * (first._1 - from._1) + first._2 - first._1 < to._1 + scale * (second._1 - from._1)
+        case List(first, second) if first._3.isInstanceOf[Unscalable[A]] =>
+          to._1 + scale * (first._1 - from._1) + first._3.asInstanceOf[Unscalable[A]].duration < to._1 + scale * (second._1 - from._1)
         case _ => true
       }
   }
 
-  def move(from: (A, A), to: (A, A), scalable: B => Boolean = _ => true): Unit = {
+  def move(from: (A, A), to: (A, A)): Unit = {
     require(canMove(from, to))
     if (from != to) {
       val scale = (to._2 - to._1) / (from._2 - from._1)
@@ -129,14 +144,14 @@ class ObservableIntervalMap[A, B](implicit fractional: Fractional[A]) extends Ob
         starts -= elem._1
         ends -= elem._2
         val toStart = to._1 + scale * (elem._1 - from._1)
-        val toEnd = if (scalable(b)) {
+        val toEnd = if (!b.isInstanceOf[Unscalable[A]]) {
           if (elem._2 == from._2) {
             to._2
           } else {
             to._1 + scale * (elem._2 - from._1)
           }
         } else {
-          to._1 + scale * (elem._1 - from._1) + elem._2 - elem._1
+          to._1 + scale * (elem._1 - from._1) + b.asInstanceOf[Unscalable[A]].duration
         }
         starts(toStart) = (toStart, toEnd, b)
         ends(toEnd) = (toStart, toEnd, b)
@@ -155,10 +170,11 @@ class ObservableIntervalMap[A, B](implicit fractional: Fractional[A]) extends Ob
 
   def ++=(elems: TraversableOnce[(A, A, B)]): Unit = {
     val list = elems.toList
-    require(list.forall(e => intersecting(e._1, e._2).isEmpty))
+    require(list.forall(e => intersecting(e._1, if(e._3.isInstanceOf[Unscalable[A]]) e._1 + e._3.asInstanceOf[Unscalable[A]].duration else e._2).isEmpty))
     for ((startA, endA, b) <- list) {
-      starts(startA) = (startA, endA, b)
-      ends(endA) = (startA, endA, b)
+      val tmp = if(b.isInstanceOf[Unscalable[A]]) startA + b.asInstanceOf[Unscalable[A]].duration else endA
+      starts(startA) = (startA, tmp, b)
+      ends(tmp) = (startA, tmp, b)
     }
     for (listener <- listeners) {
       listener.onChange(this, ObservableIntervalMap.AddChange(list))

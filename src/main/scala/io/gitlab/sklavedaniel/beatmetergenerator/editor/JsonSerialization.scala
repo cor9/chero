@@ -18,17 +18,33 @@
 
 package io.gitlab.sklavedaniel.beatmetergenerator.editor
 
+import java.net.URI
+
 import prickle._
+
+import scala.collection.mutable
+import scala.util.Try
 
 object JsonSerialization {
 
-    implicit val trackElementPickler: PicklerPair[ImmutableTrackElement] = CompositePickler[ImmutableTrackElement].concreteType[ImmutableBeat].concreteType[ImmutableMessage].
-      concreteType[ImmutableBPMPattern].concreteType[ImmutableBeatsPattern]
+  implicit val pathPickler = new Pickler[URI] {
+    override def pickle[P](obj: URI, state: PickleState)(implicit config: PConfig[P]): P = {
+      config.makeString(obj.toString)
+    }
+  }
+  implicit val pathUnpickler = new Unpickler[URI] {
+    override def unpickle[P](pickle: P, state: mutable.Map[String, Any])(implicit config: PConfig[P]): Try[URI] = {
+      config.readString(pickle).flatMap(s => Try(new URI(s)))
+    }
+  }
+  implicit val trackElementPickler: PicklerPair[ImmutableTrackElement] = CompositePickler[ImmutableTrackElement].concreteType[ImmutableBeat].concreteType[ImmutableMessage].
+    concreteType[ImmutableBPMPattern].concreteType[ImmutableBeatsPattern]
 
-    implicit val pickler: Pickler[ImmutableTrack] = Pickler.materializePickler[ImmutableTrack]
-    implicit val unpickler: Unpickler[ImmutableTrack] = Unpickler.materializeUnpickler[ImmutableTrack]
+  implicit val pickler: Pickler[ImmutableTrack] = Pickler.materializePickler[ImmutableTrack]
+  implicit val unpickler: Unpickler[ImmutableTrack] = Unpickler.materializeUnpickler[ImmutableTrack]
 
-    def save(tracks: ImmutableTracks): String = Pickle.intoString(tracks)
-    def load(tracks: String) = Unpickle[ImmutableTracks].fromString(tracks)
+  def save(tracks: ImmutableTracks): String = Pickle.intoString(tracks)
+
+  def load(tracks: String) = Unpickle[ImmutableTracks].fromString(tracks)
 
 }

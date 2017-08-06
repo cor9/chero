@@ -27,10 +27,10 @@ import javafx.scene.{Cursor, input}
 
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.{BeatFiles, ObservableIntervalMap}
 import io.gitlab.sklavedaniel.beatmetergenerator._
+import io.gitlab.sklavedaniel.beatmetergenerator.bpmdetection.WaveletBPMDetection
 import org.rogach.scallop.ScallopConf
 
 import scala.collection.mutable
-import scala.reflect.runtime.universe._
 import scalafx.Includes._
 import scalafx.animation.{Animation, KeyFrame, Timeline}
 import scalafx.application.JFXApp
@@ -48,14 +48,13 @@ import scalafx.scene.paint.{Color, Paint}
 import scalafx.scene.shape.{Line, Rectangle}
 import scalafx.scene.text.{Font, Text}
 import scalafx.scene.transform.Scale
-import scalafx.scene.{Group, Node, Scene}
+import scalafx.scene.{Group, Node, Scene, SnapshotParameters}
 import scalafx.stage.FileChooser
 import scalafx.stage.FileChooser.ExtensionFilter
 import scalafx.util.Duration
-import resource._
-
 import scala.io.Source
 import scala.util.{Failure, Success}
+import scalafx.scene.image.Image
 
 object BeatEditor2 {
 
@@ -76,60 +75,57 @@ object BeatEditor2 {
 
 class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
-  val audioFile = conf.input.orElse(Option({
-    val fc = new FileChooser()
-    fc.title = "Beatmeter Generator: Open audio file"
-    fc.getExtensionFilters += new ExtensionFilter("wav audio file (16bit unsigned)", "*.wav")
-    fc.showOpenDialog(null)
-  }))
-  if (audioFile.isEmpty) {
-    System.exit(1)
-  }
 
-  println("starting...")
-  val player = new AudioPlayer2(new BufferedInputStream(new FileInputStream(audioFile())), new BufferedInputStream(getClass.getResourceAsStream("/beats/click.wav")))
+  //new BufferedInputStream(new FileInputStream(audioFile()))
+  val player = new AudioPlayer2(new BufferedInputStream(getClass.getResourceAsStream("/beats/click.wav")))
 
   player.ratio.set(0.8)
   player.rate.set(0.5f)
 
-  class WaveView(initPoints: Seq[((Double, Double), Double)], initPxPerSec: Double, initMaxVolume: Double, initHeight: Double, sceneToContextX: Double => Double) extends Group {
+  class WaveView(initPxPerSec: Double, initHeight: Double, sceneToContextX: Double => Double) extends Group {
     self =>
-    val points = ObjectProperty(initPoints)
+    val points = ObjectProperty[Option[Array[((Double, Double), Double)]]](None)
     val pxPerSec = DoubleProperty(initPxPerSec)
-    val maxVolume = DoubleProperty(initMaxVolume)
+    val maxVolume = Bindings.createObjectBinding[Option[Double]](() => points().map(_.toIterator.map(v => v._1._1 max v._1._2).max), points)
     val height = DoubleProperty(initHeight)
+    val duration = DoubleProperty(0.0)
 
     private def update() = {
+      children.clear()
       children += new Rectangle {
         x = 0.0
         y = 0.0
-        width <== pxPerSec * points().last._2
+        width <== pxPerSec * duration
         height <== self.height
         fill = Color.Transparent
       }.delegate
-      for (Seq((value1, time1), (value2, time2)) <- points().sliding(2)) {
-        children += new Line {
-          startX <== pxPerSec * time1
-          startY <== height * (maxVolume + value1._1) / maxVolume / 2
-          endX <== pxPerSec * time2
-          endY <== height * (maxVolume + value2._1) / maxVolume / 2
-          strokeWidth = 0.5
-        }.delegate
-      }
-      for (Seq((value1, time1), (value2, time2)) <- points().sliding(2)) {
-        children += new Line {
-          startX <== pxPerSec * time1
-          startY <== height * (maxVolume - value1._2) / maxVolume / 2
-          endX <== pxPerSec * time2
-          endY <== height * (maxVolume - value2._2) / maxVolume / 2
-          strokeWidth = 0.5
-        }.delegate
+      points().foreach { p =>
+        val mv = maxVolume().get
+        for (Array((value1, time1), (value2, time2)) <- p.sliding(2)) {
+          children += new Line {
+            startX <== pxPerSec * time1
+            startY <== height * (mv + value1._1) / mv / 2
+            endX <== pxPerSec * time2
+            endY <== height * (mv + value2._1) / mv / 2
+            strokeWidth = 0.5
+          }.delegate
+        }
+        for (Array((value1, time1), (value2, time2)) <- p.sliding(2)) {
+          children += new Line {
+            startX <== pxPerSec * time1
+            startY <== height * (mv - value1._2) / mv / 2
+            endX <== pxPerSec * time2
+            endY <== height * (mv - value2._2) / mv / 2
+            strokeWidth = 0.5
+          }.delegate
+        }
       }
     }
 
     update()
 
     points.onChange(update())
+    duration.onChange(update())
 
     val scale = {
       val s = new Scale(1.0, 1.0, 0.0, 0.0)
@@ -233,24 +229,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
   class TrackHeaderView(val track: Track) extends Group {
     self =>
     val width = DoubleProperty(0.0)
-    val play = new ToggleButton {
-      text = "P"
-      tooltip = new Tooltip("mute/unmute track") {
-        font = Font(10)
-      }
-      font = Font(8)
-      focusTraversable = false
-      selected <==> track.play
-    }
-    val snap = new ToggleButton {
-      text = "S"
-      tooltip = new Tooltip("use track for snapping") {
-        font = Font(10)
-      }
-      font = Font(8)
-      focusTraversable = false
-      selected <==> track.snap
-    }
+
     val contextMenu = new ContextMenu(
       new CustomMenuItem(new TextField() {
         text <==> track.title
@@ -308,7 +287,24 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         layoutX = 2.0
         spacing = 2
         children = Seq(
-          play,
+          new ToggleButton {
+            text = "P"
+            tooltip = new Tooltip("mute/unmute track") {
+              font = Font(10)
+            }
+            font = Font(8)
+            focusTraversable = false
+            selected <==> track.play
+          },
+          new ToggleButton {
+            text = "S"
+            tooltip = new Tooltip("use track for snapping") {
+              font = Font(10)
+            }
+            font = Font(8)
+            focusTraversable = false
+            selected <==> track.snap
+          },
           new ToggleButton {
             text = "R"
             tooltip = new Tooltip("record beats to track") {
@@ -318,7 +314,6 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
             focusTraversable = false
             selected <==> track.record
           },
-          snap,
           new ToggleButton {
             text = "D"
             tooltip = new Tooltip("display track on beatmeter") {
@@ -340,6 +335,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     val duration = DoubleProperty(0.0)
     override val pxPerSec = DoubleProperty(initPxPerSec)
     val beats = ObservableIntervalMap[Double, Beat]
+
     override val scaled = {
       val s = new Scale(1.0, 1.0, 0.0, 0.0)
       transforms = Seq(s)
@@ -351,15 +347,14 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       layoutY = 25
       layoutX = 0
     }
-    val element2view = mutable.Map[(Double, Double, TrackElement), TrackElementView[TrackElement, TrackElement]]()
+    val element2view = mutable.Map[(Double, TrackElement), TrackElementView[TrackElement, TrackElement]]()
 
-    override def getView(key: (Double, Double, TrackElement)): TrackElementView[TrackElement, TrackElement] = element2view(key)
+    override def getView(key: (Double, TrackElement)): TrackElementView[TrackElement, TrackElement] = element2view(key)
 
     override def startPosition = 0.0
 
     private def addGenerator(gen: BeatsGenerator, tmp: TrackElementView[TrackElement, TrackElement]): Unit = {
       beats ++= gen.beats().map(e => (e._1 + tmp.position()._1, e._2 + tmp.position()._1, e._3)).takeWhile(_._2 <= tmp.position()._2)
-
       gen.beats.onInvalidate {
         beats --= beats.intersecting(tmp.position()._1, tmp.position()._2).map(e => (e._1, e._2))
         beats ++= gen.beats().map(e => (e._1 + tmp.position()._1, e._2 + tmp.position()._1, e._3)).takeWhile(_._2 <= tmp.position()._2)
@@ -380,19 +375,19 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
           addGenerator(beatsGroup, tmp)
           tmp
         case bpmGroup: BPMPattern =>
-          val tmp = new BPMGroupView(bpmGroup, self)
+          val tmp = new BPMPatternView(bpmGroup, self)
           addGenerator(bpmGroup, tmp)
           tmp
         case message: Message =>
           new MessageView[TrackElement](message, self)
       }
-      v.layoutX <== pxPerSec * elem._1
       v.pxPerSec <== pxPerSec
-      v.position() = (elem._1, elem._2)
+      v.position = (elem._1, elem._2)
       v.position.onChange { (_, old, pos) =>
-        if (old != pos && !track.content.contains(pos._1, pos._2)) track.content.move(old, pos, !_.isInstanceOf[Beat])
+        if (old != pos && !track.content.contains(pos._1, pos._2)) track.content.move(old, pos)
       }
-      element2view(elem) = v
+      v.layoutX <== Bindings.createDoubleBinding(() => pxPerSec() * v.position()._1, pxPerSec, v.position)
+      element2view((elem._1, elem._3)) = v
       elementGroup.children.add(v)
     }
 
@@ -404,18 +399,18 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       case (_, ObservableIntervalMap.MoveChange(from, to, l)) =>
         if (from != to) {
           for ((f, t, b) <- l) {
-            val v = element2view.remove((f._1, f._2, b)).get
-            element2view += (t._1, t._2, b) -> v
-            v.position() = t
+            val v = element2view.remove((f._1, b)).get
+            element2view += (t._1, b) -> v
+            v.position = t
           }
         }
       case (_, ObservableIntervalMap.RemoveChange(l: List[(Double, Double, TrackElement)])) =>
         for (elem <- l) {
-          element2view.remove(elem).foreach { v =>
+          element2view.remove((elem._1, elem._3)).foreach { v =>
             elementGroup.children.remove(v)
             selectedElements.remove(v)
+            beats --= beats.intersecting(elem._1, elem._2).map(e => (e._1, e._2))
           }
-          beats --= beats.intersecting(elem._1, elem._2).map(e => (e._1, e._2))
         }
     }
     track.content.addListener(listener)
@@ -511,7 +506,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
     def scaled: DoubleExpression
 
-    def getView(key: (Double, Double, A)): TrackElementView[A, A]
+    def getView(key: (Double, A)): TrackElementView[A, A]
 
     def origin = 0.0
 
@@ -548,7 +543,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
             content ++= insert
             selectedElements.clear()
             for (elem <- insert) {
-              selectedElements += getView(elem)
+              selectedElements += getView((elem._1, elem._3))
             }
           }
         }
@@ -580,7 +575,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     }
     var dragRemoved: List[(Double, Double, A)] = Nil
 
-    def selectionActive(x: Double) = true
+    def selectionActive(x: => Double) = true
 
     onDragDetected = e => {
       if (selectionActive(e.getX)) {
@@ -588,13 +583,16 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
           val x = v / pxPerSec()
           val tmp = content.intersecting(x, x)
           if (tmp.nonEmpty) {
-            val view = getView(tmp.head)
+            val view = getView(tmp.head._1, tmp.head._3)
             if (!view.selected()) {
               selectedElements.clear()
               selectedElements += view
             }
+            val dragMin = selectedElements.map(_.position()._1).min
+            val dragWidth = selectedElements.map(_.position()._2).max - dragMin
+            val dragOffset = x - selectedElements.map(_.position()._1).min
             val snapOffset = x - tmp.head._1
-            val data = (x, snapOffset, selectedElements.toList.map(x => (x.position(), x.element.toImmutable())))
+            val data = (snapOffset, dragOffset, dragWidth, selectedElements.toList.sortBy(_.position()._1).map(x => (x.position()._1 - dragMin, x.position()._2 - dragMin, x.element.toImmutable())))
             if (!e.isControlDown) {
               dragRemoved = selectedElements.toList.map(x => (x.position()._1, x.position()._2, x.element))
               content --= dragRemoved.map(x => (x._1, x._2))
@@ -605,71 +603,77 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
             cb.setContent(cc)
           }
         }
+        pressedX = None
         e.consume()
       }
     }
     onDragDone = e => {
-      if (dragElements.nonEmpty) {
-        content --= dragElements
-        dragElements = Nil
-      }
       if (e.getTransferMode == null) {
         content ++= dragRemoved
         selectedElements.clear()
         for (elem <- dragRemoved) {
-          selectedElements += getView(elem)
+          selectedElements += getView((elem._1, elem._3))
         }
       }
       dragRemoved = Nil
     }
-    var dragElements: List[(Double, Double)] = Nil
+    var dragBox: Option[Rectangle] = None
     onDragOver = e => if (selectionActive(e.getX)) {
-      content --= dragElements
-      dragElements = Nil
       val db = e.getDragboard
       if (db.getContentTypes.contains(BeatEditor2.dataformat)) {
-        val (offset, snapOffset, list) = db.getContent(BeatEditor2.dataformat).asInstanceOf[(Double, Double, List[((Double, Double), ImmutableTrackElement)])]
-        val x = snap(e.getX / pxPerSec() - snapOffset, startPosition, true) + snapOffset - offset
-        val fitting = selectionActive((list.map(_._1._2).max + x) * pxPerSec()) && list.forall(elem => clazz.isInstance(elem._2) && elem._1._1 + x >= 0 && content.intersecting(elem._1._1 + x, elem._1._2 + x).isEmpty)
-        if (fitting) {
-          val insert = list.map(elem => (elem._1._1 + x, elem._1._2 + x, elem._2.toMutable().asInstanceOf[A]))
-          content ++= insert
-          dragElements = insert.map(elem => (elem._1, elem._2))
-          e.acceptTransferModes(TransferMode.Copy, TransferMode.Move)
+        val (snapOffset, dragOffset, dragWidth, list) = db.getContent(BeatEditor2.dataformat).asInstanceOf[(Double, Double, Double, List[(Double, Double, ImmutableTrackElement)])]
+        val x = snap(e.getX / pxPerSec() - snapOffset, startPosition, true) + snapOffset - dragOffset
+        if (selectionActive((dragWidth + x) * pxPerSec()) && x >= 0) {
+          if (dragBox.isEmpty) {
+            val r = new Rectangle {
+              y = 13 + origin
+              height = 24
+              width = dragWidth * pxPerSec()
+            }
+            children += r
+            dragBox = Some(r)
+          }
+          val fitting = list.forall(elem => content.intersecting(elem._1 + x, elem._2 + x).isEmpty)
+          dragBox.get.x = x * pxPerSec()
+          if (fitting) {
+            dragBox.get.fill = Color.DarkBlue.opacity(0.5)
+            e.acceptTransferModes(TransferMode.Copy, TransferMode.Move)
+          } else {
+            dragBox.get.fill = Color.DarkRed.opacity(0.5)
+          }
         }
       }
       e.consume()
     }
     onDragExited = e => {
-      if (dragElements.nonEmpty) {
-        content --= dragElements
-        dragElements = Nil
-      }
+      dragBox.foreach(children.remove)
+      dragBox = None
     }
     onDragDropped = e => if (selectionActive(e.getX)) {
-      content --= dragElements
-      dragElements = Nil
+      dragBox.foreach(children.remove)
+      dragBox = None
       val db = e.getDragboard
-      val (offset, snapOffset, list) = db.getContent(BeatEditor2.dataformat).asInstanceOf[(Double, Double, List[((Double, Double), ImmutableTrackElement)])]
-      val x = snap(e.getX / pxPerSec() - snapOffset, startPosition, true) + snapOffset - offset
-      val fitting = selectionActive((list.map(_._1._2).max + x) * pxPerSec()) && list.forall(elem => clazz.isInstance(elem._2) && elem._1._1 + x >= 0 && content.intersecting(elem._1._1 + x, elem._1._2 + x).isEmpty)
+      val (snapOffset, dragOffset, dragWidth, list) = db.getContent(BeatEditor2.dataformat).asInstanceOf[(Double, Double, Double, List[(Double, Double, ImmutableTrackElement)])]
+      val x = snap(e.getX / pxPerSec() - snapOffset, startPosition, true) + snapOffset - dragOffset
+      val fitting = selectionActive((dragWidth + x) * pxPerSec()) && x >= 0 && list.forall(elem => clazz.isInstance(elem._3) && content.intersecting(elem._1 + x, elem._2 + x).isEmpty)
       if (fitting) {
-        val insert = list.map(elem => (elem._1._1 + x, elem._1._2 + x, elem._2.toMutable().asInstanceOf[A]))
+        val insert = list.map(elem => (elem._1 + x, elem._2 + x, elem._3.toMutable().asInstanceOf[A]))
         content ++= insert
         selectedElements.clear()
         for (elem <- insert) {
-          selectedElements += getView(elem)
+          selectedElements += getView((elem._1, elem._3))
         }
         e.setDropCompleted(true)
       }
       e.consume()
+      dragRemoved = Nil
     }
     onMouseDragged = e => {
       if (selectionBox.isEmpty && selectionPos.isDefined) {
         val rect = new Rectangle {
           y = 13 + origin
           height = 24
-          stroke = Paint.valueOf("DarkBlue")
+          stroke = Color.DarkBlue
           fill = Color.Transparent
         }
         selectionBox = Some(rect)
@@ -690,9 +694,9 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         val end = (rect.x() + rect.width()) / pxPerSec()
         for (elem <- content.within(start, end)) {
           if (e.isControlDown) {
-            selectedElements -= getView(elem)
+            selectedElements -= getView((elem._1, elem._3))
           } else {
-            selectedElements += getView(elem)
+            selectedElements += getView((elem._1, elem._3))
           }
         }
         children.remove(rect)
@@ -706,8 +710,8 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         if (e.getClickCount == 1 && e.isStillSincePress) {
           val tmp = content.intersecting(e.getX / pxPerSec(), e.getX / pxPerSec())
           for (elem <- tmp) {
-            if (!selectedElements.remove(getView(elem))) {
-              selectedElements += getView(elem)
+            if (!selectedElements.remove(getView((elem._1, elem._3)))) {
+              selectedElements += getView((elem._1, elem._3))
             }
           }
           if (tmp.isEmpty) {
@@ -723,13 +727,20 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
   sealed class TrackElementView[+A <: TrackElement, B <: TrackElement](val element: A, val context: SelectionContainer[B]) extends Group {
     val pxPerSec = DoubleProperty(0.0)
-    val position = ObjectProperty((0.0, 0.0))
+    private val position_ = ReadOnlyObjectWrapper((0.0, 0.0))
+
+    def position = position_.readOnlyProperty
+
+    def position_=(value: (Double, Double)): Unit = {
+      position_() = value
+    }
+
     val duration = Bindings.createDoubleBinding(() => position()._2 - position()._1, position)
     val width = pxPerSec * duration
     val selected = BooleanProperty(false)
   }
 
-  sealed abstract class ResizableElementView[+A <: TrackElement, B <: TrackElement](element: A, context: SelectionContainer[B]) extends TrackElementView[A, B](element, context) {
+  sealed abstract class ResizableElementView[A <: TrackElement, B <: TrackElement](element: A, context: SelectionContainer[B]) extends TrackElementView[A, B](element, context) {
     self =>
     def target: Node
 
@@ -740,6 +751,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         self.setCursor(Cursor.DEFAULT)
       }
     }
+
     target.onMouseDragged = e => {
       if (resizeOffset.isDefined) {
         val tmp = position()._1
@@ -747,8 +759,13 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
         val snapped = snap(tmp + newDuration, 0.0, false)
 
-        if (context.content.intersecting(tmp, snapped).forall(p => tmp <= p._1 && p._2 <= position()._2)) {
-          position() = (tmp, snapped)
+        resizeBox.foreach { r =>
+          r.width = e.getX + resizeOffset.get
+          if (context.content.intersecting(tmp, snapped).forall(p => tmp <= p._1 && p._2 <= position()._2)) {
+            r.fill = Color.DarkBlue.opacity(0.5)
+          } else {
+            r.fill = Color.DarkRed.opacity(0.5)
+          }
         }
         e.consume()
       }
@@ -757,13 +774,37 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     def minDuration = 0.0
 
     private var resizeOffset: Option[Double] = None
+    private var resizeBox: Option[Rectangle] = None
     target.onMousePressed = e => {
       if (e.isPrimaryButtonDown && e.getX > width.doubleValue() - 5 / context.scaled.doubleValue()) {
         resizeOffset = Some(width.doubleValue() - e.getX)
+        val r = new Rectangle {
+          x = 0.0
+          y = -10.0
+          height = 20.0
+          width = self.width.doubleValue()
+          fill = Color.DarkBlue.opacity(0.5)
+        }
+        children += r
+        resizeBox = Some(r)
+        e.consume()
+      } else if (e.isPrimaryButtonDown && e.getX > width.doubleValue() - 8 / context.scaled.doubleValue()) {
         e.consume()
       }
     }
     target.onMouseReleased = e => {
+      if (resizeOffset.isDefined) {
+        val tmp = position()._1
+        val newDuration = minDuration.max((e.getX + resizeOffset.get).max(0.05) / pxPerSec())
+
+        val snapped = snap(tmp + newDuration, 0.0, false)
+
+        if (context.content.intersecting(tmp, snapped).forall(p => tmp <= p._1 && p._2 <= position()._2)) {
+          position = (tmp, snapped)
+        }
+        resizeBox.foreach(children.remove)
+        e.consume()
+      }
       resizeOffset = None
       if (e.getX < width.doubleValue() - 5 / context.scaled.doubleValue() || !contains(e.getX, e.getY)) {
         self.setCursor(Cursor.DEFAULT)
@@ -771,35 +812,42 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     }
   }
 
-  def snap(pos: Double, offset: Double, atStart: Boolean) = Stage.digitDown().flatMap { extraSnaps =>
-    mainView.snaps().flatMap { snaps =>
-      val (start, end) = if (atStart) {
-        (snaps.starting((pos + offset - 10).max(0.0), pos + offset).lastOption.map(_._1 - offset),
-          snaps.starting(pos + offset, pos + offset + 10).headOption.map(_._1 - offset))
-      } else {
-        (snaps.ending((pos + offset - 10).max(0.0), pos + offset).lastOption.map(_._2 - offset),
-          snaps.ending(pos + offset, pos + offset + 10).headOption.map(_._2 - offset))
+  def snap(pos: Double, offset: Double, atStart: Boolean) = Stage.digitDown().flatMap {
+    extraSnaps =>
+      mainView.snaps().flatMap {
+        snaps =>
+          val (start, end) = if (atStart) {
+            (snaps.starting((pos + offset - 10).max(0.0), pos + offset).lastOption.map(_._1 - offset),
+              snaps.starting(pos + offset, pos + offset + 10).headOption.map(_._1 - offset))
+          } else {
+            (snaps.ending((pos + offset - 10).max(0.0), pos + offset).lastOption.map(_._2 - offset),
+              snaps.ending(pos + offset, pos + offset + 10).headOption.map(_._2 - offset))
+          }
+          val points = (start match {
+            case Some(s) => end match {
+              case Some(e) =>
+                Iterator(s) ++ Iterator.range(1, extraSnaps + 1).map {
+                  i => s + i * (e - s) / (extraSnaps + 1)
+                } ++ Iterator(e)
+              case None => Iterator(s)
+            }
+            case None => end.toIterator
+          }).filter(x => (x - pos).abs <= 0.1)
+          if (points.isEmpty) {
+            None
+          } else {
+            Some(points.minBy(x => (x - pos).abs))
+          }
       }
-      val points = (start match {
-        case Some(s) => end match {
-          case Some(e) =>
-            Iterator(s) ++ Iterator.range(1, extraSnaps + 1).map {
-              i => s + i * (e - s) / (extraSnaps + 1)
-            } ++ Iterator(e)
-          case None => Iterator(s)
-        }
-        case None => end.toIterator
-      }).filter(x => (x - pos).abs <= 0.1)
-      if (points.isEmpty) {
-        None
-      } else {
-        Some(points.minBy(x => (x - pos).abs))
-      }
-    }
   }.getOrElse(pos)
 
   final class BeatView[B >: Beat <: TrackElement](val beat: Beat, val editable: Boolean, context: SelectionContainer[B]) extends TrackElementView[Beat, B](beat, context) {
     self =>
+
+    override def position_=(value: (Double, Double)): Unit = {
+      super.position_=(value._1, value._1 + 0.05)
+    }
+
     val highlight = BooleanProperty(false)
     children = Seq(new Rectangle {
       width <== self.width
@@ -846,9 +894,9 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     override def origin = -26
 
     val beatsGroup = new Group
-    val element2view = mutable.Map[(Double, Double, Beat), TrackElementView[Beat, Beat]]()
+    val element2view = mutable.Map[(Double, Beat), TrackElementView[Beat, Beat]]()
 
-    override def getView(key: (Double, Double, Beat)): TrackElementView[Beat, Beat] = element2view(key)
+    override def getView(key: (Double, Beat)): TrackElementView[Beat, Beat] = element2view(key)
 
     override def startPosition = position()._1
 
@@ -871,32 +919,66 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       rectangle,
       beatsGroup,
       new Line {
-        self =>
+        self2 =>
         startX <== beatsPattern.patternDuration * pxPerSec
         endX <== beatsPattern.patternDuration * pxPerSec
         startY = -10.0
         endY = 10.0
         strokeWidth = 0.5
+        private var dragBeatsPattern: Option[ImmutableBeatsPattern] = None
+
+        private var line: Option[Line] = None
         onMousePressed = e => {
+          dragBeatsPattern = Some(beatsPattern.toImmutable())
+          val l = new Line {
+            startY = -10.0
+            endY = 10.0
+            strokeWidth = 0.5
+            startX = beatsPattern.patternDuration() * pxPerSec()
+            endX = beatsPattern.patternDuration() * pxPerSec()
+            stroke = Color.DarkBlue.opacity(0.5)
+          }
+          self.children += l
+          line = Some(l)
           e.consume()
         }
         onMouseMoved = e => {
-          self.delegate.setCursor(Cursor.H_RESIZE)
+          self2.delegate.setCursor(Cursor.H_RESIZE)
         }
         onMouseDragged = e => {
           val tmp = snap(0.05.max(e.getX / pxPerSec()), position()._1, true)
+          line.get.startX = tmp * pxPerSec()
+          line.get.endX = tmp * pxPerSec()
           if (e.isControlDown) {
-            if (beatsPattern.pattern.canMove((0, beatsPattern.patternDuration()), (0, tmp), !_.isInstanceOf[Beat])) {
-              beatsPattern.pattern.move((0, beatsPattern.patternDuration()), (0, tmp), !_.isInstanceOf[Beat])
-              beatsPattern.patternDuration() = beatsPattern.pattern.lastOption.map(_._2).getOrElse(0.0).max(tmp)
+            if (beatsPattern.pattern.canMove((0, beatsPattern.patternDuration()), (0, tmp))) {
+              line.get.stroke = Color.DarkBlue
+            } else {
+              line.get.stroke = Color.DarkRed
             }
+          } else if (tmp >= beatsPattern.pattern.lastOption.map(_._2).getOrElse(0.0)) {
+            line.get.stroke = Color.DarkBlue
           } else {
-            beatsPattern.patternDuration() = beatsPattern.pattern.lastOption.map(_._2).getOrElse(0.0).max(tmp)
+            line.get.stroke = Color.DarkRed
           }
           e.consume()
         }
         onMouseReleased = e => {
-          self.delegate.setCursor(Cursor.DEFAULT)
+          line.foreach(self.children.remove)
+          line = None
+          val tmp = snap(0.05.max(e.getX / pxPerSec()), position()._1, true)
+          if (e.isControlDown) {
+            if (beatsPattern.pattern.canMove((0, beatsPattern.patternDuration()), (0, tmp))) {
+              beatsPattern.pattern.move((0, beatsPattern.patternDuration()), (0, tmp))
+              beatsPattern.patternDuration() = beatsPattern.pattern.lastOption.map(_._2).getOrElse(0.0).max(tmp)
+            } else {
+              beatsPattern.patternDuration() = dragBeatsPattern.get.patternDuration
+              beatsPattern.pattern.clear()
+              beatsPattern.pattern ++= dragBeatsPattern.get.toMutable().pattern
+            }
+          } else {
+            beatsPattern.patternDuration() = beatsPattern.pattern.lastOption.map(_._2).getOrElse(0.0).max(tmp)
+          }
+          self2.delegate.setCursor(Cursor.DEFAULT)
           e.consume()
         }
       }
@@ -904,29 +986,33 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
     private def update(): Unit = {
       element2view.clear()
-      beatsGroup.children = beatsPattern.pattern.headOption.map { elem =>
-        val v = new BeatView[Beat](elem._3, true, self)
-        v.position() = (elem._1, elem._2)
-        v.pxPerSec <== pxPerSec
-        v.layoutX <== pxPerSec * elem._1
-        element2view.put((elem._1, elem._2, elem._3), v)
-        v.highlight <== beatsPattern.highlightFirst
-        v
-      }.toIterable ++ (for ((start, end, b) <- beatsPattern.pattern.tail) yield {
-        val v = new BeatView[Beat](b, true, self)
-        v.position() = (start, end)
-        v.pxPerSec <== pxPerSec
-        v.layoutX <== pxPerSec * start
-        element2view.put((start, end, b), v)
-        v
-      }) ++ (for ((start, end, b) <- beatsPattern.beats().drop(beatsPattern.pattern.size).takeWhile(_._2 < duration.get())) yield {
-        val v = new BeatView[Beat](b, false, self)
-        v.position() = (start, end)
-        v.pxPerSec <== pxPerSec
-        v.layoutX <== pxPerSec * start
-        element2view.put((start, end, b), v)
-        v
-      })
+      if (beatsPattern.pattern.nonEmpty) {
+        beatsGroup.children = beatsPattern.pattern.headOption.map { elem =>
+          val v = new BeatView[Beat](elem._3, true, self)
+          v.position = (elem._1, elem._2)
+          v.pxPerSec <== pxPerSec
+          v.layoutX <== pxPerSec * elem._1
+          element2view.put((elem._1, elem._3), v)
+          v.highlight <== beatsPattern.highlightFirst
+          v
+        }.toIterable ++ (for ((start, end, b) <- beatsPattern.pattern.tail) yield {
+          val v = new BeatView[Beat](b, true, self)
+          v.position = (start, end)
+          v.pxPerSec <== pxPerSec
+          v.layoutX <== pxPerSec * start
+          element2view.put((start, b), v)
+          v
+        }) ++ (for ((start, end, b) <- beatsPattern.beats().drop(beatsPattern.pattern.size).takeWhile(_._2 < duration.get())) yield {
+          val v = new BeatView[Beat](b, false, self)
+          v.position = (start, end)
+          v.pxPerSec <== pxPerSec
+          v.layoutX <== pxPerSec * start
+          element2view.put((start, b), v)
+          v
+        })
+      } else {
+        beatsGroup.children.clear()
+      }
     }
 
     update()
@@ -936,7 +1022,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
     override def minDuration = beatsPattern.patternDuration()
 
-    override def selectionActive(x: Double) = x / pxPerSec() <= beatsPattern.patternDuration()
+    override def selectionActive(x: => Double) = x / pxPerSec() <= beatsPattern.patternDuration()
 
 
     var contextMenuX = 0.0
@@ -981,7 +1067,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     }
   }
 
-  final class BPMGroupView(val bpmPattern: BPMPattern, context: SelectionContainer[TrackElement]) extends ResizableElementView[BPMPattern, TrackElement](bpmPattern, context) {
+  final class BPMPatternView(val bpmPattern: BPMPattern, context: SelectionContainer[TrackElement]) extends ResizableElementView[BPMPattern, TrackElement](bpmPattern, context) {
     self =>
     override def target = this
 
@@ -1001,14 +1087,14 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       beatsGroup.children = bpmPattern.beats().headOption.map { elem =>
         val v = new BeatView[TrackElement](elem._3, false, context)
         v.pxPerSec <== pxPerSec
-        v.position() = (elem._1, elem._2)
+        v.position = (elem._1, elem._2)
         v.layoutX <== pxPerSec * elem._1
         v.highlight <== bpmPattern.highlightFirst
         v
       }.toIterable ++ (for ((start, end, b) <- bpmPattern.beats().tail.takeWhile(_._2 < duration.get())) yield {
         val v = new BeatView[TrackElement](b, false, context)
         v.pxPerSec <== pxPerSec
-        v.position() = (start, end)
+        v.position = (start, end)
         v.layoutX <== pxPerSec * start
         v
       })
@@ -1065,7 +1151,19 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       new CheckMenuItem("Highlight First") {
         selected <==> bpmPattern.highlightFirst
       },
-      new CheckMenuItem("Detect BPM")
+      new CheckMenuItem("Detect BPM") {
+        onAction = handle {
+          player.audio().foreach { data =>
+            val detection = new WaveletBPMDetection(WaveletBPMDetection.Daubechies4, 17)
+            val dataSlice = data.slice((position()._1 * AudioPlayer2.format.getFrameRate * 2).toInt, (position()._2 * AudioPlayer2.format.getFrameRate * 2).toInt + 1)
+            val monoData = dataSlice.toIterator.grouped(AudioPlayer2.format.getChannels).map(_.map(_.toDouble).sum / Short.MaxValue).toArray
+            val (bpm, bpms) = detection.detect(monoData, AudioPlayer2.format.getSampleRate, Some((t, d) => {
+              println(f"$d%.3f in window starting at $t%.3f")
+            }))
+            bpmPattern.bpm() = bpm
+          }
+        }
+      }
     )
     onMouseClicked = e => {
       if (MouseButton.Secondary.equals(e.getButton)) {
@@ -1133,7 +1231,39 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
     val tracks = new ObservableBuffer[Track]()
 
+    private val tracksDuration_ = ReadOnlyDoubleWrapper(0.0)
+    val tracksDuration = tracksDuration_.readOnlyProperty
+
+    private def calcTracksDuration(): Unit = {
+      tracksDuration_() = (Iterator(0.0) ++ (for {
+        track <- tracks
+        (_, d, _) <- track.content.lastOption
+      } yield d)).max
+    }
+
+    val tracksListener: InvalidationListener = _ => {
+      calcTracksDuration()
+    }
+    tracks.onChange { (_, cs) =>
+      import scalafx.collections.ObservableBuffer.{Add, Remove}
+      calcTracksDuration()
+      for (c <- cs) {
+        c match {
+          case Add(i, as) =>
+            for (a <- as) {
+              a.content.addListener(tracksListener)
+            }
+          case Remove(i, rs) =>
+            for (r <- rs) {
+              r.content.removeListener(tracksListener)
+            }
+          case _ =>
+        }
+      }
+    }
+
     val snaps = ObjectProperty[Option[ObservableIntervalMap[Double, Beat]]](None)
+    val record = ObjectProperty[Option[Track]](None)
 
     val headerBox = new VBox {
       spacing = 5
@@ -1148,9 +1278,10 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       focusTraversable = false
 
       val sceeneToContextX = (x: Double) => sceneToLocal(x, 0.0).getX + scrollX
-      println("generating waveform...")
-      val waveView = new WaveView(player.maxima, 20, player.maxima.toIterator.map(v => v._1._1 max v._1._2).max, 200, sceeneToContextX)
-      println("waveform generated.")
+      val waveView = new WaveView(20, 200, sceeneToContextX) {
+        points <== player.maxima
+        duration <== Bindings.createDoubleBinding(() => 10.0.max(player.audioDuration().max(tracksDuration())), player.duration, tracksDuration)
+      }
 
       val scrollTimeline = new Timeline {
         keyFrames = KeyFrame(time = Duration(50), onFinished = _ => {
@@ -1174,7 +1305,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
               for (t <- ts) yield {
                 val v = new TrackView(20, t) {
                   scaled <== waveView.scale
-                  duration <== player.duration
+                  duration <== Bindings.createDoubleBinding(() => 10.0.max(player.audioDuration().max(tracksDuration())), player.duration, tracksDuration)
                 }
                 val h = new TrackHeaderView(t) {
                   width <== headerBox.width
@@ -1183,15 +1314,25 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                 track2headerView(t) = h
                 tracksBox.children.add(i, v)
                 headerBox.children.add(i, h)
-                player.beats.add(i, (h.play.selected, v.beats))
-                h.snap.selected.onChange { (_, _, b) =>
+                player.beats.add(i, (h.track.play, v.beats))
+                h.track.snap.onChange { (_, _, b) =>
                   if (b) {
                     track2headerView.values.foreach(h2 => if (h2 != h) {
-                      h2.snap.selected = false
+                      h2.track.snap() = false
                     })
                     snaps() = Some(v.beats)
                   } else {
                     snaps() = None
+                  }
+                }
+                h.track.record.onChange { (_, _, b) =>
+                  if (b) {
+                    track2headerView.values.foreach(h2 => if (h2 != h) {
+                      h2.track.record() = false
+                    })
+                    record() = Some(h.track)
+                  } else {
+                    record() = None
                   }
                 }
               }
@@ -1252,7 +1393,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       val positionLineView = new PositionLineView(20, 10, sceeneToContextX) {
         position <==> player.position
         scale <== waveView.scale
-        duration <== player.duration
+        duration <== Bindings.createDoubleBinding(() => 10.0.max(player.audioDuration().max(tracksDuration())), player.duration, tracksDuration)
         height <== box.height
       }
 
@@ -1332,31 +1473,6 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       headerGroup,
       scrollPane
     )
-
-    tracks.append(new Track() {
-      title() = "very long title"
-      content ++= beats
-    })
-    tracks.append(new Track() {
-      title() = "foo"
-      content ++= Seq(
-        (0.5, 10.0, new BPMPattern() {
-          bpm() = 120
-        }),
-        (20, 100.0, new BeatsPattern() {
-          pattern ++= Seq(
-            (0.5, 0.55, new Beat()),
-            (1.5, 1.55, new Beat()),
-            (3.5, 3.55, new Beat()),
-            (4.5, 4.55, new Beat())
-          )
-          patternDuration() = 10.0
-        }),
-        (150, 200.0, new Message() {
-          text() = "hello world"
-        })
-      )
-    })
 
   }
 
@@ -1464,6 +1580,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
           down_9() = false
         }
       }
+
       root = new BorderPane {
         prefWidth = 800
         top = new MenuBar {
@@ -1477,25 +1594,27 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                     Option(fc.showOpenDialog(window())) match {
                       case Some(file) =>
                         try {
-                          JsonSerialization.load(Source.fromFile(file, "utf-8").mkString)  match {
+                          JsonSerialization.load(Source.fromFile(file, "utf-8").mkString) match {
                             case Success(tracks) => {
                               mainView.tracks.clear()
                               for (track <- tracks.content) {
                                 mainView.tracks += track.toMutable()
                               }
                             }
-                            case Failure(_) =>
+                            case Failure(e) =>
                               val alert = new Alert(AlertType.Error) {
                                 title = "Beatmeter Generator"
-                                text = "File contains errors."
+                                headerText = "Could not load file"
+                                contentText = e.getLocalizedMessage
                               }
                               alert.showAndWait()
                           }
                         } catch {
-                          case _: Exception =>
+                          case e: Exception =>
                             val alert = new Alert(AlertType.Error) {
                               title = "Beatmeter Generator"
-                              text = "Could not open file."
+                              headerText = "Could not open file"
+                              contentText = e.getLocalizedMessage
                             }
                             alert.showAndWait()
                         }
@@ -1509,16 +1628,39 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                     fc.title = "Beatmeter Generator: Save"
                     Option(fc.showSaveDialog(window())) match {
                       case Some(file) =>
-                        val s = JsonSerialization.save(new ImmutableTracks(mainView.tracks.map(_.toImmutable()).toList))
+                        val s = JsonSerialization.save(new ImmutableTracks(mainView.tracks.map(_.toImmutable()).toList, None))
                         val r = for (out <- resource.managed(new OutputStreamWriter(new FileOutputStream(file), "utf-8"))) yield {
                           out.write(s)
                         }
                         r.tried match {
                           case Success(_) =>
-                          case Failure(_) =>
+                          case Failure(e) =>
                             val alert = new Alert(AlertType.Error) {
                               title = "Beatmeter Generator"
-                              text = "Could not save file."
+                              headerText = "Could not save file"
+                              contentText = e.getLocalizedMessage
+                            }
+                            alert.showAndWait()
+                        }
+                      case None =>
+                    }
+                  }
+                },
+                new MenuItem("Load Audio") {
+                  onAction = handle {
+                    val fc = new FileChooser()
+                    fc.title = "Beatmeter Generator: Open audio file"
+                    fc.getExtensionFilters += new ExtensionFilter("wav audio file (16bit unsigned)", "*.wav")
+                    Option(fc.showOpenDialog(window())) match {
+                      case Some(file) =>
+                        AudioPlayer2.readData(new BufferedInputStream(new FileInputStream(file))) match {
+                          case Success(data) =>
+                            player.audio() = Some(data)
+                          case Failure(e) =>
+                            val alert = new Alert(AlertType.Error) {
+                              title = "Beatmeter Generator"
+                              headerText = "Could not load file"
+                              contentText = e.getLocalizedMessage
                             }
                             alert.showAndWait()
                         }
@@ -1556,9 +1698,17 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
               selected <==> player.playing
               focusTraversable = false
             },
-            new ToggleButton("beat") {
+            new Button("beat") {
               tooltip = Tooltip("Insert beat at current position")
               focusTraversable = false
+              onAction = handle {
+                mainView.record().foreach { track =>
+                  val x = player.position()._1
+                  if (track.content.intersecting(x, x + 0.05).isEmpty) {
+                    track.content ++= Iterator((x, x + 0.05, new Beat()))
+                  }
+                }
+              }
             },
             new HBox {
               hgrow = Priority.Always
@@ -1595,6 +1745,29 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
   def weak(listener: InvalidationListener): InvalidationListener = new WeakInvalidationListener(listener)
 
-  println("started.")
+  mainView.tracks.append(new Track() {
+    title() = "very long title"
+    content ++= beats
+  })
+  mainView.tracks.append(new Track() {
+    title() = "foo"
+    content ++= Seq(
+      (0.5, 10.0, new BPMPattern() {
+        bpm() = 120
+      }),
+      (20, 100.0, new BeatsPattern() {
+        pattern ++= Seq(
+          (0.5, 0.55, new Beat()),
+          (1.5, 1.55, new Beat()),
+          (3.5, 3.55, new Beat()),
+          (4.5, 4.55, new Beat())
+        )
+        patternDuration() = 10.0
+      }),
+      (150, 200.0, new Message() {
+        text() = "hello world"
+      })
+    )
+  })
 }
 

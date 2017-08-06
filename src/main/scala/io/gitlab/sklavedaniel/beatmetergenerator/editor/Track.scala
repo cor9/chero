@@ -18,6 +18,8 @@
 
 package io.gitlab.sklavedaniel.beatmetergenerator.editor
 
+import java.net.URI
+
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap
 
 import scalafx.beans.binding.{Bindings, ObjectBinding}
@@ -32,20 +34,21 @@ class Track {
   val display = BooleanProperty(false)
   val snap = BooleanProperty(false)
   val content = ObservableIntervalMap[Double, TrackElement]
+  val beat = ObjectProperty[Option[URI]](None)
 
   def toImmutable() = {
     new ImmutableTrack(title(), play(), record(), display(), snap(), content.toList.map { elem =>
       (elem._1, elem._2, elem._3.toImmutable())
-    })
+    }, beat())
   }
 }
 
 
-case class ImmutableTracks(content: List[ImmutableTrack]) {
-
+case class ImmutableTracks(content: List[ImmutableTrack], audio: Option[URI]) {
 }
 
-case class ImmutableTrack(title: String, play: Boolean, record: Boolean, display: Boolean, snap: Boolean, content: List[(Double, Double, ImmutableTrackElement)]) {
+case class ImmutableTrack(title: String, play: Boolean, record: Boolean, display: Boolean, snap: Boolean,
+  content: List[(Double, Double, ImmutableTrackElement)], beat: Option[URI]) {
   def toMutable() = {
     val tmp = new Track()
     tmp.title() = title
@@ -56,6 +59,7 @@ case class ImmutableTrack(title: String, play: Boolean, record: Boolean, display
     tmp.content ++= content.map { elem =>
       (elem._1, elem._2, elem._3.toMutable())
     }
+    tmp.beat() = beat
     tmp
   }
 }
@@ -63,15 +67,18 @@ case class ImmutableTrack(title: String, play: Boolean, record: Boolean, display
 sealed trait TrackElement {
   def toImmutable(): ImmutableTrackElement
 }
+trait Unscalable[A] {
+  def duration: A
+}
 
 sealed trait ImmutableTrackElement {
   def toMutable(): TrackElement
 }
 
 
-class Beat() extends TrackElement {
+class Beat() extends TrackElement with Unscalable[Double] {
   val highlight = BooleanProperty(false)
-
+  val duration = 0.05
   override def toImmutable() = ImmutableBeat(highlight())
 }
 
