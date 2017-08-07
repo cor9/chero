@@ -22,10 +22,41 @@ import java.net.URI
 
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap
 
+import scala.util.{Success, Try}
 import scalafx.beans.binding.{Bindings, ObjectBinding}
 import scalafx.beans.property.{BooleanProperty, DoubleProperty, ObjectProperty}
+import scalafx.collections.ObservableBuffer
 
+final class Tracks {
+  val content = ObservableBuffer[Track]()
+  val audio = ObjectProperty[Option[(URI, Array[Short])]](None)
 
+  def toImmutable(base: URI) = {
+    ImmutableTracks(content.toList.map(_.toImmutable(base)), audio().map(u => base.relativize(u._1)))
+  }
+}
+
+case class ImmutableTracks(content: List[ImmutableTrack], audio: Option[URI]) {
+  def toMutable(base: URI, load: URI => Try[Array[Short]]): Try[Tracks] = {
+    (audio match {
+      case Some(uri) =>
+        val auri = base.resolve(uri)
+        load(uri).map(arr => Some((auri, arr)))
+      case None =>
+        Success(None)
+    }).flatMap { aud =>
+      val list = content.map(_.toMutable(base, load)).foldLeft(Success(Nil): Try[List[Track]]) { (l, t) =>
+        l.flatMap(l2 => t.map(t2 => t2 :: l2))
+      }
+      list.map { l =>
+        val t = new Tracks()
+        t.content ++= l
+        t.audio() = aud
+        t
+      }
+    }
+  }
+}
 
 class Track {
   val title = ObjectProperty("")
@@ -34,39 +65,45 @@ class Track {
   val display = BooleanProperty(false)
   val snap = BooleanProperty(false)
   val content = ObservableIntervalMap[Double, TrackElement]
-  val beat = ObjectProperty[Option[URI]](None)
+  val beat = ObjectProperty[Option[(URI, Array[Short])]](None)
 
-  def toImmutable() = {
+  def toImmutable(base: URI) = {
     new ImmutableTrack(title(), play(), record(), display(), snap(), content.toList.map { elem =>
       (elem._1, elem._2, elem._3.toImmutable())
-    }, beat())
+    }, beat().map(u => base.relativize(u._1)))
   }
 }
 
-
-case class ImmutableTracks(content: List[ImmutableTrack], audio: Option[URI]) {
-}
-
 case class ImmutableTrack(title: String, play: Boolean, record: Boolean, display: Boolean, snap: Boolean,
-  content: List[(Double, Double, ImmutableTrackElement)], beat: Option[URI]) {
-  def toMutable() = {
-    val tmp = new Track()
-    tmp.title() = title
-    tmp.play() = play
-    tmp.record() = record
-    tmp.display() = display
-    tmp.snap() = snap
-    tmp.content ++= content.map { elem =>
-      (elem._1, elem._2, elem._3.toMutable())
+  content: List[(Double, Double, ImmutableTrackElement)], beat: Option[URI]
+) {
+  def toMutable(base: URI, load: URI => Try[Array[Short]]) = {
+    (beat match {
+      case Some(uri) =>
+        val auri = base.resolve(uri)
+        load(uri).map(arr => Some((auri, arr)))
+      case None =>
+        Success(None)
+    }).map { aud =>
+      val tmp = new Track()
+      tmp.title() = title
+      tmp.play() = play
+      tmp.record() = record
+      tmp.display() = display
+      tmp.snap() = snap
+      tmp.content ++= content.map { elem =>
+        (elem._1, elem._2, elem._3.toMutable())
+      }
+      tmp.beat() = aud
+      tmp
     }
-    tmp.beat() = beat
-    tmp
   }
 }
 
 sealed trait TrackElement {
   def toImmutable(): ImmutableTrackElement
 }
+
 trait Unscalable[A] {
   def duration: A
 }
@@ -79,6 +116,7 @@ sealed trait ImmutableTrackElement {
 class Beat() extends TrackElement with Unscalable[Double] {
   val highlight = BooleanProperty(false)
   val duration = 0.05
+
   override def toImmutable() = ImmutableBeat(highlight())
 }
 

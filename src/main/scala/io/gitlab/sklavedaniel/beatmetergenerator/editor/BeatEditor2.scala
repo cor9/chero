@@ -19,6 +19,7 @@
 package io.gitlab.sklavedaniel.beatmetergenerator.editor
 
 import java.io._
+import java.net.URI
 import javafx.beans.binding.{DoubleBinding, DoubleExpression}
 import javafx.beans.value.{ChangeListener, WeakChangeListener}
 import javafx.beans.{InvalidationListener, WeakInvalidationListener, property}
@@ -28,6 +29,7 @@ import javafx.scene.{Cursor, input}
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.{BeatFiles, ObservableIntervalMap}
 import io.gitlab.sklavedaniel.beatmetergenerator._
 import io.gitlab.sklavedaniel.beatmetergenerator.bpmdetection.WaveletBPMDetection
+import io.gitlab.sklavedaniel.beatmetergenerator.editor.AudioPlayer2.BeatInfo
 import org.rogach.scallop.ScallopConf
 
 import scala.collection.mutable
@@ -53,7 +55,7 @@ import scalafx.stage.FileChooser
 import scalafx.stage.FileChooser.ExtensionFilter
 import scalafx.util.Duration
 import scala.io.Source
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 import scalafx.scene.image.Image
 
 object BeatEditor2 {
@@ -77,7 +79,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
 
   //new BufferedInputStream(new FileInputStream(audioFile()))
-  val player = new AudioPlayer2(new BufferedInputStream(getClass.getResourceAsStream("/beats/click.wav")))
+  val player = new AudioPlayer2()
 
   player.ratio.set(0.8)
   player.rate.set(0.5f)
@@ -236,28 +238,62 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         editable = true
 
       }, false),
-      new MenuItem("Select Sound"),
+      new CheckMenuItem("Custom Sound") {
+        val listener: ChangeListener[Option[(URI, Array[Short])]] = (_, _, b) => {
+          selected() = b.isDefined
+        }
+        selected = track.beat().isDefined
+        track.beat.addListener(weak(listener))
+        selected.onChange { (_, _, current) =>
+          if (current) {
+            if (track.beat().isEmpty) {
+              val fc = new FileChooser()
+              fc.title = "Beatmeter Generator: Open audio file"
+              fc.getExtensionFilters += new ExtensionFilter("wav audio file (16bit unsigned)", "*.wav")
+              Option(fc.showOpenDialog(null)) match {
+                case Some(file) =>
+                  AudioPlayer2.readData(new BufferedInputStream(new FileInputStream(file))) match {
+                    case Success(data) =>
+                      track.beat() = Some((file.toURI, data))
+                    case Failure(e) =>
+                      val alert = new Alert(AlertType.Error) {
+                        title = "Beatmeter Generator"
+                        headerText = "Could not load file"
+                        contentText = e.getLocalizedMessage
+                      }
+                      alert.showAndWait()
+                      selected() = false
+                  }
+                case None =>
+                  selected() = false
+              }
+            }
+          } else if (track.beat().isDefined) {
+            track.beat() = None
+          }
+        }
+      },
       new MenuItem("Move up") {
         onAction = handle {
-          if (mainView.tracks.head != track) {
-            val index = mainView.tracks.indexOf(track)
-            mainView.tracks.remove(track)
-            mainView.tracks.add(index - 1, track)
+          if (tracks().content.head != track) {
+            val index = tracks().content.indexOf(track)
+            tracks().content.remove(track)
+            tracks().content.add(index - 1, track)
           }
         }
       },
       new MenuItem("Move down") {
         onAction = handle {
-          if (mainView.tracks.last != track) {
-            val index = mainView.tracks.indexOf(track)
-            mainView.tracks.remove(track)
-            mainView.tracks.add(index + 1, track)
+          if (tracks().content.last != track) {
+            val index = tracks().content.indexOf(track)
+            tracks().content.remove(track)
+            tracks().content.add(index + 1, track)
           }
         }
       },
       new MenuItem("Delete") {
         onAction = handle {
-          mainView.tracks.remove(track)
+          tracks().content.remove(track)
         }
       }
     )
@@ -814,7 +850,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
   def snap(pos: Double, offset: Double, atStart: Boolean) = Stage.digitDown().flatMap {
     extraSnaps =>
-      mainView.snaps().flatMap {
+      mainView().snaps().flatMap {
         snaps =>
           val (start, end) = if (atStart) {
             (snaps.starting((pos + offset - 10).max(0.0), pos + offset).lastOption.map(_._1 - offset),
@@ -1227,39 +1263,30 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
   val beats = conf.beats.toOption.map(BeatFiles.load(_).map(t => (t, t + 0.05, new Beat()))).getOrElse(Seq[(Double, Double, Beat)]())
 
-  object mainView extends HBox {
 
-    val tracks = new ObservableBuffer[Track]()
+  val tracks = ObjectProperty(new Tracks())
+  val audioListener: InvalidationListener = _ => {
+    player.audio() = tracks().audio().map(_._2)
+  }
+  tracks.onChange { (_, old, current) =>
+    player.audio() = tracks().audio().map(_._2)
+    old.audio.removeListener(audioListener)
+    current.audio.addListener(audioListener)
+  }
+  tracks().audio.addListener(audioListener)
+
+  var mainView = Bindings.createObjectBinding(() => new MainView(tracks()), tracks)
+
+  class MainView(val tracks: Tracks) extends HBox {
 
     private val tracksDuration_ = ReadOnlyDoubleWrapper(0.0)
     val tracksDuration = tracksDuration_.readOnlyProperty
 
     private def calcTracksDuration(): Unit = {
       tracksDuration_() = (Iterator(0.0) ++ (for {
-        track <- tracks
+        track <- tracks.content
         (_, d, _) <- track.content.lastOption
       } yield d)).max
-    }
-
-    val tracksListener: InvalidationListener = _ => {
-      calcTracksDuration()
-    }
-    tracks.onChange { (_, cs) =>
-      import scalafx.collections.ObservableBuffer.{Add, Remove}
-      calcTracksDuration()
-      for (c <- cs) {
-        c match {
-          case Add(i, as) =>
-            for (a <- as) {
-              a.content.addListener(tracksListener)
-            }
-          case Remove(i, rs) =>
-            for (r <- rs) {
-              r.content.removeListener(tracksListener)
-            }
-          case _ =>
-        }
-      }
     }
 
     val snaps = ObjectProperty[Option[ObservableIntervalMap[Double, Beat]]](None)
@@ -1298,46 +1325,61 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       private val track2view = mutable.Map[Track, TrackView]()
       private val track2headerView = mutable.Map[Track, TrackHeaderView]()
 
-      tracks.onChange { (_, cs) =>
+      private val tracksListener: InvalidationListener = _ => {
+        calcTracksDuration()
+      }
+
+      private def addTrack(i: Int, t: Track): Unit = {
+        t.content.addListener(tracksListener)
+        val v = new TrackView(20, t) {
+          scaled <== waveView.scale
+          duration <== Bindings.createDoubleBinding(() => 10.0.max(player.audioDuration().max(tracksDuration())), player.duration, tracksDuration)
+        }
+        val h = new TrackHeaderView(t) {
+          width <== headerBox.width
+        }
+        track2view(t) = v
+        track2headerView(t) = h
+        tracksBox.children.add(i, v)
+        headerBox.children.add(i, h)
+        val info = new BeatInfo()
+        info.beat <== Bindings.createObjectBinding(() => {
+          t.beat().map(_._2).getOrElse(AudioPlayer2.defaultBeat)
+        }, t.beat)
+        player.beats.add(i, (h.track.play, info, v.beats))
+        h.track.snap.onChange { (_, _, b) =>
+          if (b) {
+            track2headerView.values.foreach(h2 => if (h2 != h) {
+              h2.track.snap() = false
+            })
+            snaps() = Some(v.beats)
+          } else {
+            snaps() = None
+          }
+        }
+        h.track.record.onChange { (_, _, b) =>
+          if (b) {
+            track2headerView.values.foreach(h2 => if (h2 != h) {
+              h2.track.record() = false
+            })
+            record() = Some(h.track)
+          } else {
+            record() = None
+          }
+        }
+      }
+
+      tracks.content.onChange { (_, cs) =>
+        calcTracksDuration()
         for (c <- cs) {
           c match {
             case ObservableBuffer.Add(i, ts) =>
-              for (t <- ts) yield {
-                val v = new TrackView(20, t) {
-                  scaled <== waveView.scale
-                  duration <== Bindings.createDoubleBinding(() => 10.0.max(player.audioDuration().max(tracksDuration())), player.duration, tracksDuration)
-                }
-                val h = new TrackHeaderView(t) {
-                  width <== headerBox.width
-                }
-                track2view(t) = v
-                track2headerView(t) = h
-                tracksBox.children.add(i, v)
-                headerBox.children.add(i, h)
-                player.beats.add(i, (h.track.play, v.beats))
-                h.track.snap.onChange { (_, _, b) =>
-                  if (b) {
-                    track2headerView.values.foreach(h2 => if (h2 != h) {
-                      h2.track.snap() = false
-                    })
-                    snaps() = Some(v.beats)
-                  } else {
-                    snaps() = None
-                  }
-                }
-                h.track.record.onChange { (_, _, b) =>
-                  if (b) {
-                    track2headerView.values.foreach(h2 => if (h2 != h) {
-                      h2.track.record() = false
-                    })
-                    record() = Some(h.track)
-                  } else {
-                    record() = None
-                  }
-                }
+              for (t <- ts) {
+                addTrack(i, t)
               }
             case ObservableBuffer.Remove(i, ts) =>
               for (t <- ts) {
+                t.content.removeListener(tracksListener)
                 track2view.remove(t).foreach(tracksBox.children.remove)
                 track2headerView.remove(t).foreach(headerBox.children.remove)
                 player.beats.remove(i)
@@ -1346,6 +1388,11 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
           }
         }
       }
+
+      for ((t, i) <- tracks.content.zipWithIndex) {
+        addTrack(i, t)
+      }
+      calcTracksDuration()
 
       val box = new VBox {
         spacing = 5
@@ -1595,10 +1642,19 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                       case Some(file) =>
                         try {
                           JsonSerialization.load(Source.fromFile(file, "utf-8").mkString) match {
-                            case Success(tracks) => {
-                              mainView.tracks.clear()
-                              for (track <- tracks.content) {
-                                mainView.tracks += track.toMutable()
+                            case Success(ts) => {
+                              ts.toMutable(file.getParentFile.toURI, uri => {
+                                Try(uri.toURL().openStream()).flatMap(in => AudioPlayer2.readData(new BufferedInputStream(in)))
+                              }) match {
+                                case Success(t) =>
+                                  tracks() = t
+                                case Failure(e) =>
+                                  val alert = new Alert(AlertType.Error) {
+                                    title = "Beatmeter Generator"
+                                    headerText = "Could not load file"
+                                    contentText = e.getLocalizedMessage
+                                  }
+                                  alert.showAndWait()
                               }
                             }
                             case Failure(e) =>
@@ -1628,7 +1684,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                     fc.title = "Beatmeter Generator: Save"
                     Option(fc.showSaveDialog(window())) match {
                       case Some(file) =>
-                        val s = JsonSerialization.save(new ImmutableTracks(mainView.tracks.map(_.toImmutable()).toList, None))
+                        val s = JsonSerialization.save(tracks().toImmutable(file.getParentFile.toURI))
                         val r = for (out <- resource.managed(new OutputStreamWriter(new FileOutputStream(file), "utf-8"))) yield {
                           out.write(s)
                         }
@@ -1655,7 +1711,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                       case Some(file) =>
                         AudioPlayer2.readData(new BufferedInputStream(new FileInputStream(file))) match {
                           case Success(data) =>
-                            player.audio() = Some(data)
+                            tracks().audio() = Some((file.toURI, data))
                           case Failure(e) =>
                             val alert = new Alert(AlertType.Error) {
                               title = "Beatmeter Generator"
@@ -1674,7 +1730,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
               items = Seq(
                 new MenuItem("New Track") {
                   onAction = handle {
-                    mainView.tracks += new Track()
+                    tracks().content += new Track()
                   }
                 },
                 new MenuItem("Undo"),
@@ -1690,7 +1746,10 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
             }
           )
         }
-        center = mainView
+        center = mainView()
+        mainView.onChange { (_, _, v) =>
+          center() = v
+        }
         bottom = new ToolBar {
           padding = Insets(0, 0, 0, 0)
           items = Seq(
@@ -1702,7 +1761,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
               tooltip = Tooltip("Insert beat at current position")
               focusTraversable = false
               onAction = handle {
-                mainView.record().foreach { track =>
+                mainView().record().foreach { track =>
                   val x = player.position()._1
                   if (track.content.intersecting(x, x + 0.05).isEmpty) {
                     track.content ++= Iterator((x, x + 0.05, new Beat()))
@@ -1745,11 +1804,11 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
   def weak(listener: InvalidationListener): InvalidationListener = new WeakInvalidationListener(listener)
 
-  mainView.tracks.append(new Track() {
+  mainView().tracks.content.append(new Track() {
     title() = "very long title"
     content ++= beats
   })
-  mainView.tracks.append(new Track() {
+  mainView().tracks.content.append(new Track() {
     title() = "foo"
     content ++= Seq(
       (0.5, 10.0, new BPMPattern() {
