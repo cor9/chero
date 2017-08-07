@@ -160,6 +160,16 @@ class AudioPlayer2() {
   val playing = BooleanProperty(false)
   playing.onChange(syncChange)
 
+  private def computeCurrentBeats(currentPosition: Double) =
+    beats.toArray.flatMap {
+      case (enabled, info, map) if enabled() =>
+        val tmp = (map.toList.map(b => (b._1 * format.getFrameRate).ceil.toInt) ++ map.lastOption.map(x => ((x._1 * format.getFrameRate).ceil.toInt + info.beatCount())))
+          .sliding(2).filter(_.length == 2).map(x => (x(0), x(1))).dropWhile(_._2 <= (currentPosition * format.getFrameRate).round.toInt).toSeq
+        Some((info.beatCount(), info.beat(), tmp))
+      case _ =>
+        None
+    }
+
   private var audioThread = new AudioThread()
   audioThread.start()
 
@@ -184,23 +194,14 @@ class AudioPlayer2() {
         sync.take()
 
         val task = new FutureTask[(Double, Double, Float, Boolean, Array[(Int, Array[Short], Seq[(Int, Int)])], Option[Array[Short]], Int, Int)](() => {
-          val position = (self.position()._1 * format.getFrameRate).round.toInt
-          val currentBeats = beats.toArray.flatMap {
-            case (enabled, info, map) if enabled() =>
-              val tmp = (map.toList.map(b => (b._1 * format.getFrameRate).ceil.toInt) ++ map.lastOption.map(x => ((x._1 * format.getFrameRate).ceil.toInt + info.beatCount())))
-                .sliding(2).filter(_.length == 2).map(x => (x(0), x(1))).dropWhile(_._2 <= position).toSeq
-              Some((info.beatCount(), info.beat(), tmp))
-            case _ =>
-              None
-          }
-          (self.position()._1, self.ratio(), self.rate(), self.playing(), currentBeats, audio(), audioCount(), count())
+          (self.position()._1, self.ratio(), self.rate(), self.playing(), computeCurrentBeats(self.position()._1), audio(), audioCount(), count())
         })
         Platform.runLater(task)
         val (currentPosition, currentRatio, currentRate, currentPlaying, currentBeats, currentAudio, currentAudioCount, currentCount) = task.get
 
 
         if (currentPlaying) {
-          var position = (currentPosition * format.getFrameRate).round.toInt
+          var pos = (currentPosition * format.getFrameRate).round.toInt
           val bufferSize = (format.getFrameRate * bufferDuration * currentRate).round.toInt
           var bs = currentBeats.map(_._3)
           val bbuffer = ByteBuffer.allocate(bufferSize * format.getFrameSize).order(if (format.isBigEndian) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN)
@@ -209,51 +210,95 @@ class AudioPlayer2() {
           sourceLine.start()
           updatePosition(currentPosition + sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * currentRate, true)
 
-          while (sync.isEmpty && position < currentCount) {
-            bbuffer.clear()
-            val l = bufferSize.min(currentCount - position)
-            for {
-              i <- 0 until l
-              j <- 0 until format.getChannels
-            } {
-              if (currentAudio.isDefined && position < currentAudioCount) {
-                bbuffer.putShort(((1.0 - currentRatio) * currentAudio.get((position + i) * format.getChannels + j)).toShort)
-              } else {
-                bbuffer.putShort(0)
-              }
-            }
-
-            bs = bs.map(_.dropWhile(_._2 < position))
-            for (bi <- bs.indices) {
-              for ((b1, b2) <- bs(bi).takeWhile(_._1 <= position + bufferSize)) {
-                val targetStart = (b1 - position).max(0)
-                val sourceStart = (position - b1).max(0)
-                val len = (bufferSize - targetStart).min(currentBeats(bi)._1 - sourceStart)
-                if (len > 0) {
-                  for {
-                    i <- 0 until len
-                    j <- 0 until format.getChannels
-                  } {
-                    val k = ((targetStart + i) * format.getChannels + j) * format.getFrameSize / format.getChannels
-                    bbuffer.putShort(k,
-                      (bbuffer.getShort(k) + currentRatio * currentBeats(bi)._2((sourceStart + i) * format.getChannels + j)).toShort)
-                  }
-                }
-              }
-            }
-            position += sourceLine.write(bbuffer.array(), 0, l * format.getFrameSize) / format.getFrameSize
+          while (sync.isEmpty && pos < currentCount) {
+            val (newbs, l) = fillBuffer(bufferSize, pos, currentCount, currentAudio, currentAudioCount, currentRatio, bbuffer, bs, currentBeats)
+            bs = newbs
+            pos += sourceLine.write(bbuffer.array(), 0, l * format.getFrameSize) / format.getFrameSize
             updatePosition(currentPosition + sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * currentRate, false)
           }
           sourceLine.drain()
           updatePosition(currentPosition + sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * currentRate, false)
           sourceLine.stop()
           sourceLine.close()
-          if (position >= currentCount) {
+          if (pos >= currentCount) {
             Platform.runLater(playing() = false)
           }
         }
       }
     }
+  }
+
+  private def fillBuffer(bufferSize: Int, pos: Int, currentCount: Int, currentAudio: Option[Array[Short]], currentAudioCount: Int,
+    currentRatio: Double, bbuffer: ByteBuffer, bs: Array[Seq[(Int, Int)]], currentBeats: Array[(Int, Array[Short], Seq[(Int, Int)])]
+  ) = {
+    bbuffer.clear()
+    val l = bufferSize.min(currentCount - pos)
+    for {
+      i <- 0 until l
+      j <- 0 until format.getChannels
+    } {
+      if (currentAudio.isDefined && pos < currentAudioCount) {
+        bbuffer.putShort(((1.0 - currentRatio) * currentAudio.get((pos + i) * format.getChannels + j)).toShort)
+      } else {
+        bbuffer.putShort(0)
+      }
+    }
+
+    val newbs = bs.map(_.dropWhile(_._2 < pos))
+    for (bi <- bs.indices) {
+      for ((b1, b2) <- bs(bi).takeWhile(_._1 <= pos + l)) {
+        val targetStart = (b1 - pos).max(0)
+        val sourceStart = (pos - b1).max(0)
+        val len = (bufferSize - targetStart).min(currentBeats(bi)._1 - sourceStart)
+        if (len > 0) {
+          for {
+            i <- 0 until len
+            j <- 0 until format.getChannels
+          } {
+            val k = ((targetStart + i) * format.getChannels + j) * format.getFrameSize / format.getChannels
+            bbuffer.putShort(k,
+              (bbuffer.getShort(k) + currentRatio * currentBeats(bi)._2((sourceStart + i) * format.getChannels + j)).toShort)
+          }
+        }
+      }
+    }
+    (newbs, l)
+  }
+
+  def generateStream(): (InputStream, Long) = {
+    val (currentRatio, currentRate, currentPlaying, currentBeats, currentAudio, currentAudioCount, currentCount) =
+      (self.ratio(), self.rate(), self.playing(), computeCurrentBeats(0), audio(), audioCount(), count())
+    (new InputStream {
+      var pos = 0
+      val bufferSize = (format.getFrameRate * bufferDuration * currentRate).round.toInt
+      var bs = currentBeats.map(_._3)
+      val bbuffer = ByteBuffer.allocate(bufferSize * format.getFrameSize).order(if (format.isBigEndian) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN)
+      var bbufferPos = 0
+      var bbufferLimit = 0
+
+      private def generate(): Unit = {
+        val (newbs, l) = fillBuffer(bufferSize, pos, currentCount, currentAudio, currentAudioCount, currentRatio, bbuffer, bs, currentBeats)
+        bs = newbs
+        pos += l
+        bbufferPos = 0
+        bbufferLimit = l * format.getFrameSize
+      }
+
+      generate()
+
+      override def read(): Int = {
+        if(bbufferPos != bbufferLimit) {
+          val result = bbuffer.get(bbufferPos) & 0xff
+          bbufferPos += 1
+          if (bbufferPos == bbufferLimit) {
+            generate()
+          }
+          result
+        } else {
+          -1
+        }
+      }
+    }, currentCount)
   }
 
   private def rateFormat(format: AudioFormat, rate: Float) =

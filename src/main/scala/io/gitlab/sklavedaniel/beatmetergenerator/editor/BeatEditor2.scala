@@ -25,6 +25,7 @@ import javafx.beans.value.{ChangeListener, WeakChangeListener}
 import javafx.beans.{InvalidationListener, WeakInvalidationListener, property}
 import javafx.geometry.VPos
 import javafx.scene.{Cursor, input}
+import javax.sound.sampled.{AudioFileFormat, AudioInputStream, AudioSystem}
 
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.{BeatFiles, ObservableIntervalMap}
 import io.gitlab.sklavedaniel.beatmetergenerator._
@@ -1739,7 +1740,36 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
             },
             new Menu("Tools") {
               items = Seq(
-                new MenuItem("Generate Audio"),
+                new MenuItem("Generate Audio") {
+                  onAction = handle {
+                    val fc = new FileChooser()
+                    fc.title = "Beatmeter Generator: Generate Audio"
+                    Option(fc.showSaveDialog(window())) match {
+                      case Some(file) =>
+                        try {
+                          val (is, count) = player.generateStream()
+                          val ais = new AudioInputStream(is, AudioPlayer2.format, count)
+                          try {
+                            AudioSystem.write(ais, AudioFileFormat.Type.WAVE, file)
+                          } finally {
+                            ais.close()
+                          }
+                          println("finished")
+                        } catch {
+                          case e: Throwable =>
+                            val alert = new Alert(AlertType.Error) {
+                              title = "Beatmeter Generator"
+                              headerText = "Could not save file"
+                              contentText = e.getLocalizedMessage
+                            }
+                            alert.showAndWait()
+                        }
+                      case None =>
+                    }
+
+
+                  }
+                },
                 new MenuItem("Generate Beatmeter"),
                 new MenuItem("Beatmeter Settings")
               )
