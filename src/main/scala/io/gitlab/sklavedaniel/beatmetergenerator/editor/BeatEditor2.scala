@@ -1808,6 +1808,24 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
               hgap = 5
               vgap = 5
               addRow(0,
+                new Text("Position"),
+                new Text {
+                  text <== Bindings.createStringBinding(() => formatTime(player.position()._1), player.position)
+                }.delegate
+              )
+              addRow(1,
+                new Text("Duration"),
+                new Text {
+                  text <== Bindings.createStringBinding(() => formatTime(player.duration()), player.duration)
+                }.delegate
+              )
+            },
+            new GridPane {
+              scaleX = 0.8
+              scaleY = 0.8
+              hgap = 5
+              vgap = 5
+              addRow(0,
                 new Text("Speed"),
                 new Slider(0.2f, 1.0f, 1.0f) {
                   blockIncrement = 0.1f
@@ -1858,5 +1876,13 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       })
     )
   })
+
+  def formatTime(time: Double) = {
+    val ms = (time * 1000).round
+    val minutes = ms / (1000 * 60)
+    val seconds = ms % (1000 * 60) / 1000
+    val milis = ms % 1000
+    f"$minutes%02d:$seconds%02d.$milis%03d"
+  }
 }
 
