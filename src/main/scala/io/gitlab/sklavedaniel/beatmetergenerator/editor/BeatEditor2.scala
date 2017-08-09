@@ -18,46 +18,53 @@
 
 package io.gitlab.sklavedaniel.beatmetergenerator.editor
 
+import java.awt.Shape
+import java.awt.image.BufferedImage
 import java.io._
 import java.net.URI
-import javafx.beans.binding.{DoubleBinding, DoubleExpression}
+import java.nio.file.Files
+import javafx.beans.binding.DoubleExpression
 import javafx.beans.value.{ChangeListener, WeakChangeListener}
-import javafx.beans.{InvalidationListener, WeakInvalidationListener, property}
+import javafx.beans.{InvalidationListener, WeakInvalidationListener}
 import javafx.geometry.VPos
 import javafx.scene.{Cursor, input}
+import javax.imageio.ImageIO
 import javax.sound.sampled.{AudioFileFormat, AudioInputStream, AudioSystem}
 
-import io.gitlab.sklavedaniel.beatmetergenerator.utils.{BeatFiles, ObservableIntervalMap}
 import io.gitlab.sklavedaniel.beatmetergenerator._
+import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.Beatmeter.Timed
+import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.{Beatmeter2, FlyingBeatmeter2}
 import io.gitlab.sklavedaniel.beatmetergenerator.bpmdetection.WaveletBPMDetection
 import io.gitlab.sklavedaniel.beatmetergenerator.editor.AudioPlayer2.BeatInfo
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap
 import org.rogach.scallop.ScallopConf
 
+import scala.collection.immutable.Queue
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
+import scala.io.Source
+import scala.util.{Failure, Success, Try}
 import scalafx.Includes._
 import scalafx.animation.{Animation, KeyFrame, Timeline}
 import scalafx.application.JFXApp
 import scalafx.application.JFXApp.PrimaryStage
-import scalafx.beans.binding.{Bindings, ObjectExpression}
+import scalafx.beans.binding.Bindings
 import scalafx.beans.property._
 import scalafx.collections.ObservableSet.{Add, Remove}
 import scalafx.collections.{ObservableBuffer, ObservableSet}
-import scalafx.geometry.{Insets, Pos, Side}
+import scalafx.geometry.{Insets, Side}
 import scalafx.scene.control.Alert.AlertType
 import scalafx.scene.control.{MenuItem, _}
 import scalafx.scene.input._
 import scalafx.scene.layout._
-import scalafx.scene.paint.{Color, Paint}
+import scalafx.scene.paint.Color
 import scalafx.scene.shape.{Line, Rectangle}
 import scalafx.scene.text.{Font, Text}
 import scalafx.scene.transform.Scale
-import scalafx.scene.{Group, Node, Scene, SnapshotParameters}
-import scalafx.stage.FileChooser
+import scalafx.scene.{Group, Node, Scene}
 import scalafx.stage.FileChooser.ExtensionFilter
+import scalafx.stage.{DirectoryChooser, FileChooser}
 import scalafx.util.Duration
-import scala.io.Source
-import scala.util.{Failure, Success, Try}
-import scalafx.scene.image.Image
 
 object BeatEditor2 {
 
@@ -78,8 +85,8 @@ object BeatEditor2 {
 
 class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
+  BeatEditor2.dataformat.delegate.toString
 
-  //new BufferedInputStream(new FileInputStream(audioFile()))
   val player = new AudioPlayer2()
 
   player.ratio.set(0.8)
@@ -499,7 +506,8 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         onAction = handle {
           insert(contextMenuX)
         }
-      }
+      },
+      new Menu("Common Patterns")
     )
 
     override def mouseClicked(e: MouseEvent) = {
@@ -1121,20 +1129,13 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     )
 
     private def update(): Unit = {
-      beatsGroup.children = bpmPattern.beats().headOption.map { elem =>
-        val v = new BeatView[TrackElement](elem._3, false, context)
-        v.pxPerSec <== pxPerSec
-        v.position = (elem._1, elem._2)
-        v.layoutX <== pxPerSec * elem._1
-        v.highlight <== bpmPattern.highlightFirst
-        v
-      }.toIterable ++ (for ((start, end, b) <- bpmPattern.beats().tail.takeWhile(_._2 < duration.get())) yield {
+      beatsGroup.children = for ((start, end, b) <- bpmPattern.beats().takeWhile(_._2 < duration.get())) yield {
         val v = new BeatView[TrackElement](b, false, context)
         v.pxPerSec <== pxPerSec
         v.position = (start, end)
         v.layoutX <== pxPerSec * start
         v
-      })
+      }
     }
 
     update()
@@ -1262,9 +1263,6 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     }
   }
 
-  val beats = conf.beats.toOption.map(BeatFiles.load(_).map(t => (t, t + 0.05, new Beat()))).getOrElse(Seq[(Double, Double, Beat)]())
-
-
   val tracks = ObjectProperty(new Tracks())
   val audioListener: InvalidationListener = _ => {
     player.audio() = tracks().audio().map(_._2)
@@ -1323,8 +1321,8 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         spacing = 5
       }
 
-      private val track2view = mutable.Map[Track, TrackView]()
-      private val track2headerView = mutable.Map[Track, TrackHeaderView]()
+      val track2view = mutable.Map[Track, TrackView]()
+      val track2headerView = mutable.Map[Track, TrackHeaderView]()
 
       private val tracksListener: InvalidationListener = _ => {
         calcTracksDuration()
@@ -1759,7 +1757,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                           case e: Throwable =>
                             val alert = new Alert(AlertType.Error) {
                               title = "Beatmeter Generator"
-                              headerText = "Could not save file"
+                              headerText = "Could not generate audio"
                               contentText = e.getLocalizedMessage
                             }
                             alert.showAndWait()
@@ -1770,8 +1768,155 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
                   }
                 },
-                new MenuItem("Generate Beatmeter"),
-                new MenuItem("Beatmeter Settings")
+                new MenuItem("Generate Video") {
+                  onAction = handle {
+                    def merge[A, B: Ordering](seq: Seq[Traversable[A]], f: A => B): List[A] = {
+                      def impl(seq: Seq[Traversable[A]], result: ListBuffer[A]): List[A] = {
+                        if (seq.isEmpty) {
+                          result.toList
+                        } else {
+                          val (trv, idx: Int) = seq.zipWithIndex.minBy(s => s._1.headOption.map(f))
+                          if (trv.isEmpty) {
+                            impl(seq.slice(0, idx) ++ seq.slice(idx + 1, seq.size), result)
+                          } else {
+                            result += trv.head
+                            impl(seq.slice(0, idx) ++ (trv.tail +: seq.slice(idx + 1, seq.size)), result)
+                          }
+                        }
+                      }
+
+                      impl(seq, ListBuffer.empty)
+                    }
+
+                    val beats = merge[(Double, Boolean), Double](mainView().scrollPane.track2view.values.toList.filter(_.track.display()).map(_.beats.toList.map(b => (b._1, b._3.highlight()))),
+                      b => b._1)
+                    val messages = merge[(Double, Double, String), Double](
+                      tracks().content.toList.filter(_.display()).map(_.content.toList.flatMap { b =>
+                        b._3 match {
+                          case msg: Message => Some((b._1, b._2, msg.text()))
+                          case _ => None
+                        }
+                      }),
+                      b => b._1)
+                    if (beats.nonEmpty || messages.nonEmpty) {
+                      val conf = tracks().beatmeterSettings()
+                      val beatmeter: Beatmeter2 = new FlyingBeatmeter2(conf)
+                      val beatViolations = if (beats.size < 2) {
+                        Nil
+                      } else {
+                        beats.sliding(2).filter { case Seq(a, b) => b._1 - a._1 < beatmeter.minimalBeatDistance }
+                      }
+                      val messageViolations = if (messages.size < 2) {
+                        Nil
+                      } else {
+                        messages.sliding(2).filter { case Seq(a, b) => a._2 >= b._1 }
+                      }
+                      if (beatViolations.nonEmpty) {
+                        val alert = new Alert(AlertType.Error) {
+                          title = "Beatmeter Generator"
+                          headerText = s"Beat Distance is smaller than ${beatmeter.minimalBeatDistance}s."
+                          contentText = beatViolations.map { case Seq(a, b) => s"${a._1} ${b._1}" }.mkString("\n")
+                        }
+                        alert.showAndWait()
+                      } else if (messageViolations.nonEmpty) {
+                        val alert = new Alert(AlertType.Error) {
+                          title = "Beatmeter Generator"
+                          headerText = "Messages are overlapping."
+                          contentText = messageViolations.map { case Seq(a, b) => s"${a._1} ${b._1}" }.mkString("\n")
+                        }
+                        alert.showAndWait()
+                      } else {
+                        val frameCount = (conf.frames * player.duration()).round.toInt
+
+                        class State(val clip: Option[Shape], var remaining: Stream[Timed]) {
+                          var current: Queue[Timed] = Queue()
+                        }
+
+                        val elementStreams = beatmeter.getElementStreams(beats, messages, frameCount)
+
+                        val states: List[State] = elementStreams.map(tl => new State(tl.clip, tl.stream))
+
+                        val fc = new DirectoryChooser()
+                        fc.title = "Beatmeter Generator: Generate Video"
+                        Option(fc.showDialog(window())) match {
+                          case Some(dir) =>
+                            try {
+                              val cnt = if (dir.exists() && dir.listFiles().nonEmpty) {
+                                val alert = new Alert(AlertType.Confirmation) {
+                                  title = "Beatmeter Generator"
+                                  headerText = "Output Directory is not empty!"
+                                  contentText = s"Delete all contents of\n${dir.getAbsolutePath}?"
+                                }
+
+                                def deleteDir(file: File): Unit = {
+                                  if (file.isDirectory) {
+                                    file.listFiles().foreach(deleteDir)
+                                  }
+                                  if (!file.delete()) {
+                                    throw new Exception(s"Could not delete ${file.getAbsolutePath}.")
+                                  }
+                                }
+
+                                if (ButtonType.OK == alert.showAndWait().get) {
+                                  dir.listFiles().foreach(deleteDir)
+                                  true
+                                } else {
+                                  false
+                                }
+                              } else {
+                                true
+                              }
+                              if (cnt) {
+                                for (i <- 0 until frameCount) {
+                                  println(s"Encoding frame ${i + 1} of $frameCount")
+                                  val currentTime = i.toDouble / beatmeter.frames
+                                  val image = new BufferedImage(beatmeter.width, beatmeter.height, BufferedImage.TYPE_INT_ARGB)
+                                  val g = image.createGraphics()
+
+                                  for (state <- states) {
+                                    state.current = state.current.filter { case Timed(_, endFrame, _) => endFrame > i }
+                                      .enqueue(state.remaining.takeWhile { case Timed(startFrame, _, _) => startFrame <= i })
+                                    state.remaining = state.remaining.dropWhile { case Timed(startFrame, _, _) => startFrame <= i }
+                                    state.clip.foreach(g.setClip)
+
+                                    for (Timed(startFrame, _, drawable) <- state.current) {
+                                      val offset = i - startFrame
+                                      drawable.draw(offset, g)
+                                    }
+
+                                    g.setClip(null) // scalastyle:ignore null
+
+                                  }
+
+                                  ImageIO.write(image, "PNG", new File(dir, f"frame-$i%010d.png"))
+                                }
+                                println("finished")
+                              }
+                            } catch {
+                              case e: Throwable =>
+                                val alert = new Alert(AlertType.Error) {
+                                  title = "Beatmeter Generator"
+                                  headerText = "Could not generate video"
+                                  contentText = e.getLocalizedMessage
+                                }
+                                alert.showAndWait()
+                            }
+                          case None =>
+                        }
+                      }
+                    }
+                  }
+                },
+                new MenuItem("Beatmeter Settings") {
+                  onAction = handle {
+                    val dialog = new BeatmeterDialog(tracks().beatmeterSettings())
+                    val result = dialog.showAndWait().asInstanceOf[Option[FlyingBeatmeter2.Conf]]
+                    result match {
+                      case Some(r) => tracks().beatmeterSettings() = r
+                      case None =>
+                    }
+                  }
+                }
               )
             }
           )
@@ -1807,38 +1952,39 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
               scaleY = 0.8
               hgap = 5
               vgap = 5
-              addRow(0,
-                new Text("Position"),
-                new Text {
-                  text <== Bindings.createStringBinding(() => formatTime(player.position()._1), player.position)
-                }.delegate
-              )
-              addRow(1,
-                new Text("Duration"),
-                new Text {
-                  text <== Bindings.createStringBinding(() => formatTime(player.duration()), player.duration)
-                }.delegate
-              )
+
+              add(new Label("Position") {
+                tooltip = Tooltip("Current player position in mm:ss.ms")
+              }, 0, 0)
+              add(new Label {
+                text <== Bindings.createStringBinding(() => formatTime(player.position()._1), player.position)
+              }, 1, 0)
+              add(new Label("Duration") {
+                tooltip = Tooltip("Current player position in mm:ss.ms")
+              }, 0, 1)
+              add(new Label {
+                text <== Bindings.createStringBinding(() => formatTime(player.duration()), player.duration)
+              }, 1, 1)
             },
             new GridPane {
               scaleX = 0.8
               scaleY = 0.8
               hgap = 5
               vgap = 5
-              addRow(0,
-                new Text("Speed"),
-                new Slider(0.2f, 1.0f, 1.0f) {
-                  blockIncrement = 0.1f
-                  value <==> player.rate
-                }.delegate
-              )
-              addRow(1,
-                new Text("Volume"),
-                new Slider(0.0, 1.0, 0.5) {
-                  blockIncrement = 0.1
-                  value <==> player.ratio
-                }.delegate
-              )
+              add(new Label("Speed") {
+                tooltip = Tooltip("Playback speed")
+              }, 0, 0)
+              add(new Slider(0.2f, 1.0f, 1.0f) {
+                blockIncrement = 0.1f
+                value <==> player.rate
+              }, 1, 0)
+              add(new Label("Volume") {
+                tooltip = Tooltip("Ratio of volume between beats and audio file")
+              }, 0, 1)
+              add(new Slider(0.0, 1.0, 0.5) {
+                blockIncrement = 0.1
+                value <==> player.ratio
+              }, 1, 1)
             }
           )
         }
@@ -1852,37 +1998,162 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
   def weak(listener: InvalidationListener): InvalidationListener = new WeakInvalidationListener(listener)
 
-  mainView().tracks.content.append(new Track() {
-    title() = "very long title"
-    content ++= beats
-  })
-  mainView().tracks.content.append(new Track() {
-    title() = "foo"
-    content ++= Seq(
-      (0.5, 10.0, new BPMPattern() {
-        bpm() = 120
-      }),
-      (20, 100.0, new BeatsPattern() {
-        pattern ++= Seq(
-          (0.5, 0.55, new Beat()),
-          (1.5, 1.55, new Beat()),
-          (3.5, 3.55, new Beat()),
-          (4.5, 4.55, new Beat())
-        )
-        patternDuration() = 10.0
-      }),
-      (150, 200.0, new Message() {
-        text() = "hello world"
-      })
-    )
-  })
-
   def formatTime(time: Double) = {
     val ms = (time * 1000).round
     val minutes = ms / (1000 * 60)
     val seconds = ms % (1000 * 60) / 1000
     val milis = ms % 1000
     f"$minutes%02d:$seconds%02d.$milis%03d"
+  }
+
+  class BeatmeterDialog(conf: FlyingBeatmeter2.Conf) extends Dialog[FlyingBeatmeter2.Conf] {
+    val widthSpinner = new Spinner[Int](1, 10000, conf.width, 1) {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+      editable = true
+    }
+    val heightSpinner = new Spinner[Int](1, 10000, conf.height, 1) {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+      editable = true
+    }
+    val framesSpinner = new Spinner[Double](1, 240, conf.frames, 0.1) {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+      editable = true
+    }
+    val speedSpinner = new Spinner[Double](0.1, 1.0, conf.speed, 0.05) {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+      editable = true
+    }
+    val positionSpinner = new Spinner[Double](0.0, 1.0, conf.position, 0.05) {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+      editable = true
+    }
+
+    val beatColorPicker = new ColorPicker(conf.beatColor) {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+      editable = true
+    }
+    val beatBorderColorPicker = new ColorPicker(conf.beatBorderColor) {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+      editable = true
+    }
+
+    val beatHighlightColorPicker = new ColorPicker(conf.beatHighlightedColor) {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+      editable = true
+    }
+    val beatHighlightBorderColorPicker = new ColorPicker(conf.beatHighlightedBorderColor) {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+      editable = true
+    }
+
+    val messageHeightSpinner = new Spinner[Int](1, 10000, conf.messageHeight, 1) {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+      editable = true
+    }
+    val marginSpinner = new Spinner[Int](0, 10000, conf.margin, 1) {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+      editable = true
+    }
+    val messageColorPicker = new ColorPicker(conf.messageColor) {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+      editable = true
+    }
+    dialogPane = new DialogPane {
+      headerText = "Beatmeter Settings"
+      content = new GridPane {
+        hgap = 5
+        vgap = 5
+        add(new Label("Width") {
+          tooltip = Tooltip("Width of the generated video in px")
+        }, 0, 0)
+        add(widthSpinner, 1, 0)
+        add(new Label("Beatmeter Height") {
+          tooltip = Tooltip("Height of the beatmeter in px")
+        }, 0, 1)
+        add(heightSpinner, 1, 1)
+        add(new Label("Framerate") {
+          tooltip = Tooltip("Framerate in frames per sec")
+        }, 0, 2)
+        add(framesSpinner, 1, 2)
+        add(new Label("Position") {
+          tooltip = Tooltip("Position of beat when it is played as ratio of video width")
+        }, 0, 3)
+        add(positionSpinner, 1, 3)
+        add(new Label("Speed") {
+          tooltip = Tooltip("Speed of beats as ratio of video width")
+        }, 0, 4)
+        add(speedSpinner, 1, 4)
+        add(new Label("Beat Color"), 0, 5)
+        add(beatColorPicker, 1, 5)
+        add(new Label("Beat Border Color"), 0, 6)
+        add(beatBorderColorPicker, 1, 6)
+        add(new Label("Beat Highlight Color"), 0, 7)
+        add(beatHighlightColorPicker, 1, 7)
+        add(new Label("Beat Highlight Border Color"), 0, 8)
+        add(beatHighlightBorderColorPicker, 1, 8)
+        add(new Label("Message Text Height") {
+          tooltip = Tooltip("Height of text messages in px")
+        }, 0, 9)
+        add(messageHeightSpinner, 1, 9)
+        add(new Label("Beat Message Margin") {
+          tooltip = Tooltip("Margin between beatmeter and messages in px")
+        }, 0, 10)
+        add(marginSpinner, 1, 10)
+        add(new Label("Message Text Color"), 0, 11)
+        add(messageColorPicker, 1, 11)
+      }
+      buttonTypes = Seq(ButtonType.Cancel, ButtonType.Apply)
+    }
+    resultConverter = bt => {
+      if (ButtonType.Apply == bt) {
+        FlyingBeatmeter2.Conf(widthSpinner.value(), heightSpinner.value(), framesSpinner.value(), speedSpinner.value(),
+          positionSpinner.value(), beatColorPicker.value(), beatBorderColorPicker.value(), beatHighlightColorPicker.value(),
+          beatHighlightBorderColorPicker.value(), None, None, messageHeightSpinner.value(), marginSpinner.value(),
+          messageColorPicker.value())
+      } else {
+        conf
+      }
+    }
+  }
+
+  conf.beats.toOption.foreach { f =>
+    val file = f.getAbsoluteFile
+    JsonSerialization.load(Source.fromFile(file, "utf-8").mkString) match {
+      case Success(ts) => {
+        ts.toMutable(file.getParentFile.toURI, uri => {
+          Try(uri.toURL().openStream()).flatMap(in => AudioPlayer2.readData(new BufferedInputStream(in)))
+        }) match {
+          case Success(t) =>
+            tracks() = t
+          case Failure(e) =>
+            val alert = new Alert(AlertType.Error) {
+              title = "Beatmeter Generator"
+              headerText = "Could not load file"
+              contentText = e.getLocalizedMessage
+            }
+            alert.showAndWait()
+        }
+      }
+      case Failure(e) =>
+        val alert = new Alert(AlertType.Error) {
+          title = "Beatmeter Generator"
+          headerText = "Could not load file"
+          contentText = e.getLocalizedMessage
+        }
+        alert.showAndWait()
+    }
   }
 }
 

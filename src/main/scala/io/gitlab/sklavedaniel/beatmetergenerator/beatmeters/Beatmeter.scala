@@ -33,6 +33,7 @@ import org.rogach.scallop.{ScallopConf, Subcommand}
 import shapeless.{HNil, :: => :::}
 
 import scala.io.Source
+import scalafx.scene.paint
 
 object Beatmeter {
 
@@ -231,7 +232,13 @@ object Beatmeter {
     "#" + "0" * (6 - rgb.length) + rgb
   }
 
+  def getCSSColor(color: paint.Color) = {
+    val rgb = ((color.red * 255).toInt << 16 | (color.green * 255).toInt << 8 | (color.blue * 255).toInt).toHexString
+    "#" + "0" * (6 - rgb.length) + rgb
+  }
+
   def getCSSOpacity(color: Color) = (color.getAlpha.toFloat / 0xff).toString()
+  def getCSSOpacity(color: paint.Color) = color.opacity.toFloat.toString()
 
   def getImageLine(width: Int, pattern: (BufferedImage, BufferedImage, IndexedSeq[(BufferedImage, BufferedImage)])): ElementStream[None.type, Appended] = {
     val patternWidth = pattern._3.map(_._1.getWidth).sum
@@ -270,4 +277,16 @@ trait Beatmeter {
   def getElementStreams(beats: Seq[Double], frameCount: Int): List[Beatmeter.TimedStream]
 
   def minimalBeatDistance: Double
+}
+
+
+trait Beatmeter2 {
+
+  def getElementStreams(beats: Seq[(Double, Boolean)], messages: Seq[(Double, Double, String)], frameCount: Int): List[Beatmeter.TimedStream]
+
+  def minimalBeatDistance: Double
+
+  def width: Int
+  def height: Int
+  def frames: Double
 }

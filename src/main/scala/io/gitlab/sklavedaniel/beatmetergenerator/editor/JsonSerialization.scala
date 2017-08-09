@@ -24,6 +24,7 @@ import prickle._
 
 import scala.collection.mutable
 import scala.util.Try
+import scalafx.scene.paint.Color
 
 object JsonSerialization {
 
@@ -35,6 +36,18 @@ object JsonSerialization {
   implicit val pathUnpickler = new Unpickler[URI] {
     override def unpickle[P](pickle: P, state: mutable.Map[String, Any])(implicit config: PConfig[P]): Try[URI] = {
       config.readString(pickle).flatMap(s => Try(new URI(s)))
+    }
+  }
+  implicit val colorPickler = new Pickler[Color] {
+    override def pickle[P](obj: Color, state: PickleState)(implicit config: PConfig[P]): P = {
+      config.makeString(s"${obj.red},${obj.green},${obj.blue},${obj.opacity}")
+    }
+  }
+  implicit val colorUnpickler = new Unpickler[Color] {
+    override def unpickle[P](pickle: P, state: mutable.Map[String, Any])(implicit config: PConfig[P]): Try[Color] = {
+      config.readString(pickle).flatMap {s =>
+        val Array(r,g,b,a) = s.split(',')
+        Try(Color(r.toDouble, g.toDouble, b.toDouble, a.toDouble))}
     }
   }
   implicit val trackElementPickler: PicklerPair[ImmutableTrackElement] = CompositePickler[ImmutableTrackElement].concreteType[ImmutableBeat].concreteType[ImmutableMessage].

@@ -20,23 +20,27 @@ package io.gitlab.sklavedaniel.beatmetergenerator.editor
 
 import java.net.URI
 
+import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.FlyingBeatmeter2
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap
 
 import scala.util.{Success, Try}
 import scalafx.beans.binding.{Bindings, ObjectBinding}
 import scalafx.beans.property.{BooleanProperty, DoubleProperty, ObjectProperty}
 import scalafx.collections.ObservableBuffer
+import scalafx.scene.paint.Color
 
 final class Tracks {
   val content = ObservableBuffer[Track]()
   val audio = ObjectProperty[Option[(URI, Array[Short])]](None)
+  val beatmeterSettings = ObjectProperty(FlyingBeatmeter2.Conf(1280, 40, 25.0, 0.2, 0.4, Color.DarkRed, Color.DarkGray,
+    Color.Yellow, Color.DarkGray, None, None, 50, 5, Color.Red))
 
   def toImmutable(base: URI) = {
-    ImmutableTracks(content.toList.map(_.toImmutable(base)), audio().map(u => base.relativize(u._1)))
+    ImmutableTracks(content.toList.map(_.toImmutable(base)), audio().map(u => base.relativize(u._1)), beatmeterSettings())
   }
 }
 
-case class ImmutableTracks(content: List[ImmutableTrack], audio: Option[URI]) {
+case class ImmutableTracks(content: List[ImmutableTrack], audio: Option[URI], beatmeterSettings: FlyingBeatmeter2.Conf) {
   def toMutable(base: URI, load: URI => Try[Array[Short]]): Try[Tracks] = {
     (audio match {
       case Some(uri) =>
@@ -50,8 +54,9 @@ case class ImmutableTracks(content: List[ImmutableTrack], audio: Option[URI]) {
       }
       list.map { l =>
         val t = new Tracks()
-        t.content ++= l
+        t.content ++= l.reverse
         t.audio() = aud
+        t.beatmeterSettings() = beatmeterSettings
         t
       }
     }
@@ -139,10 +144,12 @@ class BPMPattern(val beat: Beat) extends BeatsGenerator {
 
   val highlightFirst = BooleanProperty(false)
   val bpm = DoubleProperty(0.0)
+  private val firstBeat = new Beat()
+  firstBeat.highlight <== highlightFirst
   val beats = Bindings.createObjectBinding(() => if (bpm() == 0) {
     Stream.empty
   } else {
-    Stream.from(0).map { i =>
+    Stream((0.0, 0.05, firstBeat)) ++ Stream.from(1).map { i =>
       (i * 60 / bpm(), i * 60 / bpm() + 0.05, beat)
     }
   }, bpm)
