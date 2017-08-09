@@ -266,18 +266,17 @@ class AudioPlayer2() {
   }
 
   def generateStream(): (InputStream, Long) = {
-    val (currentRatio, currentRate, currentPlaying, currentBeats, currentAudio, currentAudioCount, currentCount) =
-      (self.ratio(), self.rate(), self.playing(), computeCurrentBeats(0), audio(), audioCount(), count())
+    val (currentBeats, currentCount) = (computeCurrentBeats(0), count())
     (new InputStream {
       var pos = 0
-      val bufferSize = (format.getFrameRate * bufferDuration * currentRate).round.toInt
+      val bufferSize = (format.getFrameRate * bufferDuration).round.toInt
       var bs = currentBeats.map(_._3)
       val bbuffer = ByteBuffer.allocate(bufferSize * format.getFrameSize).order(if (format.isBigEndian) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN)
       var bbufferPos = 0
       var bbufferLimit = 0
 
       private def generate(): Unit = {
-        val (newbs, l) = fillBuffer(bufferSize, pos, currentCount, currentAudio, currentAudioCount, currentRatio, bbuffer, bs, currentBeats)
+        val (newbs, l) = fillBuffer(bufferSize, pos, currentCount, None, 0, 1.0, bbuffer, bs, currentBeats)
         bs = newbs
         pos += l
         bbufferPos = 0
@@ -287,7 +286,7 @@ class AudioPlayer2() {
       generate()
 
       override def read(): Int = {
-        if(bbufferPos != bbufferLimit) {
+        if (bbufferPos != bbufferLimit) {
           val result = bbuffer.get(bbufferPos) & 0xff
           bbufferPos += 1
           if (bbufferPos == bbufferLimit) {

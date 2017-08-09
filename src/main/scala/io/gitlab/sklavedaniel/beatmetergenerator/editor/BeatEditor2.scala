@@ -285,8 +285,10 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         onAction = handle {
           if (tracks().content.head != track) {
             val index = tracks().content.indexOf(track)
+            undoManager.startGroup()
             tracks().content.remove(track)
             tracks().content.add(index - 1, track)
+            undoManager.endGroup()
           }
         }
       },
@@ -294,8 +296,10 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         onAction = handle {
           if (tracks().content.last != track) {
             val index = tracks().content.indexOf(track)
+            undoManager.startGroup()
             tracks().content.remove(track)
             tracks().content.add(index + 1, track)
+            undoManager.endGroup()
           }
         }
       },
@@ -347,7 +351,19 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
             }
             font = Font(8)
             focusTraversable = false
-            selected <==> track.snap
+            selected.onChange { (_, _, current) =>
+              if (track.snap() != current) {
+                undoManager.startGroup()
+                track.snap() = current
+                undoManager.endGroup()
+              }
+            }
+            val listener: ChangeListener[java.lang.Boolean] = (_, _, current) => {
+              if (selected() != current) {
+                selected() = current
+              }
+            }
+            track.snap.addListener(weak(listener))
           },
           new ToggleButton {
             text = "R"
@@ -356,7 +372,19 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
             }
             font = Font(8)
             focusTraversable = false
-            selected <==> track.record
+            selected.onChange { (_, _, current) =>
+              if (track.record() != current) {
+                undoManager.startGroup()
+                track.record() = current
+                undoManager.endGroup()
+              }
+            }
+            val listener: ChangeListener[java.lang.Boolean] = (_, _, current) => {
+              if (selected() != current) {
+                selected() = current
+              }
+            }
+            track.record.addListener(weak(listener))
           },
           new ToggleButton {
             text = "D"
@@ -474,7 +502,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     val contextMenu: ContextMenu = new ContextMenu(
       new MenuItem("New Beat") {
         onAction = handle {
-          val b = new Beat()
+          val b = new Beat(Some(undoManager))
           if (content.intersecting(contextMenuX, contextMenuX + 0.05).isEmpty) {
             content ++= Iterator((contextMenuX, contextMenuX + 0.05, b))
           }
@@ -482,23 +510,29 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       },
       new MenuItem("New BPM Pattern") {
         onAction = handle {
-          val b = new BPMPattern()
+          val b = new BPMPattern(Some(undoManager))
+          undoManager.active = false
           b.bpm() = 60
+          undoManager.active = true
           newResizableElement(b)
         }
       },
       new MenuItem("New Beat Pattern") {
         onAction = handle {
-          val b = new BeatsPattern()
-          b.pattern ++= Iterator((0.0, 0.05, new Beat()))
+          val b = new BeatsPattern(Some(undoManager))
+          undoManager.active = false
+          b.pattern ++= Iterator((0.0, 0.05, new Beat(Some(undoManager))))
           b.patternDuration() = 0.25
+          undoManager.active = true
           newResizableElement(b)
         }
       },
       new MenuItem("New Message") {
         onAction = handle {
-          val b = new Message()
+          val b = new Message(Some(undoManager))
+          undoManager.active = false
           b.text() = "Hello!"
+          undoManager.active = true
           newResizableElement(b)
         }
       },
@@ -582,7 +616,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       Clipboard.systemClipboard.content.get(BeatEditor2.dataformat).foreach { data =>
         if (data.asInstanceOf[List[(Double, Double, ImmutableTrackElement)]].forall(elem => clazz.isInstance(elem._3))) {
           val insert = data.asInstanceOf[List[(Double, Double, ImmutableTrackElement)]].map { elem =>
-            (elem._1 + x, elem._2 + x, elem._3.toMutable().asInstanceOf[A])
+            (elem._1 + x, elem._2 + x, elem._3.toMutable(Some(undoManager)).asInstanceOf[A])
           }
           if (selectionActive(insert.map(_._2).max * pxPerSec()) && insert.forall(elem => content.intersecting(elem._1, elem._2).isEmpty)) {
             content ++= insert
@@ -639,6 +673,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
             val snapOffset = x - tmp.head._1
             val data = (snapOffset, dragOffset, dragWidth, selectedElements.toList.sortBy(_.position()._1).map(x => (x.position()._1 - dragMin, x.position()._2 - dragMin, x.element.toImmutable())))
             if (!e.isControlDown) {
+              undoManager.startGroup()
               dragRemoved = selectedElements.toList.map(x => (x.position()._1, x.position()._2, x.element))
               content --= dragRemoved.map(x => (x._1, x._2))
             }
@@ -653,14 +688,17 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       }
     }
     onDragDone = e => {
-      if (e.getTransferMode == null) {
-        content ++= dragRemoved
-        selectedElements.clear()
-        for (elem <- dragRemoved) {
-          selectedElements += getView((elem._1, elem._3))
+      if (dragRemoved.nonEmpty) {
+        undoManager.endGroup()
+        if (e.getTransferMode == null) {
+          undoManager.undoAction()
+          selectedElements.clear()
+          for (elem <- dragRemoved) {
+            selectedElements += getView((elem._1, elem._3))
+          }
         }
+        dragRemoved = Nil
       }
-      dragRemoved = Nil
     }
     var dragBox: Option[Rectangle] = None
     onDragOver = e => if (selectionActive(e.getX)) {
@@ -702,7 +740,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       val x = snap(e.getX / pxPerSec() - snapOffset, startPosition, true) + snapOffset - dragOffset
       val fitting = selectionActive((dragWidth + x) * pxPerSec()) && x >= 0 && list.forall(elem => clazz.isInstance(elem._3) && content.intersecting(elem._1 + x, elem._2 + x).isEmpty)
       if (fitting) {
-        val insert = list.map(elem => (elem._1 + x, elem._2 + x, elem._3.toMutable().asInstanceOf[A]))
+        val insert = list.map(elem => (elem._1 + x, elem._2 + x, elem._3.toMutable(Some(undoManager)).asInstanceOf[A]))
         content ++= insert
         selectedElements.clear()
         for (elem <- insert) {
@@ -711,7 +749,6 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         e.setDropCompleted(true)
       }
       e.consume()
-      dragRemoved = Nil
     }
     onMouseDragged = e => {
       if (selectionBox.isEmpty && selectionPos.isDefined) {
@@ -1018,7 +1055,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
             } else {
               beatsPattern.patternDuration() = dragBeatsPattern.get.patternDuration
               beatsPattern.pattern.clear()
-              beatsPattern.pattern ++= dragBeatsPattern.get.toMutable().pattern
+              beatsPattern.pattern ++= dragBeatsPattern.get.toMutable(Some(undoManager)).pattern
             }
           } else {
             beatsPattern.patternDuration() = beatsPattern.pattern.lastOption.map(_._2).getOrElse(0.0).max(tmp)
@@ -1074,7 +1111,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     val contextMenu = new ContextMenu(
       new MenuItem("New Beat") {
         onAction = handle {
-          val b = new Beat()
+          val b = new Beat(Some(undoManager))
           if (content.intersecting(contextMenuX, contextMenuX + 0.05).isEmpty) {
             content ++= Iterator((contextMenuX, contextMenuX + 0.05, b))
           }
@@ -1263,11 +1300,13 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     }
   }
 
-  val tracks = ObjectProperty(new Tracks())
+  val undoManager = new UndoManager()
+  val tracks = ObjectProperty(new Tracks(Some(undoManager)))
   val audioListener: InvalidationListener = _ => {
     player.audio() = tracks().audio().map(_._2)
   }
   tracks.onChange { (_, old, current) =>
+    undoManager.clear()
     player.audio() = tracks().audio().map(_._2)
     old.audio.removeListener(audioListener)
     current.audio.addListener(audioListener)
@@ -1644,7 +1683,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                             case Success(ts) => {
                               ts.toMutable(file.getParentFile.toURI, uri => {
                                 Try(uri.toURL().openStream()).flatMap(in => AudioPlayer2.readData(new BufferedInputStream(in)))
-                              }) match {
+                              }, Some(undoManager)) match {
                                 case Success(t) =>
                                   tracks() = t
                                 case Failure(e) =>
@@ -1729,11 +1768,21 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
               items = Seq(
                 new MenuItem("New Track") {
                   onAction = handle {
-                    tracks().content += new Track()
+                    tracks().content += new Track(Some(undoManager))
                   }
                 },
-                new MenuItem("Undo"),
-                new MenuItem("Redo")
+                new MenuItem("Undo") {
+                  disable <== !undoManager.undoable
+                  onAction = handle {
+                    undoManager.undoAction()
+                  }
+                },
+                new MenuItem("Redo") {
+                  disable <== !undoManager.redoable
+                  onAction = handle {
+                    undoManager.redoAction()
+                  }
+                }
               )
             },
             new Menu("Tools") {
@@ -1939,7 +1988,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                 mainView().record().foreach { track =>
                   val x = player.position()._1
                   if (track.content.intersecting(x, x + 0.05).isEmpty) {
-                    track.content ++= Iterator((x, x + 0.05, new Beat()))
+                    track.content ++= Iterator((x, x + 0.05, new Beat(Some(undoManager))))
                   }
                 }
               }
@@ -2134,7 +2183,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       case Success(ts) => {
         ts.toMutable(file.getParentFile.toURI, uri => {
           Try(uri.toURL().openStream()).flatMap(in => AudioPlayer2.readData(new BufferedInputStream(in)))
-        }) match {
+        }, Some(undoManager)) match {
           case Success(t) =>
             tracks() = t
           case Failure(e) =>
