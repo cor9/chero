@@ -23,6 +23,7 @@ import java.util
 
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.FlyingBeatmeter2
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap.Unscalable
 
 import scala.collection.JavaConverters
 import scala.util.{Success, Try}
@@ -31,6 +32,7 @@ import scalafx.beans.property._
 import scalafx.beans.value.ObservableValue
 import scalafx.collections.ObservableBuffer
 import scalafx.scene.paint.Color
+import scalafx.scene.text.Font
 
 final class Tracks(val undoManager: Option[UndoManager]) {
   val content = ObservableBuffer[Track]()
@@ -39,7 +41,7 @@ final class Tracks(val undoManager: Option[UndoManager]) {
   UndoManager.register(undoManager, audio)
 
   val beatmeterSettings = ObjectProperty(FlyingBeatmeter2.Conf(1280, 40, 25.0, 0.2, 0.4, Color.DarkRed, Color.DarkGray,
-    Color.Yellow, Color.DarkGray, None, None, 50, 5, Color.Red))
+    Color.Yellow, Color.DarkGray, (Font.default.getFamily, 50, false, false), 5, Color.Red, AlignCenter, 640, None))
   UndoManager.register(undoManager, beatmeterSettings)
 
   def toImmutable(base: URI) = {
@@ -47,6 +49,12 @@ final class Tracks(val undoManager: Option[UndoManager]) {
   }
 
 }
+
+sealed trait Align
+case object AlignLeft extends Align
+case object AlignRight extends Align
+case object AlignCenter extends Align
+
 
 case class ImmutableTracks(content: List[ImmutableTrack], audio: Option[URI], beatmeterSettings: FlyingBeatmeter2.Conf) {
   def toMutable(base: URI, load: URI => Try[Array[Short]], undoManager: Option[UndoManager]): Try[Tracks] = {
@@ -129,10 +137,6 @@ sealed trait TrackElement {
   def undoManager: Option[UndoManager]
 
   def toImmutable(): ImmutableTrackElement
-}
-
-trait Unscalable[A] {
-  def duration: A
 }
 
 sealed trait ImmutableTrackElement {

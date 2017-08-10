@@ -21,7 +21,7 @@ package io.gitlab.sklavedaniel.beatmetergenerator.utils
 import javafx.beans
 import javafx.beans.{InvalidationListener, WeakListener}
 
-import io.gitlab.sklavedaniel.beatmetergenerator.editor.Unscalable
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap.Unscalable
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -29,6 +29,10 @@ import scala.ref.WeakReference
 import scalafx.beans.Observable
 
 object ObservableIntervalMap {
+
+  trait Unscalable[A] {
+    def duration: A
+  }
 
   def apply[A, B](implicit fractional: Fractional[A]) = new ObservableIntervalMap[A, B]()
 

@@ -23,14 +23,16 @@ import java.awt.{Font, RenderingHints}
 import java.net.URI
 
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.Beatmeter._
+import io.gitlab.sklavedaniel.beatmetergenerator.editor.{Align, AlignCenter, AlignLeft, AlignRight}
 
 import scalafx.scene.paint.Color
 
 object FlyingBeatmeter2 {
 
   case class Conf(width: Int, height: Int, frames: Double, speed: Double, position: Double, beatColor: Color,
-    beatBorderColor: Color, beatHighlightedColor: Color, beatHighlightedBorderColor: Color, beatImage: Option[URI],
-    beatAnimation: Option[URI], messageHeight: Int, margin: Int, messageColor: Color
+    beatBorderColor: Color, beatHighlightedColor: Color, beatHighlightedBorderColor: Color,
+    messageFont: (String, Int, Boolean, Boolean), margin: Int, messageColor: Color,
+    messageAlign: Align, messagePosition: Double, imageDirectory: Option[URI]
   )
 
 }
@@ -41,9 +43,9 @@ class FlyingBeatmeter2(conf: FlyingBeatmeter2.Conf) extends Beatmeter2 {
 
   def frames: Double = conf.frames
 
-  override val height = conf.height + conf.margin + conf.messageHeight
+  override val height = conf.height + conf.margin + conf.messageFont._2
   val beatmeterWidth = (1.0 - conf.position) * conf.width
-  val beatmeterY = conf.messageHeight + conf.margin
+  val beatmeterY = conf.messageFont._2 + conf.margin
 
   val imageCSS =
     s"""
@@ -84,10 +86,12 @@ class FlyingBeatmeter2(conf: FlyingBeatmeter2.Conf) extends Beatmeter2 {
         }
     """
 
-  val beatmeterBeat = getImage(conf.beatImage.getOrElse(getClass.getResource("/meter/flying/beat.svg").toURI), conf.height, imageCSS)
-  val beatmeterBeatHighlighted = getImage(conf.beatImage.getOrElse(getClass.getResource("/meter/flying/beat.svg").toURI), conf.height, imageCSSHighlighted)
-  val beatmeterAnim = getAnim(conf.beatAnimation.getOrElse(getClass.getResource("/meter/flying/beat.anim").toURI), conf.height, conf.frames, imageCSS)
-  val beatmeterAnimHighlighted = getAnim(conf.beatAnimation.getOrElse(getClass.getResource("/meter/flying/beat.anim").toURI), conf.height, conf.frames, imageCSSHighlighted)
+  val beatmeterBeatURI = conf.imageDirectory.map(_.resolve("beat.svg")).getOrElse(getClass.getResource("/meter/flying/beat.svg").toURI)
+  val beatmeterBeat = getImage(beatmeterBeatURI, conf.height, imageCSS)
+  val beatmeterBeatHighlighted = getImage(beatmeterBeatURI, conf.height, imageCSSHighlighted)
+  val beatmeterAnimURI = conf.imageDirectory.map(_.resolve("beat.anim")).getOrElse(getClass.getResource("/meter/flying/beat.anim").toURI)
+  val beatmeterAnim = getAnim(beatmeterAnimURI, conf.height, conf.frames, imageCSS)
+  val beatmeterAnimHighlighted = getAnim(beatmeterAnimURI, conf.height, conf.frames, imageCSSHighlighted)
 
   override val minimalBeatDistance: Double = beatmeterBeat.getWidth / conf.speed / conf.width
 
@@ -121,22 +125,29 @@ class FlyingBeatmeter2(conf: FlyingBeatmeter2.Conf) extends Beatmeter2 {
       Timed(frame, frame + anim._2.size, PositionDrawable(_ => (conf.position * conf.width - anim._2.head.getWidth / 2, beatmeterY),
         AnimDrawable(frame - b._1, anim)))
     })
+    val messageFont = new Font(conf.messageFont._1,
+      (if(conf.messageFont._3) {Font.BOLD} else{Font.PLAIN}) | (if(conf.messageFont._3) {Font.ITALIC} else{Font.PLAIN}),
+      conf.messageFont._2)
     val messageStream = ElementStream(messages.toStream.map(b => (b._1 * conf.frames, b._2 * conf.frames, b._3)).map { b =>
       val startFrame = b._1.ceil.toInt
       val endFrame = b._2.ceil.toInt
-      val font = new Font("Dialog", Font.PLAIN, conf.messageHeight)
-      Timed(startFrame, endFrame, PositionDrawable(_ => (conf.width / 2, 0),
+      Timed(startFrame, endFrame, PositionDrawable(_ => (conf.messagePosition * conf.width, 0),
         (frame, g) => {
           val fadein = (frame.toDouble / conf.frames / 0.25).min(1.0)
           val fadeout = ((b._2 - b._1 - frame) / conf.frames / 0.25).min(1.0).max(0.0)
           val fade = fadein.min(fadeout)
-          g.setFont(font)
+          g.setFont(messageFont)
           val color = new awt.Color(conf.messageColor.red.toFloat, conf.messageColor.green.toFloat,
             conf.messageColor.blue.toFloat, (conf.messageColor.opacity * fade).toFloat)
           g.setColor(color)
           g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
           val bounds = g.getFontMetrics.getStringBounds(b._3, g)
-          g.drawString(b._3, -bounds.getWidth.toFloat / 2, -bounds.getY.toFloat)
+          val align = conf.messageAlign match {
+            case AlignLeft => 0.0
+            case AlignCenter => -bounds.getWidth / 2
+            case AlignRight => -bounds.getWidth
+          }
+          g.drawString(b._3, align.toFloat, -bounds.getY.toFloat)
         }
       ))
     })

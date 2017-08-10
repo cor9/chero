@@ -29,6 +29,7 @@ import javafx.beans.value.{ChangeListener, WeakChangeListener}
 import javafx.beans.{InvalidationListener, WeakInvalidationListener}
 import javafx.geometry.VPos
 import javafx.scene
+import javafx.scene.text.FontPosture
 import javafx.scene.{Cursor, control, input}
 import javax.imageio.ImageIO
 import javax.sound.sampled.{AudioFileFormat, AudioInputStream, AudioSystem}
@@ -61,7 +62,7 @@ import scalafx.scene.input._
 import scalafx.scene.layout._
 import scalafx.scene.paint.Color
 import scalafx.scene.shape.{Line, Rectangle}
-import scalafx.scene.text.{Font, Text}
+import scalafx.scene.text.{Font, FontWeight, Text}
 import scalafx.scene.transform.Scale
 import scalafx.scene.{Group, Node, Scene}
 import scalafx.stage.FileChooser.ExtensionFilter
@@ -140,7 +141,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
           val task = (callback: (Option[Double], Option[String]) => Boolean) => {
             Success(Some(compute()))
           }
-          val pd = new ProgressDialog[TraversableOnce[javafx.scene.Node]](Some(scene().windowProperty()()), "Generating waveform", Some("generating..."), false, task)
+          val pd = new ProgressDialog[TraversableOnce[javafx.scene.Node]](Some(mainView().scene().windowProperty()()), "Generating waveform", Some("generating..."), false, task)
           pd.showAndWait().get.asInstanceOf[Try[Option[TraversableOnce[javafx.scene.Node]]]] match {
             case Success(Some(nodes)) =>
               children ++= nodes
@@ -1257,7 +1258,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
               }))
               Success(Some(bpm))
             }
-            val pd = new ProgressDialog[Double](Some(scene().windowProperty()()), "Detecting BPM", Some("preparing..."), true, task)
+            val pd = new ProgressDialog[Double](Some(mainView().scene().windowProperty()()), "Detecting BPM", Some("preparing..."), true, task)
             pd.showAndWait().get.asInstanceOf[Try[Option[Double]]] match {
               case Success(Some(bpm)) =>
                 bpmPattern.bpm() = bpm
@@ -1719,7 +1720,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                               }, Some(undoManager))
                             }.map(Some(_))
                           }
-                          val pd = new ProgressDialog[Tracks](Some(scene().windowProperty()()), "Loading", Some("Loading..."), false, task)
+                          val pd = new ProgressDialog[Tracks](Some(mainView().scene().windowProperty()()), "Loading", Some("Loading..."), false, task)
                           pd.showAndWait().get.asInstanceOf[Try[Option[Tracks]]] match {
                             case Success(Some(ts)) =>
                               tracks() = ts
@@ -1758,7 +1759,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                           }
                           r.tried.map(Some(_))
                         }
-                        val pd = new ProgressDialog[Unit](Some(scene().windowProperty()()), "Saving", Some("Saving..."), false, task)
+                        val pd = new ProgressDialog[Unit](Some(mainView().scene().windowProperty()()), "Saving", Some("Saving..."), false, task)
                         pd.showAndWait().get.asInstanceOf[Try[Option[Unit]]] match {
                           case Success(Some(_)) =>
                           case Failure(e) =>
@@ -1784,7 +1785,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                         val task = (callback: (Option[Double], Option[String]) => Boolean) => {
                           AudioPlayer2.readData(new BufferedInputStream(new FileInputStream(file))).map(Some(_))
                         }
-                        val pd = new ProgressDialog[Array[Short]](Some(scene().windowProperty()()), "Loading audio", Some("Loading..."), false, task)
+                        val pd = new ProgressDialog[Array[Short]](Some(mainView().scene().windowProperty()()), "Loading audio", Some("Loading..."), false, task)
                         pd.showAndWait().get.asInstanceOf[Try[Option[Array[Short]]]] match {
                           case Success(Some(data)) =>
                             tracks().audio() = Some((file.toURI, data))
@@ -1842,7 +1843,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                               ais.close()
                             }).map(_ => Some(()))
                           }
-                          val pd = new ProgressDialog[Unit](Some(scene().windowProperty()()), "Generating audio", Some("Generating..."), true, task)
+                          val pd = new ProgressDialog[Unit](Some(mainView().scene().windowProperty()()), "Generating audio", Some("Generating..."), true, task)
                           pd.showAndWait().get.asInstanceOf[Try[Option[Unit]]] match {
                             case Success(Some(_)) =>
                             case Failure(e) =>
@@ -1969,6 +1970,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                                 true
                               }
                               if (cnt) {
+                                Files.createDirectories(dir.toPath)
                                 val task = (callback: (Option[Double], Option[String]) => Boolean) => {
                                   var compute = true
                                   Try(for (i <- 0 until frameCount) {
@@ -1997,7 +1999,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                                     }
                                   }).map(Some(_))
                                 }
-                                val pd = new ProgressDialog[Unit](Some(scene().windowProperty()()), "Generating Video", Some("Generating..."), true, task)
+                                val pd = new ProgressDialog[Unit](Some(mainView().scene().windowProperty()()), "Generating Video", Some("Generating..."), true, task)
                                 pd.showAndWait().get.asInstanceOf[Try[Option[Unit]]] match {
                                   case Success(Some(_)) =>
                                   case Failure(e) =>
@@ -2028,7 +2030,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                 },
                 new MenuItem("Beatmeter Settings") {
                   onAction = handle {
-                    val dialog = new BeatmeterDialog(tracks().beatmeterSettings())
+                    val dialog = new BeatmeterDialog(Some(mainView().scene().windowProperty()()), tracks().beatmeterSettings())
                     tracks().beatmeterSettings() = dialog.showAndWait().get.asInstanceOf[FlyingBeatmeter2.Conf]
                   }
                 }
@@ -2121,7 +2123,8 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     f"$minutes%02d:$seconds%02d.$milis%03d"
   }
 
-  class BeatmeterDialog(conf: FlyingBeatmeter2.Conf) extends Dialog[FlyingBeatmeter2.Conf] {
+  class BeatmeterDialog(ownerWindow: Option[Window], conf: FlyingBeatmeter2.Conf) extends Dialog[FlyingBeatmeter2.Conf] {
+    ownerWindow.foreach(initOwner)
     title = "Beatmeter Generator"
     val widthSpinner = new Spinner[Int](1, 10000, conf.width, 1) {
       hgrow = Priority.Always
@@ -2170,12 +2173,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       maxWidth = Double.PositiveInfinity
       editable = true
     }
-
-    val messageHeightSpinner = new Spinner[Int](1, 10000, conf.messageHeight, 1) {
-      hgrow = Priority.Always
-      maxWidth = Double.PositiveInfinity
-      editable = true
-    }
+    val messageFont = ObjectProperty(conf.messageFont)
     val marginSpinner = new Spinner[Int](0, 10000, conf.margin, 1) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
@@ -2186,10 +2184,25 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       maxWidth = Double.PositiveInfinity
       editable = true
     }
+    val messageAlign = new ComboBox[String](Seq("Left", "Center", "Right")) {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+      selectionModel().select(conf.messageAlign match {
+        case AlignLeft => 0
+        case AlignCenter => 1
+        case AlignRight => 2
+      })
+    }
+    val messagePositionSpinner = new Spinner[Double](0.0, 1.0, conf.messagePosition, 0.05) {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+      editable = true
+    }
+    val imageDirectory = ObjectProperty(conf.imageDirectory)
     dialogPane = new DialogPane {
       headerText = "Beatmeter Settings"
       content = new GridPane {
-        hgap = 5
+        hgap = 10
         vgap = 5
         add(new Label("Width") {
           tooltip = Tooltip("Width of the generated video in px")
@@ -2219,16 +2232,70 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         add(beatHighlightColorPicker, 1, 7)
         add(new Label("Beat Highlight Border Color"), 0, 8)
         add(beatHighlightBorderColorPicker, 1, 8)
-        add(new Label("Message Text Height") {
-          tooltip = Tooltip("Height of text messages in px")
-        }, 0, 9)
-        add(messageHeightSpinner, 1, 9)
         add(new Label("Beat Message Margin") {
           tooltip = Tooltip("Margin between beatmeter and messages in px")
         }, 0, 10)
         add(marginSpinner, 1, 10)
         add(new Label("Message Text Color"), 0, 11)
         add(messageColorPicker, 1, 11)
+        add(new Label("Message Font"), 0, 12)
+        add(new HBox(
+          new TextField {
+            editable = false
+            text <== Bindings.createStringBinding(() => {
+              val (family, size, bold, italic) = messageFont()
+              family + " " + size + (if (bold) {
+                " bold"
+              } else {
+                ""
+              }) + (if (italic) {
+                " italic"
+              } else {
+                ""
+              })
+            }, messageFont)
+          },
+          new Button("Choose") {
+            onAction = handle {
+              val fsd = new FontDialog(Some(scene().windowProperty()()), messageFont())
+              messageFont() = fsd.showAndWait().get.asInstanceOf[(String, Int, Boolean, Boolean)]
+            }
+          },
+        ) {
+          spacing = 5
+        }, 1, 12)
+        add(new Label("Message Alignment"), 0, 13)
+        add(messageAlign, 1, 13)
+        add(new Label("Message Position") {
+          tooltip = Tooltip("Horizontal position the message is aligned to as ratio of video width")
+        }, 0, 14)
+        add(messagePositionSpinner, 1, 14)
+        add(new Label("Image Directory") {
+          tooltip = Tooltip("Directory containing beat.svg and beat.anim.")
+        }, 0, 15)
+        add(new HBox(
+          new ToggleButton("Select") {
+            imageDirectory.onChange { (_, _, d) =>
+              selected() = d.isDefined
+            }
+            selected.onChange { (_, old, current) =>
+              if(!old && current) {
+                val dialog = new DirectoryChooser()
+                dialog.title = "Beatmeter Generator: Image Directory"
+                imageDirectory() = Option(dialog.showDialog(scene().windowProperty()())).filter(_.exists()).map(_.toURI)
+              } else if (old && !current) {
+                imageDirectory() = None
+              }
+            }
+          }, new TextField() {
+            hgrow = Priority.Always
+            maxWidth = Double.PositiveInfinity
+            editable = false
+            text <== Bindings.createStringBinding(() => imageDirectory().map(_.toString).getOrElse(""), imageDirectory)
+          }
+        ) {
+          hgap = 5
+        }, 1, 15)
       }
       buttonTypes = Seq(ButtonType.Cancel, ButtonType.Apply)
     }
@@ -2236,8 +2303,12 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       if (ButtonType.Apply == bt) {
         FlyingBeatmeter2.Conf(widthSpinner.value(), heightSpinner.value(), framesSpinner.value(), speedSpinner.value(),
           positionSpinner.value(), beatColorPicker.value(), beatBorderColorPicker.value(), beatHighlightColorPicker.value(),
-          beatHighlightBorderColorPicker.value(), None, None, messageHeightSpinner.value(), marginSpinner.value(),
-          messageColorPicker.value())
+          beatHighlightBorderColorPicker.value(), messageFont(), marginSpinner.value(),
+          messageColorPicker.value(), messageAlign.selectionModel().getSelectedIndex match {
+            case 0 => AlignLeft
+            case 1 => AlignCenter
+            case 2 => AlignRight
+          }, messagePositionSpinner.value(), imageDirectory())
       } else {
         conf
       }
@@ -2331,6 +2402,62 @@ class ProgressDialog[A](ownerWindow: Option[Window], taskTitle: String, message:
       })
     })
     thread.start()
+  }
+}
+
+class FontDialog(ownerWindow: Option[Window], initFont: (String, Int, Boolean, Boolean)) extends Dialog[(String, Int, Boolean, Boolean)] {
+  self =>
+  title = "Beatmeter Generator"
+  ownerWindow.foreach(initOwner)
+  val families = new ListView[String](Font.families.sorted)
+
+  families.selectionModel().select(initFont._1)
+  families.scrollTo(initFont._1)
+  val size = new Spinner[Int](5, 5000, initFont._2, 1) {
+    editable = true
+    hgrow = Priority.Always
+    maxWidth = Double.PositiveInfinity
+  }
+  val bold = new CheckBox("Bold") {
+    selected = initFont._3
+  }
+  val italic = new CheckBox("Italic") {
+    selected = initFont._4
+  }
+  dialogPane = new DialogPane {
+    minWidth = 200
+    minHeight = 400
+    headerText = "Select Font"
+
+    val preview = new TextField {
+      text = "Example"
+      font <== Bindings.createObjectBinding(() => Font(families.selectionModel().getSelectedItem, if (bold.selected()) {
+        FontWeight.Bold
+      } else {
+        FontWeight.Normal
+      }, if (italic.selected()) {
+        FontPosture.ITALIC
+      } else {
+        FontPosture.REGULAR
+      }, size.value()).delegate, families.selectionModel().selectedItemProperty(), size.value, bold.selected, italic.selected)
+    }
+    content = new GridPane {
+      hgap = 5
+      vgap = 5
+      add(families, 0, 0, 1, 4)
+      add(size, 1, 0, 1, 1)
+      add(bold, 1, 1, 1, 1)
+      add(italic, 1, 2, 1, 1)
+      add(preview, 0, 4, 2, 1)
+    }
+    buttonTypes = Seq(ButtonType.Cancel, ButtonType.OK)
+  }
+  resultConverter = b => {
+    if (ButtonType.OK == b) {
+      (families.selectionModel().getSelectedItem, size.value(), bold.selected(), italic.selected())
+    } else {
+      initFont
+    }
   }
 }
 

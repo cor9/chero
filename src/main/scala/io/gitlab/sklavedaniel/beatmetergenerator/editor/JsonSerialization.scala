@@ -52,6 +52,8 @@ object JsonSerialization {
   }
   implicit val trackElementPickler: PicklerPair[ImmutableTrackElement] = CompositePickler[ImmutableTrackElement].concreteType[ImmutableBeat].concreteType[ImmutableMessage].
     concreteType[ImmutableBPMPattern].concreteType[ImmutableBeatsPattern]
+  implicit val alignPickler: PicklerPair[Align] = CompositePickler[Align].concreteType[AlignLeft.type].concreteType[AlignRight.type].
+    concreteType[AlignCenter.type]
 
   implicit val pickler: Pickler[ImmutableTrack] = Pickler.materializePickler[ImmutableTrack]
   implicit val unpickler: Unpickler[ImmutableTrack] = Unpickler.materializeUnpickler[ImmutableTrack]
