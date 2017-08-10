@@ -51,8 +51,11 @@ final class Tracks(val undoManager: Option[UndoManager]) {
 }
 
 sealed trait Align
+
 case object AlignLeft extends Align
+
 case object AlignRight extends Align
+
 case object AlignCenter extends Align
 
 
@@ -116,7 +119,7 @@ case class ImmutableTrack(title: String, play: Boolean, record: Boolean, display
         Success(None)
     }).map { aud =>
       val tmp = new Track(undoManager)
-      val cntnt =  content.map { elem =>
+      val cntnt = content.map { elem =>
         (elem._1, elem._2, elem._3.toMutable(undoManager))
       }
       undoManager.foreach(_.active = false)
@@ -200,6 +203,8 @@ case class ImmutableBPMPattern(highlightFirst: Boolean, bpm: Double, beat: Immut
 }
 
 class BeatsPattern(override val undoManager: Option[UndoManager]) extends BeatsGenerator {
+  val highlightFirstPattern = BooleanProperty(false)
+  UndoManager.register(undoManager, highlightFirstPattern)
   val highlightFirst = BooleanProperty(false)
   UndoManager.register(undoManager, highlightFirst)
   val patternDuration = DoubleProperty(0.0)
@@ -215,7 +220,14 @@ class BeatsPattern(override val undoManager: Option[UndoManager]) extends BeatsG
           (i * patternDuration() + b._1, i * patternDuration() + b._2, b._3)
         }
       }
-      if (highlightFirst()) {
+      if (highlightFirstPattern()) {
+        val bs = pattern.map { b =>
+          val b3 = b._3.toImmutable().toMutable(None)
+          b3.highlight() = true
+          (b._1, b._2, b3)
+        }
+        bs.toStream ++ tmp.drop(pattern.size)
+      } else if (highlightFirst()) {
         val b = pattern.head._3.toImmutable().toMutable(None)
         b.highlight() = true
         Stream((pattern.head._1, pattern.head._2, b)) ++ tmp.tail

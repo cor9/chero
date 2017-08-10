@@ -550,7 +550,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
           newResizableElement(b)
         }
       },
-      new MenuItem("New Beats Pattern") {
+      new MenuItem("New Beat Pattern") {
         onAction = handle {
           newBeatPattern(1.0, Seq(0.0))
         }
@@ -1137,7 +1137,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
           v.pxPerSec <== pxPerSec
           v.layoutX <== pxPerSec * elem._1
           element2view.put((elem._1, elem._3), v)
-          v.highlight <== beatsPattern.highlightFirst
+          v.highlight <== beatsPattern.highlightFirst || beatsPattern.highlightFirstPattern
           v
         }.toIterable ++ (for ((start, end, b) <- beatsPattern.pattern.tail) yield {
           val v = new BeatView[Beat](b, true, self)
@@ -1145,6 +1145,8 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
           v.pxPerSec <== pxPerSec
           v.layoutX <== pxPerSec * start
           element2view.put((start, b), v)
+
+          v.highlight <== beatsPattern.highlightFirstPattern
           v
         }) ++ (for ((start, end, b) <- beatsPattern.beats().drop(beatsPattern.pattern.size).takeWhile(_._2 < duration.get())) yield {
           val v = new BeatView[Beat](b, false, self)
@@ -1196,6 +1198,9 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       },
       new CheckMenuItem("Highlight First") {
         selected <==> beatsPattern.highlightFirst
+      },
+      new CheckMenuItem("Highlight Pattern") {
+        selected <==> beatsPattern.highlightFirstPattern
       }
     )
 
