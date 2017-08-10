@@ -291,6 +291,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                         headerText = "Could not load file"
                         contentText = e.getLocalizedMessage
                       }
+                      alert.initOwner(mainView().scene().windowProperty()())
                       alert.showAndWait()
                       selected() = false
                   }
@@ -521,6 +522,16 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       }
     }
 
+    def newBeatPattern(duration: Double, beats: Seq[Double]): Unit = {
+      val b = new BeatsPattern(Some(undoManager))
+      val tmp = beats.map(d => (d, d + 0.05, new Beat(Some(undoManager))))
+      undoManager.active = false
+      b.pattern ++= tmp
+      b.patternDuration() = duration
+      undoManager.active = true
+      newResizableElement(b)
+    }
+
     val contextMenu: ContextMenu = new ContextMenu(
       new MenuItem("New Beat") {
         onAction = handle {
@@ -539,14 +550,9 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
           newResizableElement(b)
         }
       },
-      new MenuItem("New Beat Pattern") {
+      new MenuItem("New Beats Pattern") {
         onAction = handle {
-          val b = new BeatsPattern(Some(undoManager))
-          undoManager.active = false
-          b.pattern ++= Iterator((0.0, 0.05, new Beat(Some(undoManager))))
-          b.patternDuration() = 0.25
-          undoManager.active = true
-          newResizableElement(b)
+          newBeatPattern(1.0, Seq(0.0))
         }
       },
       new MenuItem("New Message") {
@@ -563,7 +569,45 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
           insert(contextMenuX)
         }
       },
-      new Menu("Common Patterns")
+      new Menu("Common Patterns") {
+        items = Seq(
+          new MenuItem("123-") {
+            onAction = handle {
+              newBeatPattern(1.0, Seq(0.0, 0.25, 0.5))
+            }
+          },
+          new MenuItem("123-4-5-") {
+            onAction = handle {
+              newBeatPattern(1.0, Seq(0.0, 0.125, 0.25, 0.5, 0.75))
+            }
+          },
+          new MenuItem("12345-") {
+            onAction = handle {
+              newBeatPattern(1.5, Seq(0.0, 0.25, 0.5, 0.75, 1.0))
+            }
+          },
+          new MenuItem("1234567-") {
+            onAction = handle {
+              newBeatPattern(2.0, Seq(0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5))
+            }
+          },
+          new MenuItem("12------") {
+            onAction = handle {
+              newBeatPattern(2.0, Seq(0.0, 0.25))
+            }
+          },
+          new MenuItem("123-4-5-6-7-8-9-") {
+            onAction = handle {
+              newBeatPattern(2.0, Seq(0.0, 0.125, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75))
+            }
+          },
+          new MenuItem("12345-6-7-8-9-10-") {
+            onAction = handle {
+              newBeatPattern(2.0, Seq(0.0, 0.125, 0.25, 0.375, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75))
+            }
+          }
+        )
+      }
     )
 
     override def mouseClicked(e: MouseEvent) = {
@@ -864,7 +908,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         val snapped = snap(tmp + newDuration, 0.0, false)
 
         resizeBox.foreach { r =>
-          r.width = e.getX + resizeOffset.get
+          r.width = (snapped - tmp) * pxPerSec()
           if (context.content.intersecting(tmp, snapped).forall(p => tmp <= p._1 && p._2 <= position()._2)) {
             r.fill = Color.DarkBlue.opacity(0.5)
           } else {
@@ -1730,6 +1774,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                                 headerText = "Could not load file"
                                 contentText = e.getLocalizedMessage
                               }
+                              alert.initOwner(mainView().scene().windowProperty()())
                               alert.showAndWait()
                             case Success(None) =>
                           }
@@ -1740,6 +1785,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                               headerText = "Could not open file"
                               contentText = e.getLocalizedMessage
                             }
+                            alert.initOwner(mainView().scene().windowProperty()())
                             alert.showAndWait()
                         }
                       case None =>
@@ -1768,6 +1814,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                               headerText = "Could not save file"
                               contentText = e.getLocalizedMessage
                             }
+                            alert.initOwner(mainView().scene().windowProperty()())
                             alert.showAndWait()
                           case Success(None) =>
                         }
@@ -1795,6 +1842,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                               headerText = "Could not load file"
                               contentText = e.getLocalizedMessage
                             }
+                            alert.initOwner(mainView().scene().windowProperty()())
                             alert.showAndWait()
                           case Success(None) =>
                         }
@@ -1852,6 +1900,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                                 headerText = "Could not generate audio"
                                 contentText = e.getLocalizedMessage
                               }
+                              alert.initOwner(mainView().scene().windowProperty()())
                               alert.showAndWait()
                             case Success(None) =>
                           }
@@ -1862,6 +1911,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                               headerText = "Could not generate audio"
                               contentText = e.getLocalizedMessage
                             }
+                            alert.initOwner(mainView().scene().windowProperty()())
                             alert.showAndWait()
                         }
                       case None =>
@@ -1920,6 +1970,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                           headerText = s"Beat Distance is smaller than ${beatmeter.minimalBeatDistance}s."
                           contentText = beatViolations.map { case Seq(a, b) => s"${a._1} ${b._1}" }.mkString("\n")
                         }
+                        alert.initOwner(mainView().scene().windowProperty()())
                         alert.showAndWait()
                       } else if (messageViolations.nonEmpty) {
                         val alert = new Alert(AlertType.Error) {
@@ -1927,6 +1978,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                           headerText = "Messages are overlapping."
                           contentText = messageViolations.map { case Seq(a, b) => s"${a._1} ${b._1}" }.mkString("\n")
                         }
+                        alert.initOwner(mainView().scene().windowProperty()())
                         alert.showAndWait()
                       } else {
                         val frameCount = (conf.frames * player.duration()).round.toInt
@@ -1960,6 +2012,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                                   }
                                 }
 
+                                alert.initOwner(mainView().scene().windowProperty()())
                                 if (ButtonType.OK == alert.showAndWait().get) {
                                   dir.listFiles().foreach(deleteDir)
                                   true
@@ -2008,6 +2061,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                                       headerText = "Could not generate video"
                                       contentText = e.getLocalizedMessage
                                     }
+                                    alert.initOwner(mainView().scene().windowProperty()())
                                     alert.showAndWait()
                                   case Success(None) =>
                                 }
@@ -2020,6 +2074,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                                   headerText = "Could not generate video"
                                   contentText = e.getLocalizedMessage
                                 }
+                                alert.initOwner(mainView().scene().windowProperty()())
                                 alert.showAndWait()
                             }
                           case None =>
@@ -2279,7 +2334,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
               selected() = d.isDefined
             }
             selected.onChange { (_, old, current) =>
-              if(!old && current) {
+              if (!old && current) {
                 val dialog = new DirectoryChooser()
                 dialog.title = "Beatmeter Generator: Image Directory"
                 imageDirectory() = Option(dialog.showDialog(scene().windowProperty()())).filter(_.exists()).map(_.toURI)
@@ -2330,6 +2385,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
               headerText = "Could not load file"
               contentText = e.getLocalizedMessage
             }
+            alert.initOwner(mainView().scene().windowProperty()())
             alert.showAndWait()
         }
       }
@@ -2339,6 +2395,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
           headerText = "Could not load file"
           contentText = e.getLocalizedMessage
         }
+        alert.initOwner(mainView().scene().windowProperty()())
         alert.showAndWait()
     }
   }
