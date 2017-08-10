@@ -155,7 +155,7 @@ class ObservableIntervalMap[A, B](implicit fractional: Fractional[A]) extends Ob
         }
         starts(toStart) = (toStart, toEnd, b)
         ends(toEnd) = (toStart, toEnd, b)
-        list += ((from, (toStart, toEnd), b))
+        list += (((elem._1, elem._2), (toStart, toEnd), b))
       }
       for (listener <- listeners) {
         listener.onChange(this, ObservableIntervalMap.MoveChange(from, to, list.toList))

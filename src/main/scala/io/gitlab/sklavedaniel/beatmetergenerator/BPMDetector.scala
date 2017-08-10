@@ -61,6 +61,7 @@ class BPMDetector(conf: BPMDetector.Conf) {
   println("Analyzing")
   val (bpm, bpms) = detection.detect(monoData, format.getSampleRate, Some((t, d) => {
     println(f"$d%.3f in window starting at $t%.3f")
+    true
   }))
   println(f"Median bpm: $bpm%.3f")
 

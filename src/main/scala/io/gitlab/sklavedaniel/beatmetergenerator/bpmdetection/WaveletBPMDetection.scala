@@ -185,13 +185,18 @@ class WaveletBPMDetection(
   }
 
 
-  override def detect(data: Array[Double], sampleRate: Double, onWindowAnalyzed: Option[(Double, Double) => Unit]) = {
+  override def detect(data: Array[Double], sampleRate: Double, onWindowAnalyzed: Option[(Double, Double) => Boolean]) = {
     val windowCount = (data.length.toDouble / windowSize).toInt
+    var computing = true
     val bpms = for (i <- 0 until windowCount) yield {
-      val time = i * windowSize.toDouble / sampleRate
-      val bpm = computeWindowBpm(data.slice(i * windowSize, (i + 1) * windowSize), sampleRate)
-      onWindowAnalyzed.foreach(_(time, bpm))
-      (time, bpm)
+      if (computing) {
+        val time = i * windowSize.toDouble / sampleRate
+        val bpm = computeWindowBpm(data.slice(i * windowSize, (i + 1) * windowSize), sampleRate)
+        onWindowAnalyzed.foreach(f => computing = f(time, bpm))
+        (time, bpm)
+      } else {
+        (0.0, 0.0)
+      }
     }
     (bpms.map(_._2).sorted.apply(bpms.size / 2), bpms)
   }

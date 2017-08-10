@@ -108,15 +108,16 @@ case class ImmutableTrack(title: String, play: Boolean, record: Boolean, display
         Success(None)
     }).map { aud =>
       val tmp = new Track(undoManager)
+      val cntnt =  content.map { elem =>
+        (elem._1, elem._2, elem._3.toMutable(undoManager))
+      }
       undoManager.foreach(_.active = false)
       tmp.title() = title
       tmp.play() = play
       tmp.record() = record
       tmp.display() = display
       tmp.snap() = snap
-      tmp.content ++= content.map { elem =>
-        (elem._1, elem._2, elem._3.toMutable(undoManager))
-      }
+      tmp.content ++= cntnt
       tmp.beat() = aud
       undoManager.foreach(_.active = true)
       tmp
@@ -226,10 +227,11 @@ class BeatsPattern(override val undoManager: Option[UndoManager]) extends BeatsG
 case class ImmutableBeatsPattern(highlightFirst: Boolean, patternDuration: Double, pattern: List[(Double, Double, ImmutableBeat)]) extends ImmutableTrackElement {
   override def toMutable(undoManager: Option[UndoManager]) = {
     val b = new BeatsPattern(undoManager)
+    val pttrn = pattern.map(x => (x._1, x._2, x._3.toMutable(undoManager)))
     undoManager.foreach(_.active = false)
     b.highlightFirst() = highlightFirst
     b.patternDuration() = patternDuration
-    b.pattern ++= pattern.map(x => (x._1, x._2, x._3.toMutable(undoManager)))
+    b.pattern ++= pttrn
     undoManager.foreach(_.active = true)
     b
   }

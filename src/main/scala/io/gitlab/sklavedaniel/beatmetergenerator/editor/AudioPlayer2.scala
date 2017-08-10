@@ -29,13 +29,13 @@ import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap
 import org.apache.commons.io.IOUtils
 import resource._
 
-import scala.collection.mutable.ListBuffer
-import scala.util.Try
+import scala.util.{Success, Try}
 import scalafx.application.Platform
 import scalafx.beans.binding.Bindings
 import scalafx.beans.property._
 import scalafx.collections.ObservableBuffer
 import scalafx.collections.ObservableBuffer.{Add, Remove}
+import scalafx.stage.Window
 
 object AudioPlayer2 {
 
@@ -77,6 +77,8 @@ class AudioPlayer2() {
 
   import AudioPlayer2.format
 
+  val progressDialogWindow = ObjectProperty[Option[Window]](None)
+
   val bufferDuration = 0.1
 
   val audio = ObjectProperty[Option[Array[Short]]](None)
@@ -87,14 +89,33 @@ class AudioPlayer2() {
   val maximaFrames = (maximaDuration * format.getFrameRate * format.getChannels).round.toInt
 
   val maxima = Bindings.createObjectBinding[Option[Array[((Double, Double), Double)]]](() => audio().map { a =>
-    val result = new Array[((Double, Double), Double)](a.length / maximaFrames)
-    for (i <- 0 until a.length / maximaFrames) {
-      val maxLeft = (for (j <- 0 until maximaFrames / 2) yield a(maximaFrames * i + 2 * j)).max
-      val maxRight = (for (j <- 0 until maximaFrames / 2) yield a(maximaFrames * i + 2 * j + 1)).max
-      val time = i * maximaDuration
-      result(i) = ((maxLeft, maxRight), time)
+    def compute(callback: (Option[Double], Option[String]) => Boolean) = {
+      val result = new Array[((Double, Double), Double)](a.length / maximaFrames)
+      val limit = a.length / maximaFrames
+      for (i <- 0 until limit) {
+        callback(Some(i.toDouble / limit), None)
+        val maxLeft = (for (j <- 0 until maximaFrames / 2) yield a(maximaFrames * i + 2 * j)).max
+        val maxRight = (for (j <- 0 until maximaFrames / 2) yield a(maximaFrames * i + 2 * j + 1)).max
+        val time = i * maximaDuration
+        result(i) = ((maxLeft, maxRight), time)
+      }
+      result
     }
-    result
+
+    if (progressDialogWindow().isDefined) {
+      val task = (callback: (Option[Double], Option[String]) => Boolean) => {
+        Success(Some(compute(callback)))
+      }
+      val pd = new ProgressDialog[Array[((Double, Double), Double)]](progressDialogWindow(), "Analyzing audio", Some("analyzing..."), false, task)
+      pd.showAndWait().get.asInstanceOf[Try[Option[Array[((Double, Double), Double)]]]] match {
+        case Success(Some(result)) =>
+          result
+        case _ =>
+          assert(false); ???
+      }
+    } else {
+      compute((_, _) => true)
+    }
   }, audio)
 
 
@@ -265,9 +286,9 @@ class AudioPlayer2() {
     (newbs, l)
   }
 
-  def generateStream(): (InputStream, Long) = {
+  def generateStream(): ((Double => Boolean) => InputStream, Long) = {
     val (currentBeats, currentCount) = (computeCurrentBeats(0), count())
-    (new InputStream {
+    ((callback: Double => Boolean) => new InputStream {
       var pos = 0
       val bufferSize = (format.getFrameRate * bufferDuration).round.toInt
       var bs = currentBeats.map(_._3)
@@ -290,7 +311,9 @@ class AudioPlayer2() {
           val result = bbuffer.get(bbufferPos) & 0xff
           bbufferPos += 1
           if (bbufferPos == bbufferLimit) {
-            generate()
+            if(callback(pos.toDouble / currentCount)) {
+              generate()
+            }
           }
           result
         } else {
