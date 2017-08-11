@@ -36,7 +36,7 @@ import javax.sound.sampled.{AudioFileFormat, AudioInputStream, AudioSystem}
 
 import io.gitlab.sklavedaniel.beatmetergenerator._
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.Beatmeter.Timed
-import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.{Beatmeter2, FlyingBeatmeter2}
+import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.{Beatmeter2, FlyingBeatmeter2, WaveformBeatmeter2}
 import io.gitlab.sklavedaniel.beatmetergenerator.bpmdetection.WaveletBPMDetection
 import io.gitlab.sklavedaniel.beatmetergenerator.editor.AudioPlayer2.BeatInfo
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap
@@ -1398,7 +1398,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
   var mainView = Bindings.createObjectBinding(() => new MainView(tracks()), tracks)
 
-  class MainView(val tracks: Tracks) extends HBox {
+  class MainView(val tracks: Tracks) extends GridPane {
 
     private val tracksDuration_ = ReadOnlyDoubleWrapper(0.0)
     val tracksDuration = tracksDuration_.readOnlyProperty
@@ -1637,11 +1637,18 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
         height <== Bindings.createDoubleBinding(() => self.layoutBounds().getHeight, self.layoutBounds)
       }
     }
-    children = Seq(
-      headerGroup,
-      scrollPane
-    )
 
+    add(headerGroup, 0, 0)
+    add(scrollPane, 1, 0)
+
+    columnConstraints = Seq(new ColumnConstraints(), new ColumnConstraints {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+    })
+    rowConstraints = Seq(new RowConstraints() {
+      vgrow = Priority.Always
+      maxHeight = Double.PositiveInfinity
+    })
   }
 
   def mouseHandler(single: MouseEvent => Unit, double: MouseEvent => Unit) = {
@@ -1751,6 +1758,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
       root = new BorderPane {
         prefWidth = 800
+        prefHeight = 600
         top = new MenuBar {
           menus = Seq(
             new Menu("File") {
@@ -1957,8 +1965,11 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                       b => b._1)
 
                     if (beats.nonEmpty || messages.nonEmpty) {
-                      val conf = tracks().beatmeterSettings()
-                      val beatmeter: Beatmeter2 = new FlyingBeatmeter2(conf)
+                      val beatmeter: Beatmeter2 = if(tracks().flying()) {
+                        new FlyingBeatmeter2(tracks().flyingBeatmeter())
+                      } else {
+                        new WaveformBeatmeter2(tracks().waveformBeatmeter())
+                      }
                       val beatViolations = if (beats.size < 2) {
                         Nil
                       } else {
@@ -1986,7 +1997,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                         alert.initOwner(mainView().scene().windowProperty()())
                         alert.showAndWait()
                       } else {
-                        val frameCount = (conf.frames * player.duration()).round.toInt
+                        val frameCount = (beatmeter.frames * player.duration()).round.toInt
 
                         class State(val clip: Option[Shape], var remaining: Stream[Timed]) {
                           var current: Queue[Timed] = Queue()
@@ -2090,8 +2101,14 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                 },
                 new MenuItem("Beatmeter Settings") {
                   onAction = handle {
-                    val dialog = new BeatmeterDialog(Some(mainView().scene().windowProperty()()), tracks().beatmeterSettings())
-                    tracks().beatmeterSettings() = dialog.showAndWait().get.asInstanceOf[FlyingBeatmeter2.Conf]
+                    val dialog = new BeatmeterDialog(Some(mainView().scene().windowProperty()()), tracks().flying(),
+                      tracks().flyingBeatmeter(), tracks().waveformBeatmeter())
+                    val r = dialog.showAndWait().get.asInstanceOf[(Boolean, FlyingBeatmeter2.Conf, WaveformBeatmeter2.Conf)]
+                    undoManager.startGroup()
+                    tracks().flying() = r._1
+                    tracks().flyingBeatmeter() = r._2
+                    tracks().waveformBeatmeter() = r._3
+                    undoManager.endGroup()
                   }
                 }
               )
@@ -2181,198 +2198,6 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     val seconds = ms % (1000 * 60) / 1000
     val milis = ms % 1000
     f"$minutes%02d:$seconds%02d.$milis%03d"
-  }
-
-  class BeatmeterDialog(ownerWindow: Option[Window], conf: FlyingBeatmeter2.Conf) extends Dialog[FlyingBeatmeter2.Conf] {
-    ownerWindow.foreach(initOwner)
-    title = "Beatmeter Generator"
-    val widthSpinner = new Spinner[Int](1, 10000, conf.width, 1) {
-      hgrow = Priority.Always
-      maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val heightSpinner = new Spinner[Int](1, 10000, conf.height, 1) {
-      hgrow = Priority.Always
-      maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val framesSpinner = new Spinner[Double](1, 240, conf.frames, 0.1) {
-      hgrow = Priority.Always
-      maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val speedSpinner = new Spinner[Double](0.1, 1.0, conf.speed, 0.05) {
-      hgrow = Priority.Always
-      maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val positionSpinner = new Spinner[Double](0.0, 1.0, conf.position, 0.05) {
-      hgrow = Priority.Always
-      maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-
-    val beatColorPicker = new ColorPicker(conf.beatColor) {
-      hgrow = Priority.Always
-      maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val beatBorderColorPicker = new ColorPicker(conf.beatBorderColor) {
-      hgrow = Priority.Always
-      maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-
-    val beatHighlightColorPicker = new ColorPicker(conf.beatHighlightedColor) {
-      hgrow = Priority.Always
-      maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val beatHighlightBorderColorPicker = new ColorPicker(conf.beatHighlightedBorderColor) {
-      hgrow = Priority.Always
-      maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val messageFont = ObjectProperty(conf.messageFont)
-    val marginSpinner = new Spinner[Int](0, 10000, conf.margin, 1) {
-      hgrow = Priority.Always
-      maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val messageColorPicker = new ColorPicker(conf.messageColor) {
-      hgrow = Priority.Always
-      maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val messageAlign = new ComboBox[String](Seq("Left", "Center", "Right")) {
-      hgrow = Priority.Always
-      maxWidth = Double.PositiveInfinity
-      selectionModel().select(conf.messageAlign match {
-        case AlignLeft => 0
-        case AlignCenter => 1
-        case AlignRight => 2
-      })
-    }
-    val messagePositionSpinner = new Spinner[Double](0.0, 1.0, conf.messagePosition, 0.05) {
-      hgrow = Priority.Always
-      maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val imageDirectory = ObjectProperty(conf.imageDirectory)
-    dialogPane = new DialogPane {
-      headerText = "Beatmeter Settings"
-      content = new GridPane {
-        hgap = 10
-        vgap = 5
-        add(new Label("Width") {
-          tooltip = Tooltip("Width of the generated video in px")
-        }, 0, 0)
-        add(widthSpinner, 1, 0)
-        add(new Label("Beatmeter Height") {
-          tooltip = Tooltip("Height of the beatmeter in px")
-        }, 0, 1)
-        add(heightSpinner, 1, 1)
-        add(new Label("Framerate") {
-          tooltip = Tooltip("Framerate in frames per sec")
-        }, 0, 2)
-        add(framesSpinner, 1, 2)
-        add(new Label("Position") {
-          tooltip = Tooltip("Position of beat when it is played as ratio of video width")
-        }, 0, 3)
-        add(positionSpinner, 1, 3)
-        add(new Label("Speed") {
-          tooltip = Tooltip("Speed of beats as ratio of video width")
-        }, 0, 4)
-        add(speedSpinner, 1, 4)
-        add(new Label("Beat Color"), 0, 5)
-        add(beatColorPicker, 1, 5)
-        add(new Label("Beat Border Color"), 0, 6)
-        add(beatBorderColorPicker, 1, 6)
-        add(new Label("Beat Highlight Color"), 0, 7)
-        add(beatHighlightColorPicker, 1, 7)
-        add(new Label("Beat Highlight Border Color"), 0, 8)
-        add(beatHighlightBorderColorPicker, 1, 8)
-        add(new Label("Beat Message Margin") {
-          tooltip = Tooltip("Margin between beatmeter and messages in px")
-        }, 0, 10)
-        add(marginSpinner, 1, 10)
-        add(new Label("Message Text Color"), 0, 11)
-        add(messageColorPicker, 1, 11)
-        add(new Label("Message Font"), 0, 12)
-        add(new HBox(
-          new TextField {
-            editable = false
-            text <== Bindings.createStringBinding(() => {
-              val (family, size, bold, italic) = messageFont()
-              family + " " + size + (if (bold) {
-                " bold"
-              } else {
-                ""
-              }) + (if (italic) {
-                " italic"
-              } else {
-                ""
-              })
-            }, messageFont)
-          },
-          new Button("Choose") {
-            onAction = handle {
-              val fsd = new FontDialog(Some(scene().windowProperty()()), messageFont())
-              messageFont() = fsd.showAndWait().get.asInstanceOf[(String, Int, Boolean, Boolean)]
-            }
-          },
-        ) {
-          spacing = 5
-        }, 1, 12)
-        add(new Label("Message Alignment"), 0, 13)
-        add(messageAlign, 1, 13)
-        add(new Label("Message Position") {
-          tooltip = Tooltip("Horizontal position the message is aligned to as ratio of video width")
-        }, 0, 14)
-        add(messagePositionSpinner, 1, 14)
-        add(new Label("Image Directory") {
-          tooltip = Tooltip("Directory containing beat.svg and beat.anim.")
-        }, 0, 15)
-        add(new HBox(
-          new ToggleButton("Select") {
-            imageDirectory.onChange { (_, _, d) =>
-              selected() = d.isDefined
-            }
-            selected.onChange { (_, old, current) =>
-              if (!old && current) {
-                val dialog = new DirectoryChooser()
-                dialog.title = "Beatmeter Generator: Image Directory"
-                imageDirectory() = Option(dialog.showDialog(scene().windowProperty()())).filter(_.exists()).map(_.toURI)
-              } else if (old && !current) {
-                imageDirectory() = None
-              }
-            }
-          }, new TextField() {
-            hgrow = Priority.Always
-            maxWidth = Double.PositiveInfinity
-            editable = false
-            text <== Bindings.createStringBinding(() => imageDirectory().map(_.toString).getOrElse(""), imageDirectory)
-          }
-        ) {
-          hgap = 5
-        }, 1, 15)
-      }
-      buttonTypes = Seq(ButtonType.Cancel, ButtonType.Apply)
-    }
-    resultConverter = bt => {
-      if (ButtonType.Apply == bt) {
-        FlyingBeatmeter2.Conf(widthSpinner.value(), heightSpinner.value(), framesSpinner.value(), speedSpinner.value(),
-          positionSpinner.value(), beatColorPicker.value(), beatBorderColorPicker.value(), beatHighlightColorPicker.value(),
-          beatHighlightBorderColorPicker.value(), messageFont(), marginSpinner.value(),
-          messageColorPicker.value(), messageAlign.selectionModel().getSelectedIndex match {
-            case 0 => AlignLeft
-            case 1 => AlignCenter
-            case 2 => AlignRight
-          }, messagePositionSpinner.value(), imageDirectory())
-      } else {
-        conf
-      }
-    }
   }
 
   conf.beats.toOption.foreach { f =>

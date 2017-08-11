@@ -18,11 +18,13 @@
 
 package io.gitlab.sklavedaniel.beatmetergenerator.beatmeters
 
+import java.awt
 import java.awt.geom.AffineTransform
 import java.awt.{AlphaComposite, Color, Composite, Graphics2D, Shape}
 import java.awt.image.BufferedImage
 import java.io.File
 import java.net.URI
+import scalafx.scene
 
 import io.gitlab.sklavedaniel.beatmetergenerator.Main.Converters
 import org.apache.batik.anim.dom.{SAXSVGDocumentFactory, SVGDOMImplementation}
@@ -37,6 +39,10 @@ import scalafx.scene.paint
 
 object Beatmeter {
 
+  def toAWTColor(color: scene.paint.Color, fade: Double = 1.0) = {
+    new awt.Color(color.red.toFloat, color.green.toFloat,
+      color.blue.toFloat, (fade * color.opacity).toFloat)
+  }
   abstract class BeatmeterSubcommand(name: String, val base: BeatmeterBaseConf) extends Subcommand(name) with Converters {
 
     def beatmeter(): Beatmeter

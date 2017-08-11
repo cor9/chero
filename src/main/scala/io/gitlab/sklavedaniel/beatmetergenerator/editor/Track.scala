@@ -22,6 +22,7 @@ import java.net.URI
 import java.util
 
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.FlyingBeatmeter2
+import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.WaveformBeatmeter2
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap.Unscalable
 
@@ -40,12 +41,18 @@ final class Tracks(val undoManager: Option[UndoManager]) {
   val audio = ObjectProperty[Option[(URI, Array[Short])]](None)
   UndoManager.register(undoManager, audio)
 
-  val beatmeterSettings = ObjectProperty(FlyingBeatmeter2.Conf(1280, 40, 25.0, 0.2, 0.4, Color.DarkRed, Color.DarkGray,
-    Color.Yellow, Color.DarkGray, (Font.default.getFamily, 50, false, false), 5, Color.Red, AlignCenter, 640, None))
-  UndoManager.register(undoManager, beatmeterSettings)
+  val flying = BooleanProperty(true)
+  UndoManager.register(undoManager, flying)
+  val flyingBeatmeter = ObjectProperty(FlyingBeatmeter2.Conf(1280, 40, 25.0, 0.2, 0.4, Color.DarkRed, Color.DarkGray,
+    Color.Yellow, Color.DarkGray, (Font.default.getFamily, 60, true, false), 5, Color.DarkRed, Color.Black, 1.0, AlignCenter, 0.5, None))
+  UndoManager.register(undoManager, flyingBeatmeter)
+  val waveformBeatmeter = ObjectProperty(WaveformBeatmeter2.Conf(1280, 40, 25.0, 0.3, 0.4, 0.9, 0.1, Color.DarkRed, Color.Yellow,
+    Color.Black, new Color(Color.DarkGray.opacity(0.5)), Color.Black,
+    (Font.default.getFamily, 60, true, false), 5, Color.DarkRed, Color.Black, 1.0, AlignCenter, 0.5, None))
+  UndoManager.register(undoManager, waveformBeatmeter)
 
   def toImmutable(base: URI) = {
-    ImmutableTracks(content.toList.map(_.toImmutable(base)), audio().map(u => base.relativize(u._1)), beatmeterSettings())
+    ImmutableTracks(content.toList.map(_.toImmutable(base)), audio().map(u => base.relativize(u._1)), flying(), flyingBeatmeter(), waveformBeatmeter())
   }
 
 }
@@ -59,7 +66,8 @@ case object AlignRight extends Align
 case object AlignCenter extends Align
 
 
-case class ImmutableTracks(content: List[ImmutableTrack], audio: Option[URI], beatmeterSettings: FlyingBeatmeter2.Conf) {
+case class ImmutableTracks(content: List[ImmutableTrack], audio: Option[URI], flying: Boolean, flyingBeatmeter: FlyingBeatmeter2.Conf,
+  waveformBeatmeter: WaveformBeatmeter2.Conf) {
   def toMutable(base: URI, load: URI => Try[Array[Short]], undoManager: Option[UndoManager]): Try[Tracks] = {
     (audio match {
       case Some(uri) =>
@@ -76,7 +84,9 @@ case class ImmutableTracks(content: List[ImmutableTrack], audio: Option[URI], be
         undoManager.foreach(_.active = false)
         t.content ++= l.reverse
         t.audio() = aud
-        t.beatmeterSettings() = beatmeterSettings
+        t.flyingBeatmeter() = flyingBeatmeter
+        t.waveformBeatmeter() = waveformBeatmeter
+        t.flying() = flying
         undoManager.foreach(_.active = true)
         t
       }
@@ -235,16 +245,17 @@ class BeatsPattern(override val undoManager: Option[UndoManager]) extends BeatsG
         tmp
       }
     }
-  }, pattern, patternDuration, highlightFirst)
+  }, pattern, patternDuration, highlightFirst, highlightFirstPattern)
 
-  override def toImmutable = ImmutableBeatsPattern(highlightFirst(), patternDuration(), pattern.toList.map(x => (x._1, x._2, x._3.toImmutable())))
+  override def toImmutable = ImmutableBeatsPattern(highlightFirstPattern(), highlightFirst(), patternDuration(), pattern.toList.map(x => (x._1, x._2, x._3.toImmutable())))
 }
 
-case class ImmutableBeatsPattern(highlightFirst: Boolean, patternDuration: Double, pattern: List[(Double, Double, ImmutableBeat)]) extends ImmutableTrackElement {
+case class ImmutableBeatsPattern(highlightFirstPattern: Boolean, highlightFirst: Boolean, patternDuration: Double, pattern: List[(Double, Double, ImmutableBeat)]) extends ImmutableTrackElement {
   override def toMutable(undoManager: Option[UndoManager]) = {
     val b = new BeatsPattern(undoManager)
     val pttrn = pattern.map(x => (x._1, x._2, x._3.toMutable(undoManager)))
     undoManager.foreach(_.active = false)
+    b.highlightFirstPattern() = highlightFirstPattern
     b.highlightFirst() = highlightFirst
     b.patternDuration() = patternDuration
     b.pattern ++= pttrn

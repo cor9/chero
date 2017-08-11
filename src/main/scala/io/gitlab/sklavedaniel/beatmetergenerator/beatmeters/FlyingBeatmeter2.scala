@@ -19,7 +19,7 @@
 package io.gitlab.sklavedaniel.beatmetergenerator.beatmeters
 
 import java.awt
-import java.awt.{Font, RenderingHints}
+import java.awt.{BasicStroke, Font, RenderingHints}
 import java.net.URI
 
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.Beatmeter._
@@ -31,8 +31,8 @@ object FlyingBeatmeter2 {
 
   case class Conf(width: Int, height: Int, frames: Double, speed: Double, position: Double, beatColor: Color,
     beatBorderColor: Color, beatHighlightedColor: Color, beatHighlightedBorderColor: Color,
-    messageFont: (String, Int, Boolean, Boolean), margin: Int, messageColor: Color,
-    messageAlign: Align, messagePosition: Double, imageDirectory: Option[URI]
+    messageFont: (String, Int, Boolean, Boolean), margin: Int, messageColor: Color, messageBorderColor: Color,
+    messageBorderStrength: Double, messageAlign: Align, messagePosition: Double, imageDirectory: Option[URI]
   )
 
 }
@@ -125,8 +125,17 @@ class FlyingBeatmeter2(conf: FlyingBeatmeter2.Conf) extends Beatmeter2 {
       Timed(frame, frame + anim._2.size, PositionDrawable(_ => (conf.position * conf.width - anim._2.head.getWidth / 2, beatmeterY),
         AnimDrawable(frame - b._1, anim)))
     })
+
     val messageFont = new Font(conf.messageFont._1,
-      (if(conf.messageFont._3) {Font.BOLD} else{Font.PLAIN}) | (if(conf.messageFont._3) {Font.ITALIC} else{Font.PLAIN}),
+      (if (conf.messageFont._3) {
+        Font.BOLD
+      } else {
+        Font.PLAIN
+      }) | (if (conf.messageFont._4) {
+        Font.ITALIC
+      } else {
+        Font.PLAIN
+      }),
       conf.messageFont._2)
     val messageStream = ElementStream(messages.toStream.map(b => (b._1 * conf.frames, b._2 * conf.frames, b._3)).map { b =>
       val startFrame = b._1.ceil.toInt
@@ -137,17 +146,21 @@ class FlyingBeatmeter2(conf: FlyingBeatmeter2.Conf) extends Beatmeter2 {
           val fadeout = ((b._2 - b._1 - frame) / conf.frames / 0.25).min(1.0).max(0.0)
           val fade = fadein.min(fadeout)
           g.setFont(messageFont)
-          val color = new awt.Color(conf.messageColor.red.toFloat, conf.messageColor.green.toFloat,
-            conf.messageColor.blue.toFloat, (conf.messageColor.opacity * fade).toFloat)
-          g.setColor(color)
-          g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
-          val bounds = g.getFontMetrics.getStringBounds(b._3, g)
+          g.setColor(toAWTColor(conf.messageColor, fade))
+          val gv = messageFont.createGlyphVector(g.getFontRenderContext, b._3)
+          val bounds = gv.getLogicalBounds
           val align = conf.messageAlign match {
             case AlignLeft => 0.0
             case AlignCenter => -bounds.getWidth / 2
             case AlignRight => -bounds.getWidth
           }
-          g.drawString(b._3, align.toFloat, -bounds.getY.toFloat)
+          g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+            RenderingHints.VALUE_ANTIALIAS_ON);
+          val outline = gv.getOutline(align.toFloat, -bounds.getY.toFloat)
+          g.fill(outline)
+          g.setColor(toAWTColor(conf.messageBorderColor, fade))
+          g.setStroke(new BasicStroke(conf.messageBorderStrength.toFloat))
+          g.draw(outline)
         }
       ))
     })
