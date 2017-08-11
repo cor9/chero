@@ -26,6 +26,8 @@ import javax.sound.sampled._
 
 import io.gitlab.sklavedaniel.beatmetergenerator.editor.AudioPlayer2.BeatInfo
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap
+import io.gitlab.sklavedaniel.beatmetergenerator.utils._
+
 import org.apache.commons.io.IOUtils
 import resource._
 

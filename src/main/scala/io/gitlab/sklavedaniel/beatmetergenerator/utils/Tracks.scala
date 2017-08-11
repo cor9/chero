@@ -16,14 +16,11 @@
  *
  */
 
-package io.gitlab.sklavedaniel.beatmetergenerator.editor
+package io.gitlab.sklavedaniel.beatmetergenerator.utils
 
 import java.net.URI
-import javax.swing.text.StyleConstants
 
-import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.FlyingBeatmeter2
-import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.WaveformBeatmeter2
-import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap
+import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.{FlyingBeatmeter, WaveformBeatmeter}
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap.Unscalable
 
 import scala.collection.JavaConverters
@@ -33,7 +30,6 @@ import scalafx.beans.property._
 import scalafx.beans.value.ObservableValue
 import scalafx.collections.ObservableBuffer
 import scalafx.scene.paint.Color
-import scalafx.scene.text.Font
 
 final class Tracks(val undoManager: Option[UndoManager]) {
   val content = ObservableBuffer[Track]()
@@ -43,10 +39,10 @@ final class Tracks(val undoManager: Option[UndoManager]) {
 
   val flying = BooleanProperty(true)
   UndoManager.register(undoManager, flying)
-  val flyingBeatmeter = ObjectProperty(FlyingBeatmeter2.Conf(1280, 40, 25.0, 0.3, 0.4, Color.web("#2a98ff"), Color.Black,
+  val flyingBeatmeter = ObjectProperty(FlyingBeatmeter.Conf(1280, 40, 25.0, 0.3, 0.4, Color.web("#2a98ff"), Color.Black,
     Color.web("#ff3e2f"), Color.Black, ("Courgette", 60, true, false), 5, Color.web("#2a98ff"), Color.Black, 1.0, AlignCenter, 0.5, None))
   UndoManager.register(undoManager, flyingBeatmeter)
-  val waveformBeatmeter = ObjectProperty(WaveformBeatmeter2.Conf(1280, 40, 25.0, 0.3, 0.4, 1.0, 0.0, Color.web("#2a98ff"), Color.web("#ff3e2f"),
+  val waveformBeatmeter = ObjectProperty(WaveformBeatmeter.Conf(1280, 40, 25.0, 0.3, 0.4, 1.0, 0.0, Color.web("#2a98ff"), Color.web("#ff3e2f"),
     Color.Transparent, Color.web("#070707BB"), Color.web("#ffe400"),
     ("Courgette", 60, true, false), 5, Color.web("#2a98ff"), Color.Black, 1.0, AlignCenter, 0.5,
      None))
@@ -67,8 +63,8 @@ case object AlignRight extends Align
 case object AlignCenter extends Align
 
 
-case class ImmutableTracks(content: List[ImmutableTrack], audio: Option[URI], flying: Boolean, flyingBeatmeter: FlyingBeatmeter2.Conf,
-  waveformBeatmeter: WaveformBeatmeter2.Conf) {
+case class ImmutableTracks(content: List[ImmutableTrack], audio: Option[URI], flying: Boolean, flyingBeatmeter: FlyingBeatmeter.Conf,
+  waveformBeatmeter: WaveformBeatmeter.Conf) {
   def toMutable(base: URI, load: URI => Try[Array[Short]], undoManager: Option[UndoManager]): Try[Tracks] = {
     (audio match {
       case Some(uri) =>

@@ -16,7 +16,7 @@
  *
  */
 
-package io.gitlab.sklavedaniel.beatmetergenerator.editor
+package io.gitlab.sklavedaniel.beatmetergenerator.utils
 
 import java.net.URI
 

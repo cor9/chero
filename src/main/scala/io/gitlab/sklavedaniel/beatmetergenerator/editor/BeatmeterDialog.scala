@@ -18,8 +18,9 @@
 
 package io.gitlab.sklavedaniel.beatmetergenerator.editor
 
-import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.FlyingBeatmeter2
-import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.WaveformBeatmeter2
+import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.FlyingBeatmeter
+import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.WaveformBeatmeter
+import io.gitlab.sklavedaniel.beatmetergenerator.utils._
 
 import scalafx.Includes._
 import scalafx.beans.binding.Bindings
@@ -29,8 +30,8 @@ import scalafx.scene.control._
 import scalafx.scene.layout._
 import scalafx.stage.{DirectoryChooser, Window}
 
-class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: FlyingBeatmeter2.Conf, waveformConf: WaveformBeatmeter2.Conf)
-  extends Dialog[(Boolean, FlyingBeatmeter2.Conf, WaveformBeatmeter2.Conf)] {
+class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: FlyingBeatmeter.Conf, waveformConf: WaveformBeatmeter.Conf)
+  extends Dialog[(Boolean, FlyingBeatmeter.Conf, WaveformBeatmeter.Conf)] {
   ownerWindow.foreach(initOwner)
   title = "Beatmeter Generator"
 
@@ -233,7 +234,7 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
     }
 
     def getConf() = {
-      FlyingBeatmeter2.Conf(widthSpinner.value(), heightSpinner.value(), framesSpinner.value(), speedSpinner.value(),
+      FlyingBeatmeter.Conf(widthSpinner.value(), heightSpinner.value(), framesSpinner.value(), speedSpinner.value(),
         positionSpinner.value(), beatColorPicker.value(), beatBorderColorPicker.value(), beatHighlightColorPicker.value(),
         beatHighlightBorderColorPicker.value(), messageFont(), marginSpinner.value(),
         messageColorPicker.value(), messageBorderColorPicker.value(), messageBorderStrengthSpinner.value(),
@@ -463,7 +464,7 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
     }
 
     def getConf() = {
-      WaveformBeatmeter2.Conf(widthSpinner.value(), heightSpinner.value(), framesSpinner.value(), speedSpinner.value(),
+      WaveformBeatmeter.Conf(widthSpinner.value(), heightSpinner.value(), framesSpinner.value(), speedSpinner.value(),
         positionSpinner.value(), startPositionSpinner.value(), endPositionSpinner.value(), waveColorPicker.value(),
         waveHighlightColorPicker.value(), foregroundColorPicker.value(),
         backgroundColorPicker.value(), markerColorPicker.value(), messageFont(), marginSpinner.value(),

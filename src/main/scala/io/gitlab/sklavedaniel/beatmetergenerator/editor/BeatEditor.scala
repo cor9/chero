@@ -35,11 +35,12 @@ import javax.imageio.ImageIO
 import javax.sound.sampled.{AudioFileFormat, AudioInputStream, AudioSystem}
 
 import io.gitlab.sklavedaniel.beatmetergenerator._
+import io.gitlab.sklavedaniel.beatmetergenerator.utils._
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.Beatmeter.Timed
-import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.{Beatmeter2, FlyingBeatmeter2, WaveformBeatmeter2}
+import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.{Beatmeter2, FlyingBeatmeter, WaveformBeatmeter}
 import io.gitlab.sklavedaniel.beatmetergenerator.bpmdetection.WaveletBPMDetection
 import io.gitlab.sklavedaniel.beatmetergenerator.editor.AudioPlayer2.BeatInfo
-import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.{JsonSerialization, ObservableIntervalMap}
 import org.rogach.scallop.ScallopConf
 
 import scala.collection.immutable.Queue
@@ -69,30 +70,13 @@ import scalafx.stage.FileChooser.ExtensionFilter
 import scalafx.stage.{DirectoryChooser, FileChooser, Window}
 import scalafx.util.Duration
 
-object BeatEditor2 {
+object BeatEditor extends JFXApp {
 
   val dataformat = new DataFormat("beats")
-
-  class Conf extends Main.ExecutableSubcommand("editor2") {
-    val input = opt[File](descr = "Audio file to play")
-    val beats = opt[File](descr = "File containing beat definitions")
-    validateFileExists(input)
-    validateFileExists(beats)
-
-    def execute(subcommands: List[ScallopConf], args: Array[String]): Unit = {
-      new BeatEditor2(this).main(args)
-    }
-  }
-
-}
-
-class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
   Font.loadFont(getClass.getResourceAsStream("/Courgette-Regular.ttf"), -1)
 
   GraphicsEnvironment.getLocalGraphicsEnvironment.registerFont(java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, getClass.getResourceAsStream("/Courgette-Regular.ttf")))
-
-  BeatEditor2.dataformat.delegate.toString
 
   val player = new AudioPlayer2()
 
@@ -675,12 +659,12 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       }
       val cb = Clipboard.systemClipboard
       val cc = new ClipboardContent()
-      cc.put(BeatEditor2.dataformat, data)
+      cc.put(BeatEditor.dataformat, data)
       cb.setContent(cc)
     }
 
     def insert(x: Double): Unit = {
-      Clipboard.systemClipboard.content.get(BeatEditor2.dataformat).foreach { data =>
+      Clipboard.systemClipboard.content.get(BeatEditor.dataformat).foreach { data =>
         if (data.asInstanceOf[List[(Double, Double, ImmutableTrackElement)]].forall(elem => clazz.isInstance(elem._3))) {
           val insert = data.asInstanceOf[List[(Double, Double, ImmutableTrackElement)]].map { elem =>
             (elem._1 + x, elem._2 + x, elem._3.toMutable(Some(undoManager)).asInstanceOf[A])
@@ -746,7 +730,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
             }
             val cb = startDragAndDrop(if (e.isControlDown) TransferMode.Copy else TransferMode.Move)
             val cc = new input.ClipboardContent()
-            cc.put(BeatEditor2.dataformat, data)
+            cc.put(BeatEditor.dataformat, data)
             cb.setContent(cc)
           }
         }
@@ -770,8 +754,8 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     var dragBox: Option[Rectangle] = None
     onDragOver = e => if (selectionActive(e.getX)) {
       val db = e.getDragboard
-      if (db.getContentTypes.contains(BeatEditor2.dataformat)) {
-        val (snapOffset, dragOffset, dragWidth, list) = db.getContent(BeatEditor2.dataformat).asInstanceOf[(Double, Double, Double, List[(Double, Double, ImmutableTrackElement)])]
+      if (db.getContentTypes.contains(BeatEditor.dataformat)) {
+        val (snapOffset, dragOffset, dragWidth, list) = db.getContent(BeatEditor.dataformat).asInstanceOf[(Double, Double, Double, List[(Double, Double, ImmutableTrackElement)])]
         val x = snap(e.getX / pxPerSec() - snapOffset, startPosition, true) + snapOffset - dragOffset
         if (selectionActive((dragWidth + x) * pxPerSec()) && x >= 0) {
           if (dragBox.isEmpty) {
@@ -803,7 +787,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
       dragBox.foreach(children.remove)
       dragBox = None
       val db = e.getDragboard
-      val (snapOffset, dragOffset, dragWidth, list) = db.getContent(BeatEditor2.dataformat).asInstanceOf[(Double, Double, Double, List[(Double, Double, ImmutableTrackElement)])]
+      val (snapOffset, dragOffset, dragWidth, list) = db.getContent(BeatEditor.dataformat).asInstanceOf[(Double, Double, Double, List[(Double, Double, ImmutableTrackElement)])]
       val x = snap(e.getX / pxPerSec() - snapOffset, startPosition, true) + snapOffset - dragOffset
       val fitting = selectionActive((dragWidth + x) * pxPerSec()) && x >= 0 && list.forall(elem => clazz.isInstance(elem._3) && content.intersecting(elem._1 + x, elem._2 + x).isEmpty)
       if (fitting) {
@@ -1967,9 +1951,9 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
                     if (beats.nonEmpty || messages.nonEmpty) {
                       val beatmeter: Beatmeter2 = if(tracks().flying()) {
-                        new FlyingBeatmeter2(tracks().flyingBeatmeter())
+                        new FlyingBeatmeter(tracks().flyingBeatmeter())
                       } else {
-                        new WaveformBeatmeter2(tracks().waveformBeatmeter())
+                        new WaveformBeatmeter(tracks().waveformBeatmeter())
                       }
                       val beatViolations = if (beats.size < 2) {
                         Nil
@@ -2104,7 +2088,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
                   onAction = handle {
                     val dialog = new BeatmeterDialog(Some(mainView().scene().windowProperty()()), tracks().flying(),
                       tracks().flyingBeatmeter(), tracks().waveformBeatmeter())
-                    val r = dialog.showAndWait().get.asInstanceOf[(Boolean, FlyingBeatmeter2.Conf, WaveformBeatmeter2.Conf)]
+                    val r = dialog.showAndWait().get.asInstanceOf[(Boolean, FlyingBeatmeter.Conf, WaveformBeatmeter.Conf)]
                     undoManager.startGroup()
                     tracks().flying() = r._1
                     tracks().flyingBeatmeter() = r._2
@@ -2201,162 +2185,7 @@ class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
     f"$minutes%02d:$seconds%02d.$milis%03d"
   }
 
-  conf.beats.toOption.foreach { f =>
-    val file = f.getAbsoluteFile
-    JsonSerialization.load(Source.fromFile(file, "utf-8").mkString) match {
-      case Success(ts) => {
-        ts.toMutable(file.getParentFile.toURI, uri => {
-          Try(uri.toURL().openStream()).flatMap(in => AudioPlayer2.readData(new BufferedInputStream(in)))
-        }, Some(undoManager)) match {
-          case Success(t) =>
-            tracks() = t
-          case Failure(e) =>
-            val alert = new Alert(AlertType.Error) {
-              title = "Beatmeter Generator"
-              headerText = "Could not load file"
-              contentText = e.getLocalizedMessage
-            }
-            alert.initOwner(mainView().scene().windowProperty()())
-            alert.showAndWait()
-        }
-      }
-      case Failure(e) =>
-        val alert = new Alert(AlertType.Error) {
-          title = "Beatmeter Generator"
-          headerText = "Could not load file"
-          contentText = e.getLocalizedMessage
-        }
-        alert.initOwner(mainView().scene().windowProperty()())
-        alert.showAndWait()
-    }
-  }
-
   player.progressDialogWindow() = Some(mainView().scene().windowProperty()())
 }
 
-class ProgressDialog[A](ownerWindow: Option[Window], taskTitle: String, message: Option[String], cancelable: Boolean, task: ((Option[Double], Option[String]) => Boolean) => Try[Option[A]]) extends Dialog[Try[Option[A]]] {
-  self =>
-  title = "Beatmeter Generator"
-  ownerWindow.foreach(initOwner)
-  val messageNode = new Text
-  private var computing = true
-  message.foreach(messageNode.text = _)
-  val progress = new ProgressBar {
-    hgrow = Priority.Always
-    maxWidth = Double.PositiveInfinity
-  }
-  dialogPane = new DialogPane(new control.DialogPane {
-    override def createButtonBar() = new scene.Group()
-  }) {
-    minWidth = 300
-    headerText = taskTitle
-    content = new VBox {
-      spacing = 5
-      children = Seq(
-        messageNode,
-        progress,
-        new HBox(new HBox {
-          hgrow = Priority.Always
-        }, new Button("Cancel") {
-          disable = !cancelable
-          onAction = handle {
-            disable = true
-            computing = false
-          }
-        })
-      )
-    }
-  }
-
-  onShown = _ => {
-    val thread = new Thread(() => {
-      val r = task((d, s) => {
-        val task = new FutureTask[Boolean](() => {
-          d.foreach(progress.progress() = _)
-          s.foreach(messageNode.text = _)
-          computing
-        })
-        Platform.runLater(task)
-        task.get()
-      })
-      Platform.runLater(() => {
-        progress.progress() = 1.0
-        result() = r.map(opt => if (computing) {
-          opt
-        } else {
-          None
-        })
-        self.hide()
-      })
-    })
-    thread.start()
-  }
-}
-
-class FontDialog(ownerWindow: Option[Window], initFont: (String, Int, Boolean, Boolean)) extends Dialog[(String, Int, Boolean, Boolean)] {
-  self =>
-  title = "Beatmeter Generator"
-  ownerWindow.foreach(initOwner)
-  val families = new ListView[String](Font.families.sorted) {
-    cellFactory = _ => {
-      val cell = new ListCell[String]() {
-        item.onChange { (_, _, family) =>
-          font = Font.font(family)
-          text = family
-        }
-      }
-
-      cell
-    }
-  }
-
-  families.selectionModel().select(initFont._1)
-  families.scrollTo(initFont._1)
-  val size = new Spinner[Int](5, 5000, initFont._2, 1) {
-    editable = true
-    hgrow = Priority.Always
-    maxWidth = Double.PositiveInfinity
-  }
-  val bold = new CheckBox("Bold") {
-    selected = initFont._3
-  }
-  val italic = new CheckBox("Italic") {
-    selected = initFont._4
-  }
-  dialogPane = new DialogPane {
-    minWidth = 200
-    minHeight = 400
-    headerText = "Select Font"
-
-    val preview = new TextField {
-      text = "Example"
-      font <== Bindings.createObjectBinding(() => Font(families.selectionModel().getSelectedItem, if (bold.selected()) {
-        FontWeight.Bold
-      } else {
-        FontWeight.Normal
-      }, if (italic.selected()) {
-        FontPosture.ITALIC
-      } else {
-        FontPosture.REGULAR
-      }, size.value()).delegate, families.selectionModel().selectedItemProperty(), size.value, bold.selected, italic.selected)
-    }
-    content = new GridPane {
-      hgap = 5
-      vgap = 5
-      add(families, 0, 0, 1, 4)
-      add(size, 1, 0, 1, 1)
-      add(bold, 1, 1, 1, 1)
-      add(italic, 1, 2, 1, 1)
-      add(preview, 0, 4, 2, 1)
-    }
-    buttonTypes = Seq(ButtonType.Cancel, ButtonType.OK)
-  }
-  resultConverter = b => {
-    if (ButtonType.OK == b) {
-      (families.selectionModel().getSelectedItem, size.value(), bold.selected(), italic.selected())
-    } else {
-      initFont
-    }
-  }
-}
 

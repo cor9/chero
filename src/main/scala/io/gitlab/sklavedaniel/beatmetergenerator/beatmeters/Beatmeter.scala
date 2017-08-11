@@ -20,21 +20,17 @@ package io.gitlab.sklavedaniel.beatmetergenerator.beatmeters
 
 import java.awt
 import java.awt.geom.AffineTransform
-import java.awt.{AlphaComposite, Color, Composite, Graphics2D, Shape}
 import java.awt.image.BufferedImage
-import java.io.File
+import java.awt.{AlphaComposite, Color, Graphics2D, Shape}
 import java.net.URI
-import scalafx.scene
 
-import io.gitlab.sklavedaniel.beatmetergenerator.Main.Converters
 import org.apache.batik.anim.dom.{SAXSVGDocumentFactory, SVGDOMImplementation}
 import org.apache.batik.transcoder._
 import org.apache.batik.transcoder.image.ImageTranscoder
 import org.apache.batik.util.{SVGConstants, XMLResourceDescriptor}
-import org.rogach.scallop.{ScallopConf, Subcommand}
-import shapeless.{HNil, :: => :::}
 
 import scala.io.Source
+import scalafx.scene
 import scalafx.scene.paint
 
 object Beatmeter {
@@ -42,29 +38,6 @@ object Beatmeter {
   def toAWTColor(color: scene.paint.Color, fade: Double = 1.0) = {
     new awt.Color(color.red.toFloat, color.green.toFloat,
       color.blue.toFloat, (fade * color.opacity).toFloat)
-  }
-  abstract class BeatmeterSubcommand(name: String, val base: BeatmeterBaseConf) extends Subcommand(name) with Converters {
-
-    def beatmeter(): Beatmeter
-  }
-
-  trait BeatmeterBaseConf extends Converters {
-    self: ScallopConf =>
-    val duration = opt[Double](required = true, descr = "Duration of generated image sequence in seconds")
-    val frames = opt[Double](default = Some(25), descr = "Frames per second")
-    val width = opt[Int](required = true, descr = "Width of generated video")
-    val height = opt[Int](descr = "Width of generated video").orElse(width.toOption.map(x => (x / 42.66).round.toInt))
-    val speed = opt[Double](default = Some(0.2), descr = "Speed of the beatmeter in video widths per second")
-    val start = opt[Double](descr = "Left position of the beatmeter relative to width (Between 0 and 1)")
-    val end = opt[Double](descr = "Right position of the beatmeter relative to width (Between 0 and 1)")
-    val target = opt[Double](default = Some(0.2), descr = "Target position of the beatmeter relative to width (Between 0 and 1)")
-    val bmHeight = opt[Int](descr = "Height of the actual beatmeter").orElse(height.toOption.map(x => (x * 2 / 3.0).round.toInt))
-    val fgHeight = opt[Int](descr = "Height of the forground decorations").orElse(height.toOption.map(x => (x * 14 / 15.0).round.toInt))
-    val bgHeight = opt[Int](descr = "Height of the beatmeter background").orElse(bmHeight.toOption)
-    val bgColor = opt[Color](default = Some(new Color(0xbbaaaaaa, true)), descr = "Color of the beatmeter background in ARGB")
-    val fgColor = opt[Color](default = Some(new Color(0xbb4d4d4d, true)), descr = "Color of the foreground decorations ARGB")
-    val wvColor = opt[Color](default = Some(new Color(0xffff0980, true)), descr = "Color of the wave in ARGB")
-    val mrColor = opt[Color](default = Some(new Color(0xbb4d4d4d, true)), descr = "Color of the marker in ARGB")
   }
 
   object ElementStream {
@@ -277,14 +250,6 @@ object Beatmeter {
 
   type TimedStream = ElementStream[Option[Shape], Beatmeter.Timed]
 }
-
-trait Beatmeter {
-
-  def getElementStreams(beats: Seq[Double], frameCount: Int): List[Beatmeter.TimedStream]
-
-  def minimalBeatDistance: Double
-}
-
 
 trait Beatmeter2 {
 

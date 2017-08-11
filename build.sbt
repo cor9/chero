@@ -27,8 +27,8 @@ unmanagedSourceDirectories in Compile += baseDirectory.value / "lib/JWave/src"
 
 fork := true
 
-mainClass in assembly := Some("io.gitlab.sklavedaniel.beatmetergenerator.Main")
-mainClass in (Compile, run) := Some("io.gitlab.sklavedaniel.beatmetergenerator.Main")
+mainClass in assembly := Some("io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor")
+mainClass in (Compile, run) := Some("io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor")
 
 assemblyMergeStrategy in assembly := {
   case PathList("META-INF", xs @ _*) => MergeStrategy.discard
