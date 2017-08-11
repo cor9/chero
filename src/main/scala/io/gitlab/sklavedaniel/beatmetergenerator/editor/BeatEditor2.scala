@@ -18,7 +18,7 @@
 
 package io.gitlab.sklavedaniel.beatmetergenerator.editor
 
-import java.awt.Shape
+import java.awt.{GraphicsEnvironment, Shape, Toolkit}
 import java.awt.image.BufferedImage
 import java.io._
 import java.net.URI
@@ -88,12 +88,13 @@ object BeatEditor2 {
 
 class BeatEditor2(conf: BeatEditor2.Conf) extends JFXApp {
 
+  Font.loadFont(getClass.getResourceAsStream("/Courgette-Regular.ttf"), -1)
+
+  GraphicsEnvironment.getLocalGraphicsEnvironment.registerFont(java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, getClass.getResourceAsStream("/Courgette-Regular.ttf")))
+
   BeatEditor2.dataformat.delegate.toString
 
   val player = new AudioPlayer2()
-
-  player.ratio.set(0.8)
-  player.rate.set(0.5f)
 
   class WaveView(initPxPerSec: Double, initHeight: Double, sceneToContextX: Double => Double) extends Group {
     self =>
@@ -2296,7 +2297,18 @@ class FontDialog(ownerWindow: Option[Window], initFont: (String, Int, Boolean, B
   self =>
   title = "Beatmeter Generator"
   ownerWindow.foreach(initOwner)
-  val families = new ListView[String](Font.families.sorted)
+  val families = new ListView[String](Font.families.sorted) {
+    cellFactory = _ => {
+      val cell = new ListCell[String]() {
+        item.onChange { (_, _, family) =>
+          font = Font.font(family)
+          text = family
+        }
+      }
+
+      cell
+    }
+  }
 
   families.selectionModel().select(initFont._1)
   families.scrollTo(initFont._1)

@@ -176,7 +176,7 @@ class AudioPlayer2() {
   val count = Bindings.createObjectBinding[Int](() => audioCount().max(beatsCount()), audioCount, beatsCount)
 
 
-  val ratio = DoubleProperty(0.9)
+  val ratio = DoubleProperty(0.5)
   ratio.onChange(syncChange)
   val playing = BooleanProperty(false)
   playing.onChange(syncChange)

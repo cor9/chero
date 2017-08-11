@@ -124,6 +124,8 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
     }
     val imageDirectory = ObjectProperty(flyingConf.imageDirectory)
     val pane = new GridPane {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
       hgap = 10
       vgap = 5
       padding = Insets(10, 10, 10, 10)
@@ -223,6 +225,11 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
       ) {
         spacing = 5
       }, 1, 17)
+
+      columnConstraints = Seq(new ColumnConstraints(200), new ColumnConstraints {
+        hgrow = Priority.Always
+        maxWidth = Double.PositiveInfinity
+      })
     }
 
     def getConf() = {
@@ -337,6 +344,8 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
     }
     val imageDirectory = ObjectProperty(waveformConf.imageDirectory)
     val pane = new GridPane {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
       hgap = 10
       vgap = 5
       padding = Insets(10, 10, 10, 10)
@@ -446,6 +455,11 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
       ) {
         spacing = 5
       }, 1, 19)
+
+      columnConstraints = Seq(new ColumnConstraints(200), new ColumnConstraints {
+        hgrow = Priority.Always
+        maxWidth = Double.PositiveInfinity
+      })
     }
 
     def getConf() = {
@@ -484,10 +498,11 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
         case 0 => pane.content = Flying.pane
         case 1 => pane.content = Waveform.pane
       }
-      scene().windowProperty()().sizeToScene()
     }
   }
   dialogPane = new DialogPane {
+    prefHeight = 630
+    prefWidth = 550
     headerText = "Beatmeter Settings"
     content = new VBox {
       self =>

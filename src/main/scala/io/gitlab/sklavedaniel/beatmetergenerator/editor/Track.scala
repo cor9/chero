@@ -19,7 +19,7 @@
 package io.gitlab.sklavedaniel.beatmetergenerator.editor
 
 import java.net.URI
-import java.util
+import javax.swing.text.StyleConstants
 
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.FlyingBeatmeter2
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.WaveformBeatmeter2
@@ -43,12 +43,13 @@ final class Tracks(val undoManager: Option[UndoManager]) {
 
   val flying = BooleanProperty(true)
   UndoManager.register(undoManager, flying)
-  val flyingBeatmeter = ObjectProperty(FlyingBeatmeter2.Conf(1280, 40, 25.0, 0.2, 0.4, Color.DarkRed, Color.DarkGray,
-    Color.Yellow, Color.DarkGray, (Font.default.getFamily, 60, true, false), 5, Color.DarkRed, Color.Black, 1.0, AlignCenter, 0.5, None))
+  val flyingBeatmeter = ObjectProperty(FlyingBeatmeter2.Conf(1280, 40, 25.0, 0.3, 0.4, Color.web("#2a98ff"), Color.Black,
+    Color.web("#ff3e2f"), Color.Black, ("Courgette", 60, true, false), 5, Color.web("#2a98ff"), Color.Black, 1.0, AlignCenter, 0.5, None))
   UndoManager.register(undoManager, flyingBeatmeter)
-  val waveformBeatmeter = ObjectProperty(WaveformBeatmeter2.Conf(1280, 40, 25.0, 0.3, 0.4, 0.9, 0.1, Color.DarkRed, Color.Yellow,
-    Color.Black, new Color(Color.DarkGray.opacity(0.5)), Color.Black,
-    (Font.default.getFamily, 60, true, false), 5, Color.DarkRed, Color.Black, 1.0, AlignCenter, 0.5, None))
+  val waveformBeatmeter = ObjectProperty(WaveformBeatmeter2.Conf(1280, 40, 25.0, 0.3, 0.4, 1.0, 0.0, Color.web("#2a98ff"), Color.web("#ff3e2f"),
+    Color.Transparent, Color.web("#070707BB"), Color.web("#ffe400"),
+    ("Courgette", 60, true, false), 5, Color.web("#2a98ff"), Color.Black, 1.0, AlignCenter, 0.5,
+     None))
   UndoManager.register(undoManager, waveformBeatmeter)
 
   def toImmutable(base: URI) = {

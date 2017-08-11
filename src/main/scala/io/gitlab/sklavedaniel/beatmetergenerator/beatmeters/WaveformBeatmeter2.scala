@@ -123,7 +123,6 @@ class WaveformBeatmeter2(conf: WaveformBeatmeter2.Conf) extends Beatmeter2 {
         }
     """
 
-  val emptyWave = new BufferedImage(conf.height, 1000, BufferedImage.TYPE_INT_ARGB)
   val beatmeterForegroundURI = conf.imageDirectory.map(_.resolve("foreground.svg")).getOrElse(getClass.getResource("/meter/waveform/foreground.svg").toURI)
   val beatmeterForeground = getImage(beatmeterForegroundURI, conf.height, imageCSS)
   val beatmeterBackgroundURI = conf.imageDirectory.map(_.resolve("background.svg")).getOrElse(getClass.getResource("/meter/waveform/background.svg").toURI)
@@ -217,8 +216,8 @@ class WaveformBeatmeter2(conf: WaveformBeatmeter2.Conf) extends Beatmeter2 {
           Fixed((endPos * conf.width, beatmeterY), beatmeterBackground)
         )
       ).toTimed().clip(new geom.Rectangle2D.Double(endPos * conf.width, beatmeterY, beatmeterWidth, conf.height)),
-      beatmeterStream.toTimed(conf.speed * conf.width / conf.frames, conf.width)
-        .clip(new geom.Rectangle2D.Double(conf.width * endPos, beatmeterY, beatmeterWidth, conf.height)),
+      beatmeterStream.toTimed(conf.speed * conf.width / conf.frames, conf.width),
+        //.clip(new geom.Rectangle2D.Double(conf.width * endPos, beatmeterY, beatmeterWidth, conf.height)),
       ElementStream(
         Stream(
           Fixed((endPos * conf.width, beatmeterY), beatmeterForeground)

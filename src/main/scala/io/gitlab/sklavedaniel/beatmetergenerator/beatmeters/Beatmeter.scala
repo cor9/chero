@@ -95,7 +95,7 @@ object Beatmeter {
           val startFrame = (x - width - offset) / pxPerFrame
           val error = (startFrame.ceil - startFrame) * pxPerFrame
           Timed(startFrame.ceil.toInt,
-            ((x + w - offset) / pxPerFrame).floor.toInt,
+            ((x + w - offset) / pxPerFrame).ceil.toInt,
             PositionDrawable(
               i => (width - i * pxPerFrame - error + offset, y),
               drawable))
