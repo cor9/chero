@@ -1,9 +1,9 @@
 # Beatmeter Generator
 
-A graphical editor to generate so called beat meters for vides.
-The editor lets you edit beats and beatpatters visually and then generade an audio track and image sequences for video generation (i.e. on image per frame).
+A graphical editor to generate so called beatmeters for videos.
+The editor lets you edit beats and beat patters visually and then generade an audio track and image sequences for video generation (one image per frame).
 
-Please read through the features, basi workflow and hints to get a better idea of how to use the editor.
+Please read through the features, basic workflow and hints to get a better idea of how to use the editor.
 
 ## Example Images
 
@@ -34,7 +34,7 @@ Please read through the features, basi workflow and hints to get a better idea o
 
 ## Basic Workflow
 
-1. Select *File->Load Audio* and load a .wav-file with the audio of your video. It has to be a 16bit signed int wav audio files, which most .wav files are. The wav-file will be loaded completely into memory, so don't try to load the audio track of a complete 1h video but split it up one song at a time.
+1. Select *File->Load Audio* and load a .wav file with the audio of your video. It has to be a 16bit signed int wav audio files, which most .wav files are. The .wav file will be loaded completely into memory, so don't try to load the audio track of a complete 1h video but split it up one song at a time.
 1. Select *Edit->New Tracks* to generate three new beat tracks.
 1. You can name the tracks using the context menu on the left over the gray areas, e.g. name the tracks "Beats", "Messages", and "Base".
 1. Open the context menu on the base track and select *New BPM Pattern*
@@ -86,18 +86,18 @@ It is larger than the platform independent build below but it contains everythin
 It should work on x64 variants of Windows 7 and later, for x32 use the platform independent version.
 
 ### Platform independent version
-A platform independet jar-File can be downloaded at:
+A platform independet .jar file can be downloaded at:
 [beatmeter-generator.jar](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/builds/artifacts/master/raw/target/scala-2.12/beatmeter-generator.jar?job=build)
 
 You will need the Java 8 Runtime Environment (JRE) to run the application. You can download it at:
 (Oracle Java 8)[http://www.oracle.com/technetwork/java/javase/downloads/index.html]
 
-### Nots on Linux
-If you are using Linux, your distribution will usually include OpenJDK 8.
+### Notes on Linux
+If you are using Linux, your distribution will usually include OpenJRE 8.
 Note, that under Linux you usually have to install OpenJFX as a separate package.
 Also, there seems to be a bug in OpenJFX in some versions that sometimes causes UI cliches.
 I hope this will go away as it does not happen with the Oracle JDK.
-
+If it does happen to you, consider installing the Oracle JRE. If it is availabel as a package for your distribution you can get it directly form Oracle as well.
 
 ## Screenshot
 ![main](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/screenshot.png)
