@@ -80,7 +80,7 @@ Please read through the features, basi workflow and hints to get a better idea o
 ## Download
 ### Windows
 There is a windows installer available at:
-[main](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/BeatmeterGenerator.msi)
+[BeatmeterGenerator.msi](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/BeatmeterGenerator.msi)
 
 It is larger than the platform independent build below but it contains everything you need.
 It should work on x64 variants of Windows 7 and later, for x32 use the platform independent version.
