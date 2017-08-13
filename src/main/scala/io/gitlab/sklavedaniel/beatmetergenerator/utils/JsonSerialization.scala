@@ -20,6 +20,8 @@ package io.gitlab.sklavedaniel.beatmetergenerator.utils
 
 import java.net.URI
 
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.ImmutableTracks_V0_2_0._
+import microjson._
 import prickle._
 
 import scala.collection.mutable
@@ -40,14 +42,16 @@ object JsonSerialization {
   }
   implicit val colorPickler = new Pickler[Color] {
     override def pickle[P](obj: Color, state: PickleState)(implicit config: PConfig[P]): P = {
+
       config.makeString(s"${obj.red},${obj.green},${obj.blue},${obj.opacity}")
     }
   }
   implicit val colorUnpickler = new Unpickler[Color] {
     override def unpickle[P](pickle: P, state: mutable.Map[String, Any])(implicit config: PConfig[P]): Try[Color] = {
-      config.readString(pickle).flatMap {s =>
-        val Array(r,g,b,a) = s.split(',')
-        Try(Color(r.toDouble, g.toDouble, b.toDouble, a.toDouble))}
+      config.readString(pickle).flatMap { s =>
+        val Array(r, g, b, a) = s.split(',')
+        Try(Color(r.toDouble, g.toDouble, b.toDouble, a.toDouble))
+      }
     }
   }
   implicit val trackElementPickler: PicklerPair[ImmutableTrackElement] = CompositePickler[ImmutableTrackElement].concreteType[ImmutableBeat].concreteType[ImmutableMessage].
@@ -58,8 +62,24 @@ object JsonSerialization {
   implicit val pickler: Pickler[ImmutableTrack] = Pickler.materializePickler[ImmutableTrack]
   implicit val unpickler: Unpickler[ImmutableTrack] = Unpickler.materializeUnpickler[ImmutableTrack]
 
-  def save(tracks: ImmutableTracks): String = Pickle.intoString(tracks)
+  def save(tracks: ImmutableTracks): String = {
+    val p = implicitly[Pickler[ImmutableTracks]]
+    val data = p.pickle(tracks, PickleState())
+    val json = JsObject(Map("version" -> JsString("0.2.0"), "data" -> data))
+    Json.write(json)
+  }
 
-  def load(tracks: String) = Unpickle[ImmutableTracks].fromString(tracks)
+  def load(tracks: String) = {
+    val json = Json.read(tracks)
+    val data = Try {
+      val JsObject(map) = json
+      val JsString(version) = map("version")
+      if("0.2.0" != version) {
+        throw new Exception("Unsupported version " + version)
+      }
+      map("data")
+    }
+    data.flatMap((d: JsValue) => Unpickle[ImmutableTracks].from(d))
+  }
 
 }

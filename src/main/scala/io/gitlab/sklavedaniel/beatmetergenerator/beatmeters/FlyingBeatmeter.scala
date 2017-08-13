@@ -28,7 +28,7 @@ import scalafx.scene.paint.Color
 
 object FlyingBeatmeter {
 
-  case class Conf(width: Int, height: Int, frames: Double, speed: Double, position: Double, beatColor: Color,
+  case class Conf_V0_2_0(width: Int, height: Int, frames: Double, speed: Double, position: Double, beatColor: Color,
     beatBorderColor: Color, beatHighlightedColor: Color, beatHighlightedBorderColor: Color,
     messageFont: (String, Int, Boolean, Boolean), margin: Int, messageColor: Color, messageBorderColor: Color,
     messageBorderStrength: Double, messageAlign: Align, messagePosition: Double, imageDirectory: Option[URI]
@@ -36,7 +36,7 @@ object FlyingBeatmeter {
 
 }
 
-class FlyingBeatmeter(conf: FlyingBeatmeter.Conf) extends Beatmeter2 {
+class FlyingBeatmeter(conf: FlyingBeatmeter.Conf_V0_2_0) extends Beatmeter2 {
 
   def width: Int = conf.width
 

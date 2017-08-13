@@ -30,8 +30,8 @@ import scalafx.scene.control._
 import scalafx.scene.layout._
 import scalafx.stage.{DirectoryChooser, Window}
 
-class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: FlyingBeatmeter.Conf, waveformConf: WaveformBeatmeter.Conf)
-  extends Dialog[(Boolean, FlyingBeatmeter.Conf, WaveformBeatmeter.Conf)] {
+class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: FlyingBeatmeter.Conf_V0_2_0, waveformConf: WaveformBeatmeter.Conf_V0_2_0)
+  extends Dialog[(Boolean, FlyingBeatmeter.Conf_V0_2_0, WaveformBeatmeter.Conf_V0_2_0)] {
   ownerWindow.foreach(initOwner)
   title = "Beatmeter Generator"
 
@@ -234,7 +234,7 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
     }
 
     def getConf() = {
-      FlyingBeatmeter.Conf(widthSpinner.value(), heightSpinner.value(), framesSpinner.value(), speedSpinner.value(),
+      FlyingBeatmeter.Conf_V0_2_0(widthSpinner.value(), heightSpinner.value(), framesSpinner.value(), speedSpinner.value(),
         positionSpinner.value(), beatColorPicker.value(), beatBorderColorPicker.value(), beatHighlightColorPicker.value(),
         beatHighlightBorderColorPicker.value(), messageFont(), marginSpinner.value(),
         messageColorPicker.value(), messageBorderColorPicker.value(), messageBorderStrengthSpinner.value(),
@@ -464,7 +464,7 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
     }
 
     def getConf() = {
-      WaveformBeatmeter.Conf(widthSpinner.value(), heightSpinner.value(), framesSpinner.value(), speedSpinner.value(),
+      WaveformBeatmeter.Conf_V0_2_0(widthSpinner.value(), heightSpinner.value(), framesSpinner.value(), speedSpinner.value(),
         positionSpinner.value(), startPositionSpinner.value(), endPositionSpinner.value(), waveColorPicker.value(),
         waveHighlightColorPicker.value(), foregroundColorPicker.value(),
         backgroundColorPicker.value(), markerColorPicker.value(), messageFont(), marginSpinner.value(),

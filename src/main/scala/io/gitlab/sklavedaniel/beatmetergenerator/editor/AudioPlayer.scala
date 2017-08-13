@@ -260,7 +260,7 @@ class AudioPlayer2() {
       i <- 0 until l
       j <- 0 until format.getChannels
     } {
-      if (currentAudio.isDefined && pos < currentAudioCount) {
+      if (currentAudio.isDefined && pos + i < currentAudioCount) {
         bbuffer.putShort(((1.0 - currentRatio) * currentAudio.get((pos + i) * format.getChannels + j)).toShort)
       } else {
         bbuffer.putShort(0)

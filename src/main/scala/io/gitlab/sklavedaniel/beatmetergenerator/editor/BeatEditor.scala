@@ -69,6 +69,7 @@ import scalafx.scene.{Group, Node, Scene}
 import scalafx.stage.FileChooser.ExtensionFilter
 import scalafx.stage.{DirectoryChooser, FileChooser, Window}
 import scalafx.util.Duration
+import ImmutableTracks_V0_2_0._
 
 object BeatEditor extends JFXApp {
 
@@ -359,6 +360,7 @@ object BeatEditor extends JFXApp {
             }
             font = Font(8)
             focusTraversable = false
+            selected = track.snap()
             selected.onChange { (_, _, current) =>
               if (track.snap() != current) {
                 undoManager.startGroup()
@@ -380,6 +382,7 @@ object BeatEditor extends JFXApp {
             }
             font = Font(8)
             focusTraversable = false
+            selected = track.record()
             selected.onChange { (_, _, current) =>
               if (track.record() != current) {
                 undoManager.startGroup()
@@ -1193,11 +1196,12 @@ object BeatEditor extends JFXApp {
       if (!e.isConsumed && MouseButton.Secondary.equals(e.getButton)) {
         contextMenuX = e.getX / pxPerSec()
         contextMenu.show(self, Side.Bottom, e.getX * context.scaled.doubleValue(), e.getY - layoutBounds().getHeight)
+        e.consume()
+        true
       } else {
         contextMenu.hide()
+        false
       }
-      e.consume()
-      true
     }
   }
 
@@ -1453,6 +1457,9 @@ object BeatEditor extends JFXApp {
           t.beat().map(_._2).getOrElse(AudioPlayer2.defaultBeat)
         }, t.beat)
         player.beats.add(i, (h.track.play, info, v.beats))
+        if (h.track.snap()) {
+          snaps() = Some(v.beats)
+        }
         h.track.snap.onChange { (_, _, b) =>
           if (b) {
             track2headerView.values.foreach(h2 => if (h2 != h) {
@@ -1950,7 +1957,7 @@ object BeatEditor extends JFXApp {
                       b => b._1)
 
                     if (beats.nonEmpty || messages.nonEmpty) {
-                      val beatmeter: Beatmeter2 = if(tracks().flying()) {
+                      val beatmeter: Beatmeter2 = if (tracks().flying()) {
                         new FlyingBeatmeter(tracks().flyingBeatmeter())
                       } else {
                         new WaveformBeatmeter(tracks().waveformBeatmeter())
@@ -1988,9 +1995,7 @@ object BeatEditor extends JFXApp {
                           var current: Queue[Timed] = Queue()
                         }
 
-                        val elementStreams = beatmeter.getElementStreams(beats, messages, frameCount)
-
-                        val states: List[State] = elementStreams.map(tl => new State(tl.clip, tl.stream))
+                        val states: List[State] = beatmeter.getElementStreams(beats, messages, frameCount).map(tl => new State(tl.clip, tl.stream))
 
                         val fc = new DirectoryChooser()
                         fc.title = "Beatmeter Generator: Generate Video"
@@ -2088,7 +2093,7 @@ object BeatEditor extends JFXApp {
                   onAction = handle {
                     val dialog = new BeatmeterDialog(Some(mainView().scene().windowProperty()()), tracks().flying(),
                       tracks().flyingBeatmeter(), tracks().waveformBeatmeter())
-                    val r = dialog.showAndWait().get.asInstanceOf[(Boolean, FlyingBeatmeter.Conf, WaveformBeatmeter.Conf)]
+                    val r = dialog.showAndWait().get.asInstanceOf[(Boolean, FlyingBeatmeter.Conf_V0_2_0, WaveformBeatmeter.Conf_V0_2_0)]
                     undoManager.startGroup()
                     tracks().flying() = r._1
                     tracks().flyingBeatmeter() = r._2

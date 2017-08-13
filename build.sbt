@@ -1,6 +1,6 @@
 name := "Beatmeter Generator"
 
-version := "0.1-SNAPSHOT"
+version := "0.2.0"
 
 scalaVersion := "2.12.2"
 
@@ -25,11 +25,12 @@ libraryDependencies ++= Seq(
 
 unmanagedSourceDirectories in Compile += baseDirectory.value / "lib/JWave/src"
 
+
 fork := true
 
 mainClass in assembly := Some("io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor")
-mainClass in (Compile, run) := Some("io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor")
-
+mainClass in Compile := Some("io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor")
+mainClass in run := Some("io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor")
 assemblyMergeStrategy in assembly := {
   case PathList("META-INF", xs @ _*) => MergeStrategy.discard
   case x => MergeStrategy.first
@@ -38,3 +39,21 @@ assemblyMergeStrategy in assembly := {
 assemblyJarName in assembly := s"beatmeter-generator.jar"
 
 cancelable in Global := true
+
+enablePlugins(JDKPackagerPlugin)
+
+jdkPackagerType := "installer"
+
+maintainer := "Sklave Daniel"
+
+packageSummary := "Editor and generator for beat patterns and beat indicators for music videos."
+
+packageDescription := "Editor and generator for beat patterns and beat indicators for music videos."
+
+jdkPackagerProperties := Map()
+
+jdkPackagerJVMArgs := Seq("-Xmx1g")
+
+jdkPackagerAppArgs := Seq()
+
+

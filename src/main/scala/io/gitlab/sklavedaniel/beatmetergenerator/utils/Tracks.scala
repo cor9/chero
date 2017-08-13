@@ -21,13 +21,11 @@ package io.gitlab.sklavedaniel.beatmetergenerator.utils
 import java.net.URI
 
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.{FlyingBeatmeter, WaveformBeatmeter}
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.ImmutableTracks_V0_2_0._
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap.Unscalable
 
-import scala.collection.JavaConverters
-import scala.util.{Success, Try}
 import scalafx.beans.binding.{Bindings, ObjectBinding}
 import scalafx.beans.property._
-import scalafx.beans.value.ObservableValue
 import scalafx.collections.ObservableBuffer
 import scalafx.scene.paint.Color
 
@@ -39,10 +37,10 @@ final class Tracks(val undoManager: Option[UndoManager]) {
 
   val flying = BooleanProperty(true)
   UndoManager.register(undoManager, flying)
-  val flyingBeatmeter = ObjectProperty(FlyingBeatmeter.Conf(1280, 40, 25.0, 0.3, 0.4, Color.web("#2a98ff"), Color.Black,
+  val flyingBeatmeter = ObjectProperty(FlyingBeatmeter.Conf_V0_2_0(1280, 40, 25.0, 0.3, 0.4, Color.web("#2a98ff"), Color.Black,
     Color.web("#ff3e2f"), Color.Black, ("Courgette", 60, true, false), 5, Color.web("#2a98ff"), Color.Black, 1.0, AlignCenter, 0.5, None))
   UndoManager.register(undoManager, flyingBeatmeter)
-  val waveformBeatmeter = ObjectProperty(WaveformBeatmeter.Conf(1280, 40, 25.0, 0.3, 0.4, 1.0, 0.0, Color.web("#2a98ff"), Color.web("#ff3e2f"),
+  val waveformBeatmeter = ObjectProperty(WaveformBeatmeter.Conf_V0_2_0(1280, 40, 25.0, 0.3, 0.4, 1.0, 0.0, Color.web("#2a98ff"), Color.web("#ff3e2f"),
     Color.Transparent, Color.web("#070707BB"), Color.web("#ffe400"),
     ("Courgette", 60, true, false), 5, Color.web("#2a98ff"), Color.Black, 1.0, AlignCenter, 0.5,
      None))
@@ -63,33 +61,6 @@ case object AlignRight extends Align
 case object AlignCenter extends Align
 
 
-case class ImmutableTracks(content: List[ImmutableTrack], audio: Option[URI], flying: Boolean, flyingBeatmeter: FlyingBeatmeter.Conf,
-  waveformBeatmeter: WaveformBeatmeter.Conf) {
-  def toMutable(base: URI, load: URI => Try[Array[Short]], undoManager: Option[UndoManager]): Try[Tracks] = {
-    (audio match {
-      case Some(uri) =>
-        val auri = base.resolve(uri)
-        load(uri).map(arr => Some((auri, arr)))
-      case None =>
-        Success(None)
-    }).flatMap { aud =>
-      val list = content.map(_.toMutable(base, load, undoManager)).foldLeft(Success(Nil): Try[List[Track]]) { (l, t) =>
-        l.flatMap(l2 => t.map(t2 => t2 :: l2))
-      }
-      list.map { l =>
-        val t = new Tracks(undoManager)
-        undoManager.foreach(_.active = false)
-        t.content ++= l.reverse
-        t.audio() = aud
-        t.flyingBeatmeter() = flyingBeatmeter
-        t.waveformBeatmeter() = waveformBeatmeter
-        t.flying() = flying
-        undoManager.foreach(_.active = true)
-        t
-      }
-    }
-  }
-}
 
 class Track(val undoManager: Option[UndoManager]) {
   val title = ObjectProperty("")
@@ -114,34 +85,6 @@ class Track(val undoManager: Option[UndoManager]) {
   }
 }
 
-case class ImmutableTrack(title: String, play: Boolean, record: Boolean, display: Boolean, snap: Boolean,
-  content: List[(Double, Double, ImmutableTrackElement)], beat: Option[URI]
-) {
-  def toMutable(base: URI, load: URI => Try[Array[Short]], undoManager: Option[UndoManager]) = {
-    (beat match {
-      case Some(uri) =>
-        val auri = base.resolve(uri)
-        load(uri).map(arr => Some((auri, arr)))
-      case None =>
-        Success(None)
-    }).map { aud =>
-      val tmp = new Track(undoManager)
-      val cntnt = content.map { elem =>
-        (elem._1, elem._2, elem._3.toMutable(undoManager))
-      }
-      undoManager.foreach(_.active = false)
-      tmp.title() = title
-      tmp.play() = play
-      tmp.record() = record
-      tmp.display() = display
-      tmp.snap() = snap
-      tmp.content ++= cntnt
-      tmp.beat() = aud
-      undoManager.foreach(_.active = true)
-      tmp
-    }
-  }
-}
 
 sealed trait TrackElement {
   def undoManager: Option[UndoManager]
@@ -149,9 +92,6 @@ sealed trait TrackElement {
   def toImmutable(): ImmutableTrackElement
 }
 
-sealed trait ImmutableTrackElement {
-  def toMutable(undoManager: Option[UndoManager]): TrackElement
-}
 
 
 class Beat(override val undoManager: Option[UndoManager]) extends TrackElement with Unscalable[Double] {
@@ -162,15 +102,7 @@ class Beat(override val undoManager: Option[UndoManager]) extends TrackElement w
   override def toImmutable() = ImmutableBeat(highlight())
 }
 
-case class ImmutableBeat(highlight: Boolean) extends ImmutableTrackElement {
-  override def toMutable(undoManager: Option[UndoManager]) = {
-    val b = new Beat(undoManager)
-    undoManager.foreach(_.active = false)
-    b.highlight() = highlight
-    undoManager.foreach(_.active = true)
-    b
-  }
-}
+
 
 sealed trait BeatsGenerator extends TrackElement {
   def beats: ObjectBinding[Stream[(Double, Double, Beat)]]
@@ -198,16 +130,7 @@ class BPMPattern(val beat: Beat, override val undoManager: Option[UndoManager]) 
   override def toImmutable() = ImmutableBPMPattern(highlightFirst(), bpm(), beat.toImmutable())
 }
 
-case class ImmutableBPMPattern(highlightFirst: Boolean, bpm: Double, beat: ImmutableBeat) extends ImmutableTrackElement {
-  override def toMutable(undoManager: Option[UndoManager]) = {
-    val b = new BPMPattern(beat.toMutable(undoManager), undoManager)
-    undoManager.foreach(_.active = false)
-    b.bpm() = bpm
-    b.highlightFirst() = highlightFirst
-    undoManager.foreach(_.active = true)
-    b
-  }
-}
+
 
 class BeatsPattern(override val undoManager: Option[UndoManager]) extends BeatsGenerator {
   val highlightFirstPattern = BooleanProperty(false)
@@ -247,20 +170,6 @@ class BeatsPattern(override val undoManager: Option[UndoManager]) extends BeatsG
   override def toImmutable = ImmutableBeatsPattern(highlightFirstPattern(), highlightFirst(), patternDuration(), pattern.toList.map(x => (x._1, x._2, x._3.toImmutable())))
 }
 
-case class ImmutableBeatsPattern(highlightFirstPattern: Boolean, highlightFirst: Boolean, patternDuration: Double, pattern: List[(Double, Double, ImmutableBeat)]) extends ImmutableTrackElement {
-  override def toMutable(undoManager: Option[UndoManager]) = {
-    val b = new BeatsPattern(undoManager)
-    val pttrn = pattern.map(x => (x._1, x._2, x._3.toMutable(undoManager)))
-    undoManager.foreach(_.active = false)
-    b.highlightFirstPattern() = highlightFirstPattern
-    b.highlightFirst() = highlightFirst
-    b.patternDuration() = patternDuration
-    b.pattern ++= pttrn
-    undoManager.foreach(_.active = true)
-    b
-  }
-}
-
 class Message(override val undoManager: Option[UndoManager]) extends TrackElement {
   val text = ObjectProperty("")
   UndoManager.register(undoManager, text)
@@ -268,186 +177,6 @@ class Message(override val undoManager: Option[UndoManager]) extends TrackElemen
   override def toImmutable = ImmutableMessage(text())
 }
 
-case class ImmutableMessage(text: String) extends ImmutableTrackElement {
-  override def toMutable(undoManager: Option[UndoManager]) = {
-    val b = new Message(undoManager)
-    undoManager.foreach(_.active = false)
-    b.text() = text
-    undoManager.foreach(_.active = true)
-    b
-  }
-}
 
-object UndoManager {
-  def register[A, B](undoManager: Option[UndoManager], property: Property[A, B]) = {
-    undoManager.foreach(um => {
-      property.onChange(um.propertyAction(property))
-    })
-  }
 
-  def register[A](undoManager: Option[UndoManager], list: ObservableBuffer[A]) = {
-    undoManager.foreach(um => {
-      list.onChange(um.listAction(list))
-    })
-  }
 
-  def register[A, B](undoManager: Option[UndoManager], map: ObservableIntervalMap[A, B]) = {
-    undoManager.foreach(um => {
-      map.addListener(um.intervalMapAction(map))
-    })
-  }
-}
-
-final class UndoManager {
-
-  private var undoActions = List[(() => Unit, () => Unit)]()
-  private var redoActions = List[(() => Unit, () => Unit)]()
-  var active = true
-  private var group: Option[List[(() => Unit, () => Unit)]] = None
-
-  def clear(): Unit = {
-    undoActions = Nil
-    redoActions = Nil
-    group = None
-    undoable_() = false
-    redoable_() = false
-  }
-
-  def startGroup(): Unit = {
-    group = Some(Nil)
-  }
-
-  def endGroup(): Unit = {
-    val list = group.get
-    group = None
-    if (list.nonEmpty) {
-      doAction(() => {
-        list.reverse.foreach(_._1())
-      }, () => {
-        list.foreach(_._2())
-      })
-    }
-  }
-
-  def propertyAction[A, B](property: Property[A, B]) = (_: ObservableValue[A, B], old: B, current: B) => {
-    if (old != current) {
-      doAction(() => {
-        property.setValue(current)
-      }, () => {
-        property.setValue(old)
-      })
-    }
-  }
-
-  def listAction[A](list: ObservableBuffer[A]) = (_: ObservableBuffer[A], cs: Seq[ObservableBuffer.Change[A]]) => {
-    if (cs.nonEmpty) {
-      val changes = for (c <- cs) yield
-        c match {
-          case ObservableBuffer.Add(pos, elems) =>
-            Left((pos, JavaConverters.asJavaCollection(elems.toList)))
-          case ObservableBuffer.Remove(pos, elems) =>
-            Right((pos, JavaConverters.asJavaCollection(elems.toList)))
-          case _ => assert(false); ???
-        }
-      doAction(() => {
-        for (c <- changes) {
-          c match {
-            case Left((pos, elems)) =>
-              list.addAll(pos, elems)
-            case Right((pos, elems)) =>
-              list.remove(pos, elems.size)
-          }
-        }
-      }, () => {
-        for (c <- changes.reverse) {
-          c match {
-            case Left((pos, elems)) =>
-              list.remove(pos, elems.size)
-            case Right((pos, elems)) =>
-              list.addAll(pos, elems)
-            case _ => assert(false)
-          }
-        }
-      })
-    }
-  }
-
-  def intervalMapAction[A, B](map: ObservableIntervalMap[A, B]): ObservableIntervalMap.ChangeListener[A, B] = (_: ObservableIntervalMap[A, B], change: ObservableIntervalMap.Change[A, B]) => {
-    change match {
-      case ObservableIntervalMap.AddChange(cs) =>
-        if (cs.nonEmpty) {
-          doAction(() => {
-            map ++= cs
-          }, () => {
-            map --= cs.map(c => (c._1, c._2))
-          })
-        }
-      case ObservableIntervalMap.RemoveChange(cs) => {
-        if (cs.nonEmpty) {
-          doAction(() => {
-            map --= cs.map(c => (c._1, c._2))
-          }, () => {
-            map ++= cs
-          })
-        }
-      }
-      case ObservableIntervalMap.MoveChange(from, to, cs) =>
-        if (cs.nonEmpty) {
-          doAction(() => {
-            map --= cs.map(c => c._1)
-            map ++= cs.map(c => (c._2._1, c._2._2, c._3))
-          }, () => {
-            map --= cs.map(c => c._2)
-            map ++= cs.map(c => (c._1._1, c._1._2, c._3))
-          })
-        }
-    }
-  }
-
-  def doAction(undo: () => Unit, redo: () => Unit): Unit = {
-    if (active) {
-      if (group.isDefined) {
-        group = Some((undo, redo) :: group.get)
-      } else {
-        undoActions = (undo, redo) :: undoActions
-        redoActions = Nil
-        redoable_() = false
-        undoable_() = true
-      }
-    }
-  }
-
-  def undoAction(): Unit = {
-    assert(group.isEmpty)
-    if (undoActions.nonEmpty) {
-      active = false
-      val action = undoActions.head
-      undoActions = undoActions.tail
-      redoActions = action :: redoActions
-      action._2()
-      redoable_() = true
-      undoable_() = undoActions.nonEmpty
-      active = true
-    }
-  }
-
-  def redoAction(): Unit = {
-    assert(group.isEmpty)
-    if (redoActions.nonEmpty) {
-      active = false
-      val action = redoActions.head
-      redoActions = redoActions.tail
-      undoActions = action :: undoActions
-      action._1()
-      redoable_() = redoActions.nonEmpty
-      undoable_() = true
-      active = true
-    }
-  }
-
-  private val undoable_ = ReadOnlyBooleanWrapper(false)
-  val undoable = undoable_.readOnlyProperty
-  private val redoable_ = ReadOnlyBooleanWrapper(false)
-  val redoable = redoable_.readOnlyProperty
-
-}

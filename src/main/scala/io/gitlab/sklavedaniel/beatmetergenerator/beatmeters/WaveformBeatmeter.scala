@@ -28,7 +28,7 @@ import scalafx.scene.paint.Color
 
 object WaveformBeatmeter {
 
-  case class Conf(width: Int, height: Int, frames: Double, speed: Double, position: Double, startPosition: Double, endPosition: Double,
+  case class Conf_V0_2_0(width: Int, height: Int, frames: Double, speed: Double, position: Double, startPosition: Double, endPosition: Double,
     waveColor: Color, waveHighlightedColor: Color, foregroundColor: Color, backgroundColor: Color, markerColor: Color,
     messageFont: (String, Int, Boolean, Boolean), margin: Int, messageColor: Color, messageBorderColor: Color,
     messageBorderStrength: Double, messageAlign: Align, messagePosition: Double, imageDirectory: Option[URI]
@@ -36,7 +36,7 @@ object WaveformBeatmeter {
 
 }
 
-class WaveformBeatmeter(conf: WaveformBeatmeter.Conf) extends Beatmeter2 {
+class WaveformBeatmeter(conf: WaveformBeatmeter.Conf_V0_2_0) extends Beatmeter2 {
 
   val startPos: Double = conf.startPosition
   val endPos: Double = conf.endPosition
