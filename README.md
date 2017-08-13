@@ -34,6 +34,7 @@ Please read through the features, basic workflow and hints to get a better idea 
 
 ## Basic Workflow
 
+1. I recommend using a mouse, using a laptop touch pad can give you too little control.
 1. Select *File->Load Audio* and load a .wav file with the audio of your video. It has to be a 16bit signed int wav audio files, which most .wav files are. The .wav file will be loaded completely into memory, so don't try to load the audio track of a complete 1h video but split it up one song at a time.
 1. Select *Edit->New Tracks* to generate three new beat tracks.
 1. You can name the tracks using the context menu on the left over the gray areas, e.g. name the tracks "Beats", "Messages", and "Base".
