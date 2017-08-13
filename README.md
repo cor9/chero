@@ -92,6 +92,9 @@ A platform independet .jar file can be downloaded at:
 You will need the Java 8 Runtime Environment (JRE) to run the application. You can download it at:
 [Oracle Java 8](http://www.oracle.com/technetwork/java/javase/downloads/index.html)
 
+After installing the JRE you should be able to start the jar by double clicking on it.
+If you can't try starting it from the command line using `java -jar beatmeter-generator.jar`.
+
 ### Notes on Linux
 If you are using Linux, your distribution will usually include OpenJRE 8.
 Note, that under Linux you usually have to install OpenJFX as a separate package.
