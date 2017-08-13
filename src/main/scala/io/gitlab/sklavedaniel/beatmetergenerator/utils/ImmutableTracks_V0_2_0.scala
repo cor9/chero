@@ -62,7 +62,7 @@ object ImmutableTracks_V0_2_0 {
       (beat match {
         case Some(uri) =>
           val auri = base.resolve(uri)
-          load(uri).map(arr => Some((auri, arr)))
+          load(auri).map(arr => Some((auri, arr)))
         case None =>
           Success(None)
       }).map { aud =>
