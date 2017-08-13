@@ -1,112 +1,103 @@
 # Beatmeter Generator
 
-A set of tools to generate so called beat meters for videos, i.e. a visual indicator for beats in the video's music.
-The set comprises a visual editor to edit beat sequences matching an audio file, a command line tool to generate a sequence of images at a selected frame rate, suitable to generate the animated beat meter, and a command line tool to generate a audio file playing a beat sound for every beat.
-The file format used to store beats is compatible with the Audacity lable format.
+A graphical editor to generate so called beat meters for vides.
+The editor lets you edit beats and beatpatters visually and then generade an audio track and image sequences for video generation (i.e. on image per frame).
+
+Please read through the features, basi workflow and hints to get a better idea of how to use the editor.
 
 ## Example Images
+
+![example](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/example3.png)
 
 ![example](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/example.png)
 
 ![example](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/example2.png)
 
-## Basic usage
-### Beat editing
+## Features
 
-The beat editor only supports (integer-based) wav audio files.
-Convert your audio to wav or extract it from your video using eg. Audacity or Avidemux.
+- Generation of an audio track with beat sounds
+- Generation of video (image sequences) for an animated beatmeter
+- Many options to customize beatmeter style (colors, speed, positions, fonts, custom images)
+- Multiple custom beat sounds
+- Visiual editing of beats
+- Multiple beat tracks
+- Notification messages displayed in the generated video
+- Highlighted beats in the beatmeter to indicate beat changes
+- Flexible beat groups
+  * Groups with constant BPM
+  * Groups repeating a (custom) beat pattern
+- Snapping of beats and beat patterns to a base beat.
+- Copy and paste/Drag and Drop of beats between tracks or different projects
+- BPM detection (does detect the BPM but the first beat has to be aligned manually)
+- Undo/Redo
+- Zooming
 
-Then start the visual beat editor from the command line:
+## Basic Workflow
 
-```
-java -jar beatmeter-generator.jar editor -i myaudio.wav
-```
+1. Select *File->Load Audio* and load a .wav-file with the audio of your video. It has to be a 16bit signed int wav audio files, which most .wav files are. The wav-file will be loaded completely into memory, so don't try to load the audio track of a complete 1h video but split it up one song at a time.
+1. Select *Edit->New Tracks* to generate three new beat tracks.
+1. You can name the tracks using the context menu on the left over the gray areas, e.g. name the tracks "Beats", "Messages", and "Base".
+1. Open the context menu on the base track and select *New BPM Pattern*
+1. Drag and scale the pattern to a larger part of the song with clearly audible beats. (You can scale patterns at the end of the box when the scale cursor appears). Usually, beat detection is quite robust, so selecting a large part of the song or the complete song usually works fine. Usually, larger is better but takes more time.
+1. Open the context menu on the pattern and select "Detect BPM". The bpm of the corresponding part of the song will be detected and set as bpm of the pattern. You can see it afterwards in the context menu.
+1. Drag the pattern to the first beat and scale it to cover the complete song.
+1. Press the "S" button in front of the base track to select the track for snapping.
+1. Press the "D" button in front of the messages and beats tracks to select them to be displayed in the generated video.
+1. Press the "P" button in front of the beats track to select if to be played in the generated audio.
+1. Open the context menu on the beats track, select "Common Patterns->123-" to insert a simple 123-pattern.
+1. Drag and scale it, it will snap to the positions of the snap track.
+1. There is a black bar which controls the duration of the repeated pattern.
+1. Press *CTRL* can drag it around to scale the pattern. This allows you to adjust the pattern to different speeds.
+1. If you want to modify the pattern, you can drag the beats and the duration bar arround and delete and insert beats.
+1. You can hold the 1-9 keys down while dragging or scalling to snap to 1 to 9 additional positions.
+1. You can hold the 0 key down while dragging or scalling to disable snapping temporarily.
+1. Select "Tools->Beatmeter Settings" to adjust the style of the beatmeter.
+1. Choose the width and frame rate to match your video, you can leave the other settings as they are for now.
+1. Open the context menu on the messages track and choose "New Message". Drag and scale it appropriately. You can change the message from the context menu.
+1. Select "Tools->Generate Audio" and "Tools->Generate Video" to generate both.
+1. Open a video editing tool and import your video and the generated audio file. Import the beatmeter image sequence at one image per frame (most video editing tools can do that).
+1. Line them all up and position the beatmeter video track appropriately.
+1. Have fun.
 
-You can add beats clicking the beat-button. Start playing the audio file (adjust the speed appropriately, by default the editor plays at half speed.) and click the beat button to insert beats.
 
-You can jump directly to positions in the audio file by double clicking in the audio visualisation at the top. You can also select beats from that view.
+## Hints
+- Most things have context menus to change settings
+- You can scale a beat pattern by pressing *CTRL* and tracking the black bar.
+- You can scale beat and bpm patterns at the end.
+- You can drag beats between tracks and between tracks and beat patterns.
+- Press control when dragging to copy
+- You can copy and paste from the context menu
+- Use the buttons in front of the tracks to select tracks for display, playing, recording of beats and snapping.
+- You can press the beat button at the bottom to insert a beat while playing the song.
+- You can reduce playback speed using the slider at the bottom.
+- You can double click on the wave form at the top to move the playback position or drag the red line.
+- You can press 1-9 to get additional snap positions between the beats from the snap track. Press 0 do disable snapping.
+- Copy and Dragging works between multiple instances of the editor, so you can start the editor two times and copy beats between them.
+- You can chose a custom beat sound from the context menu on the left of the tracks.
+- You can select to highlight single beats, the first beats of patterns, or the first repetition of a pattern. These beats will be highlighted in the generated beatmeter.
+- When saving, paths refering to external files (e.g. audio files) will be stored relatively if they are in the same directory or a subdirectory. 
 
-If you double click on a beat you jump exactly to that beat.
-
-You can copy and paste beats (even multiple times at once). They will get inserted to the left or the right of the current position moving the current position to the last beat of the insertion. To insert a pattern repeatedly, select the pattern and the first beat of its repetition and paste it as many times as you want.
-
-There are also two aligment tools, align equally will spead the selected beats such that their distance is equal. Align pattern requires you to select a number of pattern repetitions plus one additional beat. Then it will distribute the pattern euqaly adjusting the beats within a pattern to their average positions. For example if you have a pattern 123 123 123 123, set repetition to 3 and rest to 2 as you have 3 repetitions of the 123 pattern with two additional beats. (The last 123 is not a full pattern, as there is no beat to mark the end of the break after the last 3-beat).
-
-### BPM detection
-
-The tool can detect the beats per minute of a song. It uses an algorithm based on wavelet transformations that works very well at least for music with a constant (but not necessarily always clearly audible) beat. The implementation is taken from [here](https://github.com/mziccard/scala-audio-file/). To analyze some audio file run:
-
-```
-java -jar beatmeter-generator.jar bpm -i myaudio.wav
-```
-
-There are command line options to analyze only part of a file and fine-tune the algorithm but just running it on the hole file should usually work. Use the Add-bpm-button in the edior to add beats at the detected bpm rate. The tool outputs intermediate results, the end result can often be accurate even if many intermediate results are not.
-
-### Generating image sequences
-Once you are satisfied with your beat pattern you can generate a sequence of images for the beatmeter animation:
-
-```
-java -jar beatmeter-generator.jar video -i mybeats.txt -d 60 -w 1280 -o outputDirectory -f 29.97
-```
-
-The command has a lot of options that allows you to style your beatmeter. There are reasonable defaults though, you just have to set the duration of your video in seconds with -d, the width of your video in pixels with -w, and usually the framerate in frames per second (unless the default of 25 is appropriate).
-
-If you prefer the "flying bubbles" style instead of the classic waveform, you can do this:
-
-```
-java -jar beatmeter-generator.jar video -i mybeats.txt -d 60 -w 1280 -o outputDirectory -f 29.97 flying
-```
-
-Run the programm without any options to see all available options, e.g to change beatmeter colors.
-
-### Generating audio
-You can also generate an audio file to underline the beats.
-
-```
-java -jar beatmeter-generator.jar audio -i mybeats.txt -d 60 -o output.wav
-```
-
-You only have to supply the files and the duration. You can choose an alternative beat sound with the option --click or provide your own beat wav-file.
-
-## Shortcuts
-
-  - *b* play/pause
-  - *b* insert beat
-  - *ctrl+left* move marked beats left
-  - *ctrl+right* move marked beats right
-  - *left* one second left
-  - *right* one second right
-  - *alt+left* 0.05 seconds left
-  - *alt+right* 0.05 second right
-  - *shift+left* 10 seconds left
-  - *shift+right* 10 seconds right
-  - *n* move left side of selection to current position
-  - *shift+n* move right side of selection to current position
-  - *c* copy selected beats
-  - *v* insert selected beats to the right
-  - *shift+v* insert selected beats to the left
-  - *e* align selected beats equally
-  - *d* deselect all beats
-  - *delete* remove selected beats
-  - *ctrl+digit* select/deselect ith beat right of current position
-  - *ctrl+alt+digit* jump exactly to ith beat right of current position
-  - *z* undo last change to beats
-  - *shift+z* redo last change to beats
-  
 ## Download
-The current binary can be downloaded:
+### Windows
+There is a windows installer available at:
+[main](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/BeatmeterGenerator.msi)
+
+It is larger than the platform independent build below but it contains everything you need.
+It should work on x64 variants of Windows 7 and later, for x32 use the platform independent version.
+
+### Platform independent version
+A platform independet jar-File can be downloaded at:
 [beatmeter-generator.jar](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/builds/artifacts/master/raw/target/scala-2.12/beatmeter-generator.jar?job=build)
 
 You will need the Java 8 Runtime Environment (JRE) to run the application. You can download it at:
 (Oracle Java 8)[http://www.oracle.com/technetwork/java/javase/downloads/index.html]
 
-If you are using Linux, your distribution will usually include OpenJDK 8 which works fine as well.
+### Nots on Linux
+If you are using Linux, your distribution will usually include OpenJDK 8.
 Note, that under Linux you usually have to install OpenJFX as a separate package.
+Also, there seems to be a bug in OpenJFX in some versions that sometimes causes UI cliches.
+I hope this will go away as it does not happen with the Oracle JDK.
 
-## Notes
-- The tools do not do much error handling yet. If you provide unreasonable options like a duration shorter than the list of beats you might get strange output or internal error messages.
-- To see all command line options just run
-`java -jar beatmeter-generator.jar`
 
 ## Screenshot
 ![main](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/screenshot.png)
