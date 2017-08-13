@@ -62,6 +62,8 @@ Please read through the features, basic workflow and hints to get a better idea 
 
 
 ## Hints
+- Zoom in and out by pressing *CTRL* and scrolling
+- Press shift to scroll up and down
 - Most things have context menus to change settings
 - You can scale a beat pattern by pressing *CTRL* and tracking the black bar.
 - You can scale beat and bpm patterns at the end.
