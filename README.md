@@ -90,7 +90,7 @@ A platform independet .jar file can be downloaded at:
 [beatmeter-generator.jar](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/builds/artifacts/master/raw/target/scala-2.12/beatmeter-generator.jar?job=build)
 
 You will need the Java 8 Runtime Environment (JRE) to run the application. You can download it at:
-(Oracle Java 8)[http://www.oracle.com/technetwork/java/javase/downloads/index.html]
+[Oracle Java 8][http://www.oracle.com/technetwork/java/javase/downloads/index.html]
 
 ### Notes on Linux
 If you are using Linux, your distribution will usually include OpenJRE 8.
