@@ -1236,27 +1236,7 @@ object BeatEditor extends JFXApp {
     duration.addListener(weak(handler))
     bpmPattern.beats.addListener(weak(handler))
 
-    val bpmSpinner = new Spinner[Double](1.0, 300.0, bpmPattern.bpm(), 1.0) {
-      editable = true
-
-      private def commitEditorText(): Unit = {
-        if (editable()) {
-          val text = editor().text()
-          if (valueFactory() != null) {
-            val converter = valueFactory().getConverter
-            if (converter != null) {
-              valueFactory().value = converter.fromString(text)
-            }
-          }
-        }
-      }
-
-      focused.onChange { (_, _, nv) =>
-        if (!nv) {
-          commitEditorText()
-        }
-      }
-    }
+    val bpmSpinner = UIUtils.editableSpinner(new Spinner[Double](1.0, 300.0, bpmPattern.bpm(), 1.0))
     bpmSpinner.value.onChange { (_, old, now) =>
       if (old != now) {
         bpmPattern.bpm() = now
@@ -2191,6 +2171,7 @@ object BeatEditor extends JFXApp {
   }
 
   player.progressDialogWindow() = Some(mainView().scene().windowProperty()())
+
 }
 
 

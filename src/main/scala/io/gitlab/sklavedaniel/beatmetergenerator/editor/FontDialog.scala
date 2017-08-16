@@ -20,6 +20,8 @@ package io.gitlab.sklavedaniel.beatmetergenerator.editor
 
 import javafx.scene.text.FontPosture
 
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.UIUtils
+
 import scalafx.Includes._
 import scalafx.beans.binding.Bindings
 import scalafx.scene.control._
@@ -46,11 +48,10 @@ class FontDialog(ownerWindow: Option[Window], initFont: (String, Int, Boolean, B
 
   families.selectionModel().select(initFont._1)
   families.scrollTo(initFont._1)
-  val size = new Spinner[Int](5, 5000, initFont._2, 1) {
-    editable = true
+  val size = UIUtils.editableSpinner(new Spinner[Int](5, 5000, initFont._2, 1) {
     hgrow = Priority.Always
     maxWidth = Double.PositiveInfinity
-  }
+  })
   val bold = new CheckBox("Bold") {
     selected = initFont._3
   }

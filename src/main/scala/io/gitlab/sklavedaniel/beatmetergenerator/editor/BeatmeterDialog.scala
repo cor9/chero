@@ -36,36 +36,30 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
   title = "Beatmeter Generator"
 
   object Flying {
-    val widthSpinner = new Spinner[Int](1, 10000, flyingConf.width, 1) {
+    val widthSpinner = UIUtils.editableSpinner(new Spinner[Int](1, 10000, flyingConf.width, 1) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val heightSpinner = new Spinner[Int](1, 10000, flyingConf.height, 1) {
+    })
+    val heightSpinner = UIUtils.editableSpinner(new Spinner[Int](1, 10000, flyingConf.height, 1) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val framesSpinner = new Spinner[Double](1, 240, flyingConf.frames, 0.1) {
+    })
+    val framesSpinner = UIUtils.editableSpinner(new Spinner[Double](1, 240, flyingConf.frames, 0.1) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val speedSpinner = new Spinner[Double](0.1, 1.0, flyingConf.speed, 0.05) {
+    })
+    val speedSpinner = UIUtils.editableSpinner(new Spinner[Double](0.1, 1.0, flyingConf.speed, 0.05) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val positionSpinner = new Spinner[Double](0.0, 1.0, flyingConf.position, 0.05) {
+    })
+    val positionSpinner = UIUtils.editableSpinner(new Spinner[Double](0.0, 1.0, flyingConf.position, 0.05) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val startPositionSpinner = new Spinner[Double](0.0, 1.0, flyingConf.position, 0.05) {
+    })
+    val startPositionSpinner = UIUtils.editableSpinner(new Spinner[Double](0.0, 1.0, flyingConf.position, 0.05) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
+    })
 
     val beatColorPicker = new ColorPicker(flyingConf.beatColor) {
       hgrow = Priority.Always
@@ -89,11 +83,10 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
       editable = true
     }
     val messageFont = ObjectProperty(flyingConf.messageFont)
-    val marginSpinner = new Spinner[Int](0, 10000, flyingConf.margin, 1) {
+    val marginSpinner = UIUtils.editableSpinner(new Spinner[Int](0, 10000, flyingConf.margin, 1) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
+    })
     val messageColorPicker = new ColorPicker(flyingConf.messageColor) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
@@ -104,11 +97,10 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
       maxWidth = Double.PositiveInfinity
       editable = true
     }
-    val messageBorderStrengthSpinner = new Spinner[Double](0.0, 10.0, flyingConf.messagePosition, 0.5) {
+    val messageBorderStrengthSpinner = UIUtils.editableSpinner(new Spinner[Double](0.0, 10.0, flyingConf.messagePosition, 0.5) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
+    })
     val messageAlign = new ComboBox[String](Seq("Left", "Center", "Right")) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
@@ -118,11 +110,10 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
         case AlignRight => 2
       })
     }
-    val messagePositionSpinner = new Spinner[Double](0.0, 1.0, flyingConf.messagePosition, 0.05) {
+    val messagePositionSpinner = UIUtils.editableSpinner(new Spinner[Double](0.0, 1.0, flyingConf.messagePosition, 0.05) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
+    })
     val imageDirectory = ObjectProperty(flyingConf.imageDirectory)
     val pane = new GridPane {
       hgrow = Priority.Always
@@ -247,41 +238,34 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
   }
 
   object Waveform {
-    val widthSpinner = new Spinner[Int](1, 10000, waveformConf.width, 1) {
+    val widthSpinner = UIUtils.editableSpinner(new Spinner[Int](1, 10000, waveformConf.width, 1) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val heightSpinner = new Spinner[Int](1, 10000, waveformConf.height, 1) {
+    })
+    val heightSpinner = UIUtils.editableSpinner(new Spinner[Int](1, 10000, waveformConf.height, 1) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val framesSpinner = new Spinner[Double](1, 240, waveformConf.frames, 0.1) {
+    })
+    val framesSpinner = UIUtils.editableSpinner(new Spinner[Double](1, 240, waveformConf.frames, 0.1) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val speedSpinner = new Spinner[Double](0.1, 1.0, waveformConf.speed, 0.05) {
+    })
+    val speedSpinner = UIUtils.editableSpinner(new Spinner[Double](0.1, 1.0, waveformConf.speed, 0.05) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val positionSpinner = new Spinner[Double](0.0, 1.0, waveformConf.position, 0.05) {
+    })
+    val positionSpinner = UIUtils.editableSpinner(new Spinner[Double](0.0, 1.0, waveformConf.position, 0.05) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val startPositionSpinner = new Spinner[Double](0.0, 1.0, waveformConf.startPosition, 0.05) {
+    })
+    val startPositionSpinner = UIUtils.editableSpinner(new Spinner[Double](0.0, 1.0, waveformConf.startPosition, 0.05) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
-    val endPositionSpinner = new Spinner[Double](0.0, 1.0, waveformConf.endPosition, 0.05) {
+    })
+    val endPositionSpinner = UIUtils.editableSpinner(new Spinner[Double](0.0, 1.0, waveformConf.endPosition, 0.05) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
+    })
 
     val waveColorPicker = new ColorPicker(waveformConf.waveColor) {
       hgrow = Priority.Always
@@ -309,11 +293,10 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
       editable = true
     }
     val messageFont = ObjectProperty(waveformConf.messageFont)
-    val marginSpinner = new Spinner[Int](0, 10000, waveformConf.margin, 1) {
+    val marginSpinner = UIUtils.editableSpinner(new Spinner[Int](0, 10000, waveformConf.margin, 1) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
+    })
     val messageColorPicker = new ColorPicker(waveformConf.messageColor) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
@@ -324,11 +307,10 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
       maxWidth = Double.PositiveInfinity
       editable = true
     }
-    val messageBorderStrengthSpinner = new Spinner[Double](0.0, 10.0, waveformConf.messagePosition, 0.5) {
+    val messageBorderStrengthSpinner = UIUtils.editableSpinner(new Spinner[Double](0.0, 10.0, waveformConf.messagePosition, 0.5) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
+    })
     val messageAlign = new ComboBox[String](Seq("Left", "Center", "Right")) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
@@ -338,11 +320,10 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
         case AlignRight => 2
       })
     }
-    val messagePositionSpinner = new Spinner[Double](0.0, 1.0, waveformConf.messagePosition, 0.05) {
+    val messagePositionSpinner = UIUtils.editableSpinner(new Spinner[Double](0.0, 1.0, waveformConf.messagePosition, 0.05) {
       hgrow = Priority.Always
       maxWidth = Double.PositiveInfinity
-      editable = true
-    }
+    })
     val imageDirectory = ObjectProperty(waveformConf.imageDirectory)
     val pane = new GridPane {
       hgrow = Priority.Always
