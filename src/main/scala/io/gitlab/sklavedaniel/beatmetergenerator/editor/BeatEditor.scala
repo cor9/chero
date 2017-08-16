@@ -1907,23 +1907,6 @@ object BeatEditor extends JFXApp {
                 },
                 new MenuItem("Generate Video") {
                   onAction = handle {
-                    def merge[A, B: Ordering](seq: Seq[Traversable[A]], f: A => B): List[A] = {
-                      def impl(seq: Seq[Traversable[A]], result: ListBuffer[A]): List[A] = {
-                        if (seq.isEmpty) {
-                          result.toList
-                        } else {
-                          val (trv, idx: Int) = seq.zipWithIndex.minBy(s => s._1.headOption.map(f))
-                          if (trv.isEmpty) {
-                            impl(seq.slice(0, idx) ++ seq.slice(idx + 1, seq.size), result)
-                          } else {
-                            result += trv.head
-                            impl(seq.slice(0, idx) ++ (trv.tail +: seq.slice(idx + 1, seq.size)), result)
-                          }
-                        }
-                      }
-
-                      impl(seq, ListBuffer.empty)
-                    }
 
                     val beats = merge[(Double, Boolean), Double](mainView().scrollPane.track2view.values.toList.filter(_.track.display()).map(_.beats.toList.map(b => (b._1, b._3.highlight()))),
                       b => b._1)
@@ -2080,6 +2063,48 @@ object BeatEditor extends JFXApp {
                     tracks().waveformBeatmeter() = r._3
                     undoManager.endGroup()
                   }
+                },
+                new MenuItem("Export Beats and Messages") {
+                  onAction = handle {
+                    val videoBeats = merge[(Double, Boolean), Double](mainView().scrollPane.track2view.values.toList.filter(_.track.display()).map(_.beats.toList.map(b => (b._1, b._3.highlight()))),
+                      b => b._1)
+                    val audioBeats = merge[(Double, Boolean, Option[URI]), Double](mainView().scrollPane.track2view.values.toList.filter(_.track.play()).map(t => t.beats.toList.map(b => (b._1, b._3.highlight(), t.track.beat().map(_._1)))),
+                      b => b._1)
+                    val messages = merge[(Double, Double, String), Double](
+                      tracks().content.toList.filter(_.display()).map(_.content.toList.flatMap { b =>
+                        b._3 match {
+                          case msg: Message => Some((b._1, b._2, msg.text()))
+                          case _ => None
+                        }
+                      }),
+                      b => b._1)
+                    val fc = new FileChooser()
+                    fc.title = "Beatmeter Generator: Export audio and messages"
+                    Option(fc.showSaveDialog(window())) match {
+                      case Some(file) =>
+                        val task = (callback: (Option[Double], Option[String]) => Boolean) => {
+                          val s = JsonSerialization.export(videoBeats, audioBeats, messages)
+                          val r = for (out <- resource.managed(new OutputStreamWriter(new FileOutputStream(file), "utf-8"))) yield {
+                            out.write(s)
+                          }
+                          r.tried.map(Some(_))
+                        }
+                        val pd = new ProgressDialog[Unit](Some(mainView().scene().windowProperty()()), "Saving", Some("Saving..."), false, task)
+                        pd.showAndWait().get.asInstanceOf[Try[Option[Unit]]] match {
+                          case Success(Some(_)) =>
+                          case Failure(e) =>
+                            val alert = new Alert(AlertType.Error) {
+                              title = "Beatmeter Generator"
+                              headerText = "Could not save file"
+                              contentText = e.getLocalizedMessage
+                            }
+                            alert.initOwner(mainView().scene().windowProperty()())
+                            alert.showAndWait()
+                          case Success(None) =>
+                        }
+                      case None =>
+                    }
+                  }
                 }
               )
             }
@@ -2172,6 +2197,23 @@ object BeatEditor extends JFXApp {
 
   player.progressDialogWindow() = Some(mainView().scene().windowProperty()())
 
+  def merge[A, B: Ordering](seq: Seq[Traversable[A]], f: A => B): List[A] = {
+    def impl(seq: Seq[Traversable[A]], result: ListBuffer[A]): List[A] = {
+      if (seq.isEmpty) {
+        result.toList
+      } else {
+        val (trv, idx: Int) = seq.zipWithIndex.minBy(s => s._1.headOption.map(f))
+        if (trv.isEmpty) {
+          impl(seq.slice(0, idx) ++ seq.slice(idx + 1, seq.size), result)
+        } else {
+          result += trv.head
+          impl(seq.slice(0, idx) ++ (trv.tail +: seq.slice(idx + 1, seq.size)), result)
+        }
+      }
+    }
+
+    impl(seq, ListBuffer.empty)
+  }
 }
 
 

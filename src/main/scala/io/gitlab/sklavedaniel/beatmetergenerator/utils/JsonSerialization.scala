@@ -74,12 +74,25 @@ object JsonSerialization {
     val data = Try {
       val JsObject(map) = json
       val JsString(version) = map("version")
-      if("0.2.0" != version) {
+      if ("0.2.0" != version) {
         throw new Exception("Unsupported version " + version)
       }
       map("data")
     }
     data.flatMap((d: JsValue) => Unpickle[ImmutableTracks].from(d))
+  }
+
+  def export(video: List[(Double, Boolean)], audio: List[(Double, Boolean, Option[URI])], messages: List[(Double, Double, String)]): String = {
+    val config = JsConfig("#", false)
+    val videoP = implicitly[Pickler[List[(Double, Boolean)]]]
+    val audioP = implicitly[Pickler[List[(Double, Boolean, Option[URI])]]]
+    val messagesP = implicitly[Pickler[List[(Double, Double, String)]]]
+    val videoD = JsArray(video.map(v => JsObject(Map("time" -> JsNumber(v._1.toString), "highlighted" -> (if (v._2) JsTrue else JsFalse)))))
+    val audioD = JsArray(audio.map(a => JsObject(Map("time" -> JsNumber(a._1.toString), "highlighted" -> (if (a._2) JsTrue else JsFalse)) ++
+      a._3.map(uri => "sound" -> JsString(uri.toString)).toMap)))
+    val messagesD = JsArray(messages.map(m => JsObject(Map("fromTime" -> JsNumber(m._1.toString), "toTime" -> JsNumber(m._2.toString), "message" -> JsString(m._3)))))
+    val json = JsObject(Map("audio" -> audioD, "video" -> videoD, "messages" -> messagesD))
+    Json.write(json)
   }
 
 }
