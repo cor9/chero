@@ -108,3 +108,10 @@ If it does happen to you, consider installing the Oracle JRE. If it is availabel
 ## Screenshot
 ![main](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/screenshot.png)
 
+## Ideas
+- Counters
+- Speedup/Slowdown Beat Pattern
+- Show Timestamps when dragging
+- Save last position
+- Reopen last file
+- Save to last location
