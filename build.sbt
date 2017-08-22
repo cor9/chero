@@ -28,6 +28,8 @@ unmanagedSourceDirectories in Compile += baseDirectory.value / "lib/JWave/src"
 
 fork := true
 
+javaOptions := Seq("-splash:src/main/resources/splash.png")
+
 mainClass in assembly := Some("io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor")
 mainClass in Compile := Some("io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor")
 mainClass in run := Some("io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor")
@@ -37,6 +39,9 @@ assemblyMergeStrategy in assembly := {
 }
 
 assemblyJarName in assembly := s"beatmeter-generator.jar"
+
+packageOptions in assembly +=
+  Package.ManifestAttributes("SplashScreen-Image" -> "splash.png")
 
 cancelable in Global := true
 

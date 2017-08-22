@@ -18,30 +18,28 @@
 
 package io.gitlab.sklavedaniel.beatmetergenerator.editor
 
-import java.awt.{GraphicsEnvironment, Shape, Toolkit}
 import java.awt.image.BufferedImage
+import java.awt.{GraphicsEnvironment, RenderingHints, Shape, SplashScreen}
 import java.io._
 import java.net.URI
 import java.nio.file.Files
-import java.util.concurrent.FutureTask
 import javafx.beans.binding.DoubleExpression
 import javafx.beans.value.{ChangeListener, WeakChangeListener}
 import javafx.beans.{InvalidationListener, WeakInvalidationListener}
 import javafx.geometry.VPos
-import javafx.scene
-import javafx.scene.text.FontPosture
-import javafx.scene.{Cursor, control, input}
+import javafx.scene.{Cursor, input}
 import javax.imageio.ImageIO
 import javax.sound.sampled.{AudioFileFormat, AudioInputStream, AudioSystem}
 
 import io.gitlab.sklavedaniel.beatmetergenerator._
-import io.gitlab.sklavedaniel.beatmetergenerator.utils._
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.Beatmeter.Timed
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.{Beatmeter2, FlyingBeatmeter, WaveformBeatmeter}
 import io.gitlab.sklavedaniel.beatmetergenerator.bpmdetection.WaveletBPMDetection
 import io.gitlab.sklavedaniel.beatmetergenerator.editor.AudioPlayer2.BeatInfo
-import io.gitlab.sklavedaniel.beatmetergenerator.utils.{JsonSerialization, ObservableIntervalMap}
-import org.rogach.scallop.ScallopConf
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.ImmutableTracks_V0_2_0._
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.{JsonSerialization, ObservableIntervalMap, _}
+import org.w3c.dom.events.EventTarget
+import org.w3c.dom.html.HTMLAnchorElement
 
 import scala.collection.immutable.Queue
 import scala.collection.mutable
@@ -50,39 +48,47 @@ import scala.io.Source
 import scala.util.{Failure, Success, Try}
 import scalafx.Includes._
 import scalafx.animation.{Animation, KeyFrame, Timeline}
-import scalafx.application.{JFXApp, Platform}
+import scalafx.application.JFXApp
 import scalafx.application.JFXApp.PrimaryStage
 import scalafx.beans.binding.Bindings
 import scalafx.beans.property._
 import scalafx.collections.ObservableSet.{Add, Remove}
 import scalafx.collections.{ObservableBuffer, ObservableSet}
+import scalafx.concurrent.Worker
 import scalafx.geometry.{Insets, Side}
 import scalafx.scene.control.Alert.AlertType
 import scalafx.scene.control.{MenuItem, _}
+import scalafx.scene.image.Image
 import scalafx.scene.input._
 import scalafx.scene.layout._
 import scalafx.scene.paint.Color
 import scalafx.scene.shape.{Line, Rectangle}
-import scalafx.scene.text.{Font, FontWeight, Text}
+import scalafx.scene.text.{Font, Text}
 import scalafx.scene.transform.Scale
+import scalafx.scene.web.WebView
 import scalafx.scene.{Group, Node, Scene}
 import scalafx.stage.FileChooser.ExtensionFilter
-import scalafx.stage.{DirectoryChooser, FileChooser, Window}
+import scalafx.stage.{DirectoryChooser, FileChooser}
 import scalafx.util.Duration
-import ImmutableTracks_V0_2_0._
-import org.w3c.dom.events.EventTarget
-import org.w3c.dom.html.HTMLAnchorElement
-
-import scalafx.concurrent.Worker
-import scalafx.scene.web.WebView
 
 object BeatEditor extends JFXApp {
+  val courgette = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, getClass.getResourceAsStream("/Courgette-Regular.ttf"))
+  GraphicsEnvironment.getLocalGraphicsEnvironment.registerFont(courgette)
+
+  Option(SplashScreen.getSplashScreen).foreach { splash =>
+    val g = splash.createGraphics()
+    g.setFont(courgette.deriveFont(20.0f))
+    g.setColor(java.awt.Color.decode("0xff0896"))
+    g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
+    val fb = g.getFontMetrics.getStringBounds(Information.version, g)
+    val sb = splash.getBounds
+    g.drawString(Information.version, sb.width - fb.getWidth.toFloat - 18, sb.height - fb.getHeight.toFloat - fb.getMinY.toFloat - 7)
+    splash.update()
+  }
 
   val dataformat = new DataFormat("beats")
 
-  Font.loadFont(getClass.getResourceAsStream("/Courgette-Regular.ttf"), -1)
-
-  GraphicsEnvironment.getLocalGraphicsEnvironment.registerFont(java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, getClass.getResourceAsStream("/Courgette-Regular.ttf")))
+  Font.loadFont(getClass.getResourceAsStream("/Courgette-Regular.ttf"), 20)
 
   val player = new AudioPlayer2()
 
@@ -1649,6 +1655,7 @@ object BeatEditor extends JFXApp {
   object Stage extends PrimaryStage {
     self =>
     title = "Beatmeter Generator"
+    icons ++= Seq(16, 32, 64, 128).map(r => new Image(getClass.getResourceAsStream(s"/icon-${r}x${r}.png")).delegate)
     val down_0 = BooleanProperty(false)
     val down_1 = BooleanProperty(false)
     val down_2 = BooleanProperty(false)
@@ -2248,6 +2255,11 @@ object BeatEditor extends JFXApp {
             }
           )
         }
+      }
+    }
+    onShown = handle {
+      Option(SplashScreen.getSplashScreen).foreach { splash =>
+        splash.close()
       }
     }
 
