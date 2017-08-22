@@ -32,7 +32,7 @@ mainClass in assembly := Some("io.gitlab.sklavedaniel.beatmetergenerator.editor.
 mainClass in Compile := Some("io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor")
 mainClass in run := Some("io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor")
 assemblyMergeStrategy in assembly := {
-  case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+  case PathList("META-INF", xs@_*) => MergeStrategy.discard
   case x => MergeStrategy.first
 }
 
@@ -56,4 +56,17 @@ jdkPackagerJVMArgs := Seq("-Xmx1g")
 
 jdkPackagerAppArgs := Seq()
 
+sourceGenerators in Compile += Def.task {
+  val file = (sourceManaged in Compile).value / "information" / "io" / "gitlab" / "sklavedaniel" / "beatmetergenerator" / "Information.scala"
+  IO.write(file,
+    s"""package io.gitlab.sklavedaniel.beatmetergenerator
+       |
+       | object Information {
+       |   val version = "${version.value}"
+       |   val maintainer = "${maintainer.value}"
+       |   val email = "dtspam@gmx.net"
+       |   val website = "https://gitlab.com/SklaveDaniel/BeatmeterGenerator"
+       | }""".stripMargin)
+  Seq(file)
+}.taskValue
 

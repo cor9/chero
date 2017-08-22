@@ -70,6 +70,11 @@ import scalafx.stage.FileChooser.ExtensionFilter
 import scalafx.stage.{DirectoryChooser, FileChooser, Window}
 import scalafx.util.Duration
 import ImmutableTracks_V0_2_0._
+import org.w3c.dom.events.EventTarget
+import org.w3c.dom.html.HTMLAnchorElement
+
+import scalafx.concurrent.Worker
+import scalafx.scene.web.WebView
 
 object BeatEditor extends JFXApp {
 
@@ -1236,7 +1241,7 @@ object BeatEditor extends JFXApp {
     duration.addListener(weak(handler))
     bpmPattern.beats.addListener(weak(handler))
 
-    val bpmSpinner = UIUtils.editableSpinner(new Spinner[Double](1.0, 300.0, bpmPattern.bpm(), 1.0))
+    val bpmSpinner = UIUtils.editableSpinner(new Spinner[Double](1.0, 600.0, bpmPattern.bpm(), 1.0))
     bpmSpinner.value.onChange { (_, old, now) =>
       if (old != now) {
         bpmPattern.bpm() = now
@@ -2097,6 +2102,7 @@ object BeatEditor extends JFXApp {
                               title = "Beatmeter Generator"
                               headerText = "Could not save file"
                               contentText = e.getLocalizedMessage
+                              buttonTypes = Seq(ButtonType.OK)
                             }
                             alert.initOwner(mainView().scene().windowProperty()())
                             alert.showAndWait()
@@ -2104,6 +2110,71 @@ object BeatEditor extends JFXApp {
                         }
                       case None =>
                     }
+                  }
+                }
+              )
+            },
+            new Menu("Info") {
+              items = Seq(
+                new MenuItem("About") {
+                  onAction = handle {
+                    val alert = new Dialog {
+                      title = "Beatmeter Generator"
+                      dialogPane = new DialogPane {
+                        headerText = "About"
+                        content = new GridPane {
+                          hgap = 10
+                          vgap = 5
+                          add(new Text("Version"), 0, 0)
+                          add(new Text(Information.version), 1, 0)
+                          add(new Text("Maintainer"), 0, 1)
+                          add(new Text(Information.maintainer), 1, 1)
+                          add(new Text("E-Mail"), 0, 2)
+                          add(new Hyperlink(Information.email) {
+                            onAction = handle {
+                              hostServices.showDocument("mailto:" + Information.email)
+                            }
+                          }, 1, 2)
+                          add(new Text("Website"), 0, 3)
+                          add(new Hyperlink(Information.website) {
+                            onAction = handle {
+                              hostServices.showDocument(Information.website)
+                            }
+                          }, 1, 3)
+                        }
+                        buttonTypes = Seq(ButtonType.OK)
+                      }
+                    }
+                    alert.initOwner(mainView().scene().windowProperty()())
+                    alert.showAndWait()
+                  }
+                },
+                new MenuItem("License") {
+                  onAction = handle {
+                    val alert = new Dialog {
+                      title = "Beatmeter Generator"
+                      dialogPane = new DialogPane {
+                        headerText = "License"
+                        val wv = new WebView()
+                        content = wv
+                        wv.engine.getLoadWorker.state.onChange { (_, _, s) =>
+                          if (Worker.State.Succeeded == s) {
+                            val nodes = wv.engine.document.getElementsByTagName("a")
+                            for (i <- 0 until nodes.getLength) {
+                              nodes.item(i).asInstanceOf[EventTarget].addEventListener("click", e => {
+                                hostServices.showDocument(e.getCurrentTarget.asInstanceOf[HTMLAnchorElement].getHref)
+                                e.preventDefault()
+                              }, false)
+                            }
+                            buttonTypes = Seq(ButtonType.OK)
+                          }
+                        }
+                        wv.engine.load(BeatEditor.getClass.getResource("/gpl-3.0-standalone.html").toString)
+                        wv.contextMenuEnabled = false
+                      }
+                    }
+                    alert.initOwner(mainView().scene().windowProperty()())
+                    alert.showAndWait()
                   }
                 }
               )
@@ -2179,6 +2250,7 @@ object BeatEditor extends JFXApp {
         }
       }
     }
+
   }
 
   stage = Stage
