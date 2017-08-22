@@ -1655,7 +1655,7 @@ object BeatEditor extends JFXApp {
   object Stage extends PrimaryStage {
     self =>
     title = "Beatmeter Generator"
-    icons ++= Seq(16, 32, 64, 128).map(r => new Image(getClass.getResourceAsStream(s"/icon-${r}x${r}.png")).delegate)
+    icons ++= Seq(16, 32, 64, 128).map(r => new Image(getClass.getResourceAsStream(s"/icon/icon-${r}x${r}.png")).delegate)
     val down_0 = BooleanProperty(false)
     val down_1 = BooleanProperty(false)
     val down_2 = BooleanProperty(false)

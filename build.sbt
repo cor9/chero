@@ -40,8 +40,12 @@ assemblyMergeStrategy in assembly := {
 
 assemblyJarName in assembly := s"beatmeter-generator.jar"
 
+packageOptions in (Compile, packageBin) +=
+  Package.ManifestAttributes("SplashScreen-Image" -> "splash.png")
+
 packageOptions in assembly +=
   Package.ManifestAttributes("SplashScreen-Image" -> "splash.png")
+
 
 cancelable in Global := true
 
@@ -60,6 +64,15 @@ jdkPackagerProperties := Map()
 jdkPackagerJVMArgs := Seq("-Xmx1g")
 
 jdkPackagerAppArgs := Seq()
+
+lazy val osext = sys.props("os.name").toLowerCase match {
+  case os if os.contains("mac") ⇒ "*.icns"
+  case os if os.contains("win") ⇒ "*.ico"
+  case _ ⇒ "*.png"
+}
+
+jdkAppIcon :=  Some(sourceDirectory.value / "src" / "main" / "resources" / "icon" / s"icon-128x128.$osext")
+
 
 sourceGenerators in Compile += Def.task {
   val file = (sourceManaged in Compile).value / "information" / "io" / "gitlab" / "sklavedaniel" / "beatmetergenerator" / "Information.scala"
