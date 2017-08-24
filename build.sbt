@@ -76,7 +76,7 @@ lazy val osext = sys.props("os.name").toLowerCase match {
   case _ ⇒ "png"
 }
 
-jdkAppIcon :=  Some(sourceDirectory.value / "src" / "main" / "resources" / "icon" / s"icon-128x128.$osext")
+jdkAppIcon :=  Some(sourceDirectory.value / "main" / "resources" / "icon" / s"icon-128x128.$osext")
 
 
 sourceGenerators in Compile += Def.task {
