@@ -51,7 +51,12 @@ cancelable in Global := true
 
 enablePlugins(JDKPackagerPlugin)
 
-jdkPackagerType := "installer"
+jdkPackagerType := "msi"
+
+packageOptions in packageJavaLauncherJar +=
+  Package.ManifestAttributes("SplashScreen-Image" -> "splash.png")
+
+mappings in packageJavaLauncherJar += (baseDirectory.value / "src/main/resources/splash.png" -> "splash.png")
 
 maintainer := "Sklave Daniel"
 
@@ -66,9 +71,9 @@ jdkPackagerJVMArgs := Seq("-Xmx1g")
 jdkPackagerAppArgs := Seq()
 
 lazy val osext = sys.props("os.name").toLowerCase match {
-  case os if os.contains("mac") ⇒ "*.icns"
-  case os if os.contains("win") ⇒ "*.ico"
-  case _ ⇒ "*.png"
+  case os if os.contains("mac") ⇒ "icns"
+  case os if os.contains("win") ⇒ "ico"
+  case _ ⇒ "png"
 }
 
 jdkAppIcon :=  Some(sourceDirectory.value / "src" / "main" / "resources" / "icon" / s"icon-128x128.$osext")
