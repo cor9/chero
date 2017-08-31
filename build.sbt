@@ -151,9 +151,9 @@ packageMSI := {
         </Wix>
       """)
 
-    println()
+    println("Start")
     new lang.ProcessBuilder("wixl", "-v", "--arch", arch, s"$lcname-$arch.wxs").directory(output).run()
-    println()
+    println("End")
   }
 
   for ((arch, folder, productId, updateId, jdk) <- winjdks) {
