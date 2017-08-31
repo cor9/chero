@@ -82,11 +82,12 @@ Please read through the features, basic workflow and hints to get a better idea 
 
 ## Download
 ### Windows
-There is a windows installer available at:
-[BeatmeterGenerator.msi](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/BeatmeterGenerator.msi)
+There is a windows installer available (32bit and 64bit versions) at:
+[beatmeter-generator-x86.jar](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/builds/artifacts/master/raw/target/msiPackage/beatmeter-generator-x86.msi?job=build)
+[beatmeter-generator-x64.jar](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/builds/artifacts/master/raw/target/msiPackage/beatmeter-generator-x64.msi?job=build)
 
 It is larger than the platform independent build below but it contains everything you need.
-It should work on x64 variants of Windows 7 and later, for x32 use the platform independent version.
+It should work on Windows 7 and later.
 
 ### Platform independent version
 A platform independet .jar file can be downloaded at:
