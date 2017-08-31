@@ -26,3 +26,4 @@ build:
     paths:
       - "target/scala-2.12/beatmeter-generator.jar"
       - "target/msiPackage/beatmeter-generator-x64.msi" 
+      - "target/msiPackage/beatmeter-generator-x86.msi"
