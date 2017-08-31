@@ -69,7 +69,7 @@ val packageMSI = taskKey[Unit]("Generate msi package.")
 
 packageMSI := {
   val winjdks = List(("x64", "ProgramFiles64Folder", "25ec46a1-f39c-4b67-be83-9aeb3c67e923",
-    "a8d33832-cdef-488a-8a14-4f21692d4da5", new File("/root/jre1.8.0_144/")))
+    "a8d33832-cdef-488a-8a14-4f21692d4da5", new File("/home/daniel/ykd/test/image/runtime"))) //new File("/root/jre1.8.0_144/")))
   val ico = sourceDirectory.value / "main" / "resources" / "icon" / "icon-128x128.ico"
   val lcname = name.value.toLowerCase.replace(" ", "-")
   val icoName = s"$lcname.ico"

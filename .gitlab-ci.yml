@@ -24,5 +24,5 @@ build:
     - sbt packageMSI
   artifacts:
     paths:
-      - "target/scala-2.12/beatmeter-generator.jar" 
-      - "target/msiPackage/beatmeter-generator-x64.msi"
+      - "target/scala-2.12/beatmeter-generator.jar"
+      - "target/msiPackage/beatmeter-generator-x64.msi" 
