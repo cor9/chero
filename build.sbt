@@ -69,7 +69,9 @@ val packageMSI = taskKey[Unit]("Generate msi package.")
 
 packageMSI := {
   val winjdks = List(("x64", "ProgramFiles64Folder", "25ec46a1-f39c-4b67-be83-9aeb3c67e923",
-    "a8d33832-cdef-488a-8a14-4f21692d4da5", new File("/root/jre64/")))
+    "a8d33832-cdef-488a-8a14-4f21692d4da5", new File("/root/jre64/")),
+    ("x86", "ProgramFilesFolder", "2a2288d8-5c74-4a1a-9f86-54191de8c608",
+      "d153a644-d15a-4c86-b4b5-e983169ad9bd", new File("/root/jre32/")))
   val ico = sourceDirectory.value / "main" / "resources" / "icon" / "icon-128x128.ico"
   val lcname = name.value.toLowerCase.replace(" ", "-")
   val icoName = s"$lcname.ico"
@@ -106,7 +108,6 @@ packageMSI := {
 
     val (runtimeFiles, runtimeIds, _) = getRuntimeXML(jdk, 0, 0)
 
-    println("Generating")
     IO.write(output / s"$lcname-$arch.wxs",
       s"""<?xml version='1.0'?>
         <Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
@@ -152,11 +153,7 @@ packageMSI := {
         </Wix>
       """)
 
-    println("Start")
     new lang.ProcessBuilder("wixl", "-v", "--arch", arch, s"$lcname-$arch.wxs").directory(output).inheritIO().start().waitFor()
-    println("End")
-    new lang.ProcessBuilder("find", ".").directory(output).run()
-
   }
 
   for ((arch, folder, productId, updateId, jdk) <- winjdks) {
