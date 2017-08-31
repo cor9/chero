@@ -153,7 +153,7 @@ packageMSI := {
       """)
 
     println("Start")
-    new lang.ProcessBuilder("wixl", "-v", "--arch", arch, s"$lcname-$arch.wxs").directory(output).inheritIO().run()
+    new lang.ProcessBuilder("wixl", "-v", "--arch", arch, s"$lcname-$arch.wxs").directory(output).inheritIO().start().waitFor()
     println("End")
     new lang.ProcessBuilder("find", ".").directory(output).run()
 
