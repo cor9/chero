@@ -21,7 +21,8 @@ build:
   script:
     - git submodule init
     - git submodule update
-    - sbt assembly
+    - sbt packageMSI
   artifacts:
     paths:
       - "target/scala-2.12/beatmeter-generator.jar" 
+      - "target/msiPackage/beatmeter-generator-x64.jar"
