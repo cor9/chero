@@ -106,6 +106,7 @@ packageMSI := {
 
     val (runtimeFiles, runtimeIds, _) = getRuntimeXML(jdk, 0, 0)
 
+    println("Generating")
     IO.write(output / s"$lcname-$arch.wxs",
       s"""<?xml version='1.0'?>
         <Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
