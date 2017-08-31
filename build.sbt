@@ -155,6 +155,8 @@ packageMSI := {
     println("Start")
     new lang.ProcessBuilder("wixl", "-v", "--arch", arch, s"$lcname-$arch.wxs").directory(output).run()
     println("End")
+    new lang.ProcessBuilder("find", ".").directory(output).run()
+
   }
 
   for ((arch, folder, productId, updateId, jdk) <- winjdks) {
