@@ -2068,7 +2068,7 @@ object BeatEditor extends JFXApp {
                   onAction = handle {
                     val dialog = new BeatmeterDialog(Some(mainView().scene().windowProperty()()), tracks().flying(),
                       tracks().flyingBeatmeter(), tracks().waveformBeatmeter())
-                    val r = dialog.showAndWait().get.asInstanceOf[(Boolean, FlyingBeatmeter.Conf_V0_2_0, WaveformBeatmeter.Conf_V0_2_0)]
+                    val r = dialog.showAndWait().get.asInstanceOf[(Boolean, FlyingBeatmeter.Conf_V0_2_3, WaveformBeatmeter.Conf_V0_2_0)]
                     undoManager.startGroup()
                     tracks().flying() = r._1
                     tracks().flyingBeatmeter() = r._2

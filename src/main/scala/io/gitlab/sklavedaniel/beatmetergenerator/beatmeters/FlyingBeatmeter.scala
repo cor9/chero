@@ -32,11 +32,21 @@ object FlyingBeatmeter {
     beatBorderColor: Color, beatHighlightedColor: Color, beatHighlightedBorderColor: Color,
     messageFont: (String, Int, Boolean, Boolean), margin: Int, messageColor: Color, messageBorderColor: Color,
     messageBorderStrength: Double, messageAlign: Align, messagePosition: Double, imageDirectory: Option[URI]
+  ) {
+    def toV0_2_3 = Conf_V0_2_3(width, height, frames, speed, position, beatColor, beatBorderColor, beatHighlightedColor,
+      beatHighlightedBorderColor, messageFont, margin, messageColor, messageBorderColor, messageBorderStrength,
+      messageAlign, messagePosition, imageDirectory)
+  }
+
+  case class Conf_V0_2_3(width: Int, height: Int, frames: Double, speed: Double, position: Double, beatColor: Color,
+    beatBorderColor: Color, beatHighlightedColor: Color, beatHighlightedBorderColor: Color,
+    messageFont: (String, Int, Boolean, Boolean), margin: Int, messageColor: Color, messageBorderColor: Color,
+    messageBorderStrength: Double, messageAlign: Align, messagePosition: Double, imageDirectory: Option[URI]
   )
 
 }
 
-class FlyingBeatmeter(conf: FlyingBeatmeter.Conf_V0_2_0) extends Beatmeter2 {
+class FlyingBeatmeter(conf: FlyingBeatmeter.Conf_V0_2_3) extends Beatmeter2 {
 
   def width: Int = conf.width
 

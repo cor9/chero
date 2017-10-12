@@ -20,12 +20,13 @@ package io.gitlab.sklavedaniel.beatmetergenerator.utils
 
 import java.net.URI
 
-import io.gitlab.sklavedaniel.beatmetergenerator.utils.ImmutableTracks_V0_2_0._
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.ImmutableTracks_V0_2_0
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.ImmutableTracks_V0_2_3
 import microjson._
 import prickle._
 
 import scala.collection.mutable
-import scala.util.Try
+import scala.util.{Failure, Try}
 import scalafx.scene.paint.Color
 
 object JsonSerialization {
@@ -54,32 +55,34 @@ object JsonSerialization {
       }
     }
   }
-  implicit val trackElementPickler: PicklerPair[ImmutableTrackElement] = CompositePickler[ImmutableTrackElement].concreteType[ImmutableBeat].concreteType[ImmutableMessage].
-    concreteType[ImmutableBPMPattern].concreteType[ImmutableBeatsPattern]
+  implicit val trackElementPickler: PicklerPair[ImmutableTracks_V0_2_0.ImmutableTrackElement] = CompositePickler[ImmutableTracks_V0_2_0.ImmutableTrackElement].
+    concreteType[ImmutableTracks_V0_2_0.ImmutableBeat].concreteType[ImmutableTracks_V0_2_0.ImmutableMessage].
+    concreteType[ImmutableTracks_V0_2_0.ImmutableBPMPattern].concreteType[ImmutableTracks_V0_2_0.ImmutableBeatsPattern]
   implicit val alignPickler: PicklerPair[Align] = CompositePickler[Align].concreteType[AlignLeft.type].concreteType[AlignRight.type].
     concreteType[AlignCenter.type]
 
-  implicit val pickler: Pickler[ImmutableTrack] = Pickler.materializePickler[ImmutableTrack]
-  implicit val unpickler: Unpickler[ImmutableTrack] = Unpickler.materializeUnpickler[ImmutableTrack]
+  implicit val pickler: Pickler[ImmutableTracks_V0_2_0.ImmutableTrack] = Pickler.materializePickler[ImmutableTracks_V0_2_0.ImmutableTrack]
+  implicit val unpickler: Unpickler[ImmutableTracks_V0_2_0.ImmutableTrack] = Unpickler.materializeUnpickler[ImmutableTracks_V0_2_0.ImmutableTrack]
 
-  def save(tracks: ImmutableTracks): String = {
-    val p = implicitly[Pickler[ImmutableTracks]]
+  def save(tracks: ImmutableTracks_V0_2_3.ImmutableTracks): String = {
+    val p = implicitly[Pickler[ImmutableTracks_V0_2_3.ImmutableTracks]]
     val data = p.pickle(tracks, PickleState())
-    val json = JsObject(Map("version" -> JsString("0.2.0"), "data" -> data))
+    val json = JsObject(Map("version" -> JsString("0.2.3"), "data" -> data))
     Json.write(json)
   }
 
-  def load(tracks: String) = {
+  def load(tracks: String): Try[ImmutableTracks_V0_2_3.ImmutableTracks] = {
     val json = Json.read(tracks)
-    val data = Try {
-      val JsObject(map) = json
-      val JsString(version) = map("version")
-      if ("0.2.0" != version) {
-        throw new Exception("Unsupported version " + version)
-      }
-      map("data")
+    val JsObject(map) = json
+    val JsString(version) = map("version")
+    version match {
+      case "0.2.0" =>
+        Unpickle[ImmutableTracks_V0_2_0.ImmutableTracks].from(map("data")).map(_.toV_0_2_3)
+      case "0.2.3" =>
+        Unpickle[ImmutableTracks_V0_2_3.ImmutableTracks].from(map("data"))
+      case _ =>
+        Failure(new Exception("Unsupported version " + version))
     }
-    data.flatMap((d: JsValue) => Unpickle[ImmutableTracks].from(d))
   }
 
   def export(video: List[(Double, Boolean)], audio: List[(Double, Boolean, Option[URI])], messages: List[(Double, Double, String)]): String = {

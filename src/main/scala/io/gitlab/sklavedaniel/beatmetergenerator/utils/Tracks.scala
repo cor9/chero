@@ -22,6 +22,7 @@ import java.net.URI
 
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.{FlyingBeatmeter, WaveformBeatmeter}
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.ImmutableTracks_V0_2_0._
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.ImmutableTracks_V0_2_3.ImmutableTracks
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap.Unscalable
 
 import scalafx.beans.binding.{Bindings, ObjectBinding}
@@ -37,7 +38,7 @@ final class Tracks(val undoManager: Option[UndoManager]) {
 
   val flying = BooleanProperty(true)
   UndoManager.register(undoManager, flying)
-  val flyingBeatmeter = ObjectProperty(FlyingBeatmeter.Conf_V0_2_0(1280, 40, 25.0, 0.3, 0.4, Color.web("#2a98ff"), Color.Black,
+  val flyingBeatmeter = ObjectProperty(FlyingBeatmeter.Conf_V0_2_3(1280, 40, 25.0, 0.3, 0.4, Color.web("#2a98ff"), Color.Black,
     Color.web("#ff3e2f"), Color.Black, ("Courgette", 60, true, false), 5, Color.web("#2a98ff"), Color.Black, 1.0, AlignCenter, 0.5, None))
   UndoManager.register(undoManager, flyingBeatmeter)
   val waveformBeatmeter = ObjectProperty(WaveformBeatmeter.Conf_V0_2_0(1280, 40, 25.0, 0.3, 0.4, 1.0, 0.0, Color.web("#2a98ff"), Color.web("#ff3e2f"),

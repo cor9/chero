@@ -29,30 +29,7 @@ object ImmutableTracks_V0_2_0 {
   case class ImmutableTracks(content: List[ImmutableTrack], audio: Option[URI], flying: Boolean, flyingBeatmeter: FlyingBeatmeter.Conf_V0_2_0,
     waveformBeatmeter: WaveformBeatmeter.Conf_V0_2_0
   ) {
-    def toMutable(base: URI, load: URI => Try[Array[Short]], undoManager: Option[UndoManager]): Try[Tracks] = {
-      (audio match {
-        case Some(uri) =>
-          val auri = base.resolve(uri)
-          load(auri).map(arr => Some((auri, arr)))
-        case None =>
-          Success(None)
-      }).flatMap { aud =>
-        val list = content.map(_.toMutable(base, load, undoManager)).foldLeft(Success(Nil): Try[List[Track]]) { (l, t) =>
-          l.flatMap(l2 => t.map(t2 => t2 :: l2))
-        }
-        list.map { l =>
-          val t = new Tracks(undoManager)
-          undoManager.foreach(_.active = false)
-          t.content ++= l.reverse
-          t.audio() = aud
-          t.flyingBeatmeter() = flyingBeatmeter
-          t.waveformBeatmeter() = waveformBeatmeter
-          t.flying() = flying
-          undoManager.foreach(_.active = true)
-          t
-        }
-      }
-    }
+    def toV_0_2_3 = ImmutableTracks_V0_2_3.ImmutableTracks(content, audio, flying, flyingBeatmeter.toV0_2_3, waveformBeatmeter)
   }
 
   case class ImmutableTrack(title: String, play: Boolean, record: Boolean, display: Boolean, snap: Boolean,
