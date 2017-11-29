@@ -24,7 +24,10 @@ import java.awt.image.BufferedImage
 import java.awt.{AlphaComposite, Color, Graphics2D, Shape}
 import java.net.URI
 
+import io.gitlab.sklavedaniel.beatmetergenerator.utils._
 import org.apache.batik.anim.dom.{SAXSVGDocumentFactory, SVGDOMImplementation}
+import org.apache.batik.bridge.{BridgeContext, GVTBuilder, UserAgentAdapter}
+import org.apache.batik.gvt.GraphicsNode
 import org.apache.batik.transcoder._
 import org.apache.batik.transcoder.image.ImageTranscoder
 import org.apache.batik.util.{SVGConstants, XMLResourceDescriptor}
@@ -62,13 +65,13 @@ object Beatmeter {
 
     def toTimed(pxPerFrame: Double, width: Double)(implicit ev: B =:= Positioned): ElementStream[A, Timed] = toTimed(pxPerFrame, 0.0, width)
 
-    def toTimed(pxPerFrame: Double, offset: Double, width: Double)(implicit ev: B =:= Positioned): ElementStream[A, Timed] =
+    def toTimed(pxPerFrame: Double, offset: Double, width: Double, disappear: Double = 1.0)(implicit ev: B =:= Positioned): ElementStream[A, Timed] =
       ElementStream(clip,
         stream.map { case Positioned((x, y), w, drawable) =>
           val startFrame = (x - width - offset) / pxPerFrame
           val error = (startFrame.ceil - startFrame) * pxPerFrame
           Timed(startFrame.ceil.toInt,
-            ((x + w - offset) / pxPerFrame).ceil.toInt,
+            ((x + w * disappear - offset) / pxPerFrame).ceil.toInt,
             PositionDrawable(
               i => (width - i * pxPerFrame - error + offset, y),
               drawable))
@@ -117,15 +120,41 @@ object Beatmeter {
     override def draw(frame: Int, g: Graphics2D): Unit = {
       val tmp = g.getTransform
       val (x, y) = position(frame)
-      g.setTransform(AffineTransform.getTranslateInstance(x, y))
+      g.transform(AffineTransform.getTranslateInstance(x, y))
       drawable.draw(frame, g)
       g.setTransform(tmp)
     }
   }
 
-  case class ImageDrawable(image: BufferedImage) extends Drawable {
+  case class TransformDrawable(transform: Int => AffineTransform, drawable: Drawable) extends Drawable {
+    override def draw(frame: Int, g: Graphics2D): Unit = {
+      val tmp = g.getTransform
+      g.transform(transform(frame))
+      drawable.draw(frame, g)
+      g.setTransform(tmp)
+    }
+  }
+
+  case class ImageDrawable(img: BufferedImage, alignh: AlignH = AlignLeft, alignv: AlignV = AlignTop) extends Drawable {
     def draw(frame: Int, g: Graphics2D): Unit = {
-      g.drawImage(image, 0, 0, null) // scalastyle:ignore null
+      val tmp = g.getTransform
+      g.transform(AffineTransform.getTranslateInstance((alignh match {
+        case AlignLeft => 0.0
+        case AlignRight => -1.0
+        case AlignCenter => -0.5
+      }) * img.getWidth, (alignv match {
+        case AlignTop => 0.0
+        case AlignBottom => -1.0
+        case AlignMiddle => -0.5
+      }) * img.getHeight))
+      g.drawImage(img, 0, 0, null) // scalastyle:ignore null
+      g.setTransform(tmp)
+    }
+  }
+
+  case class NodeDrawable(node: GraphicsNode) extends Drawable {
+    def draw(frame: Int, g: Graphics2D): Unit = {
+      node.paint(g)
     }
   }
 
@@ -172,6 +201,15 @@ object Beatmeter {
     }
   }
 
+  case class FramesDrawable(frames: IndexedSeq[ImageDrawable]) extends Drawable {
+
+    override def draw(frame: Int, g: Graphics2D): Unit = {
+      if (frame < frames.size) {
+        frames(frame).draw(frame, g)
+      }
+    }
+  }
+
   def getImage(uri: URI, height: Float, css: String): BufferedImage = {
     val hints = new TranscodingHints()
     hints.put(SVGAbstractTranscoder.KEY_HEIGHT, height)
@@ -206,6 +244,19 @@ object Beatmeter {
     image.get
   }
 
+  def getGraphicsNode(uri: URI, height: Float, css: String): GraphicsNode = {
+    val docfactory = new SAXSVGDocumentFactory(XMLResourceDescriptor.getXMLParserClassName)
+    val doc = docfactory.createDocument(uri.toString)
+    val style = doc.createElementNS("http://www.w3.org/2000/svg", "style")
+
+    style.setTextContent(css)
+    doc.getDocumentElement.appendChild(style)
+
+    val builder = new GVTBuilder
+    val ctx = new BridgeContext(new UserAgentAdapter)
+    builder.build(ctx, doc)
+  }
+
   def getCSSColor(color: Color) = {
     val rgb = (color.getRGB & 0xffffff).toHexString
     "#" + "0" * (6 - rgb.length) + rgb
@@ -217,6 +268,7 @@ object Beatmeter {
   }
 
   def getCSSOpacity(color: Color) = (color.getAlpha.toFloat / 0xff).toString()
+
   def getCSSOpacity(color: paint.Color) = color.opacity.toFloat.toString()
 
   def getImageLine(width: Int, pattern: (BufferedImage, BufferedImage, IndexedSeq[(BufferedImage, BufferedImage)])): ElementStream[None.type, Appended] = {
@@ -251,13 +303,15 @@ object Beatmeter {
   type TimedStream = ElementStream[Option[Shape], Beatmeter.Timed]
 }
 
-trait Beatmeter2 {
+trait Beatmeter {
 
   def getElementStreams(beats: Seq[(Double, Boolean)], messages: Seq[(Double, Double, String)], frameCount: Int): List[Beatmeter.TimedStream]
 
   def minimalBeatDistance: Double
 
   def width: Int
+
   def height: Int
+
   def frames: Double
 }

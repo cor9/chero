@@ -22,7 +22,7 @@ import java.awt.{BasicStroke, Font, RenderingHints}
 import java.net.URI
 
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.Beatmeter._
-import io.gitlab.sklavedaniel.beatmetergenerator.utils.{Align, AlignCenter, AlignLeft, AlignRight}
+import io.gitlab.sklavedaniel.beatmetergenerator.utils._
 
 import scalafx.scene.paint.Color
 
@@ -31,36 +31,38 @@ object FlyingBeatmeter {
   case class Conf_V0_2_0(width: Int, height: Int, frames: Double, speed: Double, position: Double, beatColor: Color,
     beatBorderColor: Color, beatHighlightedColor: Color, beatHighlightedBorderColor: Color,
     messageFont: (String, Int, Boolean, Boolean), margin: Int, messageColor: Color, messageBorderColor: Color,
-    messageBorderStrength: Double, messageAlign: Align, messagePosition: Double, imageDirectory: Option[URI]
+    messageBorderStrength: Double, messageAlign: AlignH, messagePosition: Double, imageDirectory: Option[URI]
   ) {
     def toV0_2_3 = Conf_V0_2_3(width, height, frames, speed, position, beatColor, beatBorderColor, beatHighlightedColor,
-      beatHighlightedBorderColor, messageFont, margin, messageColor, messageBorderColor, messageBorderStrength,
-      messageAlign, messagePosition, imageDirectory)
+      beatHighlightedBorderColor, 1.5, 0.2, Color.Transparent, Color.Transparent, messageFont, margin, messageColor,
+      messageBorderColor, messageBorderStrength, messageAlign, messagePosition, imageDirectory)
   }
 
   case class Conf_V0_2_3(width: Int, height: Int, frames: Double, speed: Double, position: Double, beatColor: Color,
-    beatBorderColor: Color, beatHighlightedColor: Color, beatHighlightedBorderColor: Color,
-    messageFont: (String, Int, Boolean, Boolean), margin: Int, messageColor: Color, messageBorderColor: Color,
-    messageBorderStrength: Double, messageAlign: Align, messagePosition: Double, imageDirectory: Option[URI]
+    beatBorderColor: Color, beatHighlightedColor: Color, beatHighlightedBorderColor: Color, beatScale: Double, beatDuration: Double,
+    beatMarkerColor: Color, backgroundColor: Color, messageFont: (String, Int, Boolean, Boolean),
+    margin: Int, messageColor: Color, messageBorderColor: Color,
+    messageBorderStrength: Double, messageAlign: AlignH, messagePosition: Double, imageDirectory: Option[URI]
   )
 
 }
 
-class FlyingBeatmeter(conf: FlyingBeatmeter.Conf_V0_2_3) extends Beatmeter2 {
+class FlyingBeatmeter(conf: FlyingBeatmeter.Conf_V0_2_3) extends Beatmeter {
 
   def width: Int = conf.width
 
   def frames: Double = conf.frames
 
-  override val height = conf.height + conf.margin + conf.messageFont._2
+  override val height = (conf.height * conf.beatScale).ceil.toInt + conf.margin + conf.messageFont._2
   val beatmeterWidth = (1.0 - conf.position) * conf.width
-  val beatmeterY = conf.messageFont._2 + conf.margin
+  val beatmeterY = conf.messageFont._2 + conf.margin + conf.height * conf.beatScale / 2.0
 
   val imageCSS =
     s"""
         .wave.fill {
           fill: ${getCSSColor(conf.beatColor)} !important;
           fill-opacity: ${getCSSOpacity(conf.beatColor)} !important;
+          width: 100px !important;
         }
         .wave.stroke {
           stroke: ${getCSSColor(conf.beatColor)} !important;
@@ -73,6 +75,14 @@ class FlyingBeatmeter(conf: FlyingBeatmeter.Conf_V0_2_3) extends Beatmeter2 {
         .foreground.stroke {
           stroke: ${getCSSColor(conf.beatBorderColor)} !important;
           stroke-opacity: ${getCSSOpacity(conf.beatBorderColor)} !important;
+        }
+        .background.fill {
+          fill: ${getCSSColor(conf.backgroundColor)} !important;
+          fill-opacity: ${getCSSOpacity(conf.backgroundColor)} !important;
+        }
+        .background.stroke {
+          stroke: ${getCSSColor(conf.backgroundColor)} !important;
+          stroke-opacity: ${getCSSOpacity(conf.backgroundColor)} !important;
         }
     """
   val imageCSSHighlighted =
@@ -94,46 +104,64 @@ class FlyingBeatmeter(conf: FlyingBeatmeter.Conf_V0_2_3) extends Beatmeter2 {
           stroke-opacity: ${getCSSOpacity(conf.beatHighlightedBorderColor)} !important;
         }
     """
+  val imageCSSMarker =
+    s"""
+        .marker.fill {
+          fill: ${getCSSColor(conf.beatMarkerColor)} !important;
+          fill-opacity: ${getCSSOpacity(conf.beatMarkerColor)} !important;
+        }
+        .marker.stroke {
+          stroke: ${getCSSColor(conf.beatMarkerColor)} !important;
+          stroke-opacity: ${getCSSOpacity(conf.beatMarkerColor)} !important;
+        }
+    """
 
+  val beatmeterBackgroundURI = conf.imageDirectory.map(_.resolve("background.svg")).getOrElse(getClass.getResource("/meter/waveform/background.svg").toURI)
+  val beatmeterBackground = getImage(beatmeterBackgroundURI, (conf.height * conf.beatScale).toFloat, imageCSS)
   val beatmeterBeatURI = conf.imageDirectory.map(_.resolve("beat.svg")).getOrElse(getClass.getResource("/meter/flying/beat.svg").toURI)
   val beatmeterBeat = getImage(beatmeterBeatURI, conf.height, imageCSS)
   val beatmeterBeatHighlighted = getImage(beatmeterBeatURI, conf.height, imageCSSHighlighted)
-  val beatmeterAnimURI = conf.imageDirectory.map(_.resolve("beat.anim")).getOrElse(getClass.getResource("/meter/flying/beat.anim").toURI)
-  val beatmeterAnim = getAnim(beatmeterAnimURI, conf.height, conf.frames, imageCSS)
-  val beatmeterAnimHighlighted = getAnim(beatmeterAnimURI, conf.height, conf.frames, imageCSSHighlighted)
+  val beatmeterBeatAnimFrames = (conf.beatDuration * frames).ceil.toInt
+  val beatmeterBeatAnim = (0 until beatmeterBeatAnimFrames).map { i =>
+    val delta = (conf.beatScale - 1.0) * Math.sin(Math.PI * i / beatmeterBeatAnimFrames.toDouble)
+    val img = getImage(beatmeterBeatURI, (conf.height + conf.height * delta).toFloat, imageCSS)
+    ImageDrawable(img, AlignCenter, AlignMiddle)
+  }
+  val beatmeterBeatHighlightedAnim = (0 until beatmeterBeatAnimFrames).map { i =>
+    val delta = (conf.beatScale - 1.0) * i / beatmeterBeatAnimFrames.toDouble
+    val img = getImage(beatmeterBeatURI, (conf.height + conf.height * delta).toFloat, imageCSSHighlighted)
+    ImageDrawable(img, AlignCenter, AlignMiddle)
+  }
+  val beatmeterMarkerURI = conf.imageDirectory.map(_.resolve("marker.svg")).getOrElse(getClass.getResource("/meter/flying/marker.svg").toURI)
+  val beatmeterMarker = getImage(beatmeterMarkerURI, (conf.height * conf.beatScale).toFloat, imageCSSMarker)
 
   override val minimalBeatDistance: Double = beatmeterBeat.getWidth / conf.speed / conf.width
 
   override def getElementStreams(beats: Seq[(Double, Boolean)], messages: Seq[(Double, Double, String)], frameCount: Int): List[TimedStream] = {
     val beatmeterStream = {
-      val bs = beats.map(b => ((b._1 * conf.speed + conf.position) * conf.width - beatmeterBeat.getWidth / 2, b._2))
-
-      val middle = bs.sliding(2).map {
-        case Seq(beat1, beat2) =>
-          ElementStream(Positioned((beat1._1, beatmeterY), if (beat1._2) {
+      val bs = beats.map(b => ((b._1 * conf.speed + conf.position) * conf.width, b._2)).toStream
+      ElementStream(bs.map {
+        beat1 =>
+          val img = if (beat1._2) {
             beatmeterBeatHighlighted
           } else {
             beatmeterBeat
-          }))
-      }.reduceLeft(_ ++ _)
-      val end = ElementStream(Positioned((bs.last._1, beatmeterY), if (bs.last._2) {
-        beatmeterBeatHighlighted
-      } else {
-        beatmeterBeat
-      }))
-
-      middle ++ end
+          }
+          Positioned((beat1._1, beatmeterY), 0.0, ImageDrawable(img, AlignCenter, AlignMiddle))
+      })
     }
-    val beatAnimStream = ElementStream(beats.toStream.map(b => (b._1 * conf.frames, b._2)).map { b =>
+    val beatAnimStream = ElementStream((beats :+ (Double.PositiveInfinity, true)).sliding(2).toStream.map(b => (b.head._1 * conf.frames, b.head._2, b.tail.head._1 * conf.frames)).map { b =>
       val frame = b._1.ceil.toInt
-      val anim = if (b._2) {
-        beatmeterAnimHighlighted
+      val beat = if (b._2) {
+        beatmeterBeatHighlightedAnim
       } else {
-        beatmeterAnim
+        beatmeterBeatAnim
       }
-      Timed(frame, frame + anim._2.size, PositionDrawable(_ => (conf.position * conf.width - anim._2.head.getWidth / 2, beatmeterY),
-        AnimDrawable(frame - b._1, anim)))
+      Timed(frame, (frame + beat.size).min(b._3.round.toInt), PositionDrawable(_ => (conf.position * conf.width
+        , beatmeterY),
+        FramesDrawable(beat)))
     })
+
 
     val messageFont = new Font(conf.messageFont._1,
       (if (conf.messageFont._3) {
@@ -175,8 +203,13 @@ class FlyingBeatmeter(conf: FlyingBeatmeter.Conf_V0_2_3) extends Beatmeter2 {
     })
 
     List(
-      beatmeterStream.toTimed(conf.speed * conf.width / conf.frames, conf.position * conf.width, beatmeterWidth),
-      beatAnimStream, messageStream
+      ElementStream(        Stream(
+          Fixed((0.0, beatmeterY), ImageDrawable(beatmeterBackground, AlignCenter, AlignMiddle))
+        )      ).toTimed(),
+      beatmeterStream.toTimed(conf.speed * conf.width / conf.frames, conf.position * conf.width, beatmeterWidth, 0.5),
+      beatAnimStream, messageStream, ElementStream(Fixed((conf.position * conf.width
+        , beatmeterY),
+        ImageDrawable(beatmeterMarker, AlignCenter, AlignMiddle))).toTimed()
     )
   }
 

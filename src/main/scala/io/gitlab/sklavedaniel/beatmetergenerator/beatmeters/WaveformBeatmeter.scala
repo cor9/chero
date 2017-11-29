@@ -22,7 +22,7 @@ import java.awt.{BasicStroke, Font, RenderingHints, geom}
 import java.net.URI
 
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.Beatmeter._
-import io.gitlab.sklavedaniel.beatmetergenerator.utils.{Align, AlignCenter, AlignLeft, AlignRight}
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.{AlignH, AlignCenter, AlignLeft, AlignRight}
 
 import scalafx.scene.paint.Color
 
@@ -31,12 +31,12 @@ object WaveformBeatmeter {
   case class Conf_V0_2_0(width: Int, height: Int, frames: Double, speed: Double, position: Double, startPosition: Double, endPosition: Double,
     waveColor: Color, waveHighlightedColor: Color, foregroundColor: Color, backgroundColor: Color, markerColor: Color,
     messageFont: (String, Int, Boolean, Boolean), margin: Int, messageColor: Color, messageBorderColor: Color,
-    messageBorderStrength: Double, messageAlign: Align, messagePosition: Double, imageDirectory: Option[URI]
+    messageBorderStrength: Double, messageAlign: AlignH, messagePosition: Double, imageDirectory: Option[URI]
   )
 
 }
 
-class WaveformBeatmeter(conf: WaveformBeatmeter.Conf_V0_2_0) extends Beatmeter2 {
+class WaveformBeatmeter(conf: WaveformBeatmeter.Conf_V0_2_0) extends Beatmeter {
 
   val startPos: Double = conf.startPosition
   val endPos: Double = conf.endPosition

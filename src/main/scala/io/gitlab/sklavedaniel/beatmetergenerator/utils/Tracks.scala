@@ -39,7 +39,7 @@ final class Tracks(val undoManager: Option[UndoManager]) {
   val flying = BooleanProperty(true)
   UndoManager.register(undoManager, flying)
   val flyingBeatmeter = ObjectProperty(FlyingBeatmeter.Conf_V0_2_3(1280, 40, 25.0, 0.3, 0.4, Color.web("#2a98ff"), Color.Black,
-    Color.web("#ff3e2f"), Color.Black, ("Courgette", 60, true, false), 5, Color.web("#2a98ff"), Color.Black, 1.0, AlignCenter, 0.5, None))
+    Color.web("#ff3e2f"), Color.Black, 1.5, 0.2, Color.Black, Color.web("#00000088"), ("Courgette", 60, true, false), 5, Color.web("#2a98ff"), Color.Black, 1.0, AlignCenter, 0.5, None))
   UndoManager.register(undoManager, flyingBeatmeter)
   val waveformBeatmeter = ObjectProperty(WaveformBeatmeter.Conf_V0_2_0(1280, 40, 25.0, 0.3, 0.4, 1.0, 0.0, Color.web("#2a98ff"), Color.web("#ff3e2f"),
     Color.Transparent, Color.web("#070707BB"), Color.web("#ffe400"),
@@ -53,14 +53,21 @@ final class Tracks(val undoManager: Option[UndoManager]) {
 
 }
 
-sealed trait Align
+sealed trait AlignH
 
-case object AlignLeft extends Align
+case object AlignLeft extends AlignH
 
-case object AlignRight extends Align
+case object AlignRight extends AlignH
 
-case object AlignCenter extends Align
+case object AlignCenter extends AlignH
 
+sealed trait AlignV
+
+case object AlignTop extends AlignV
+
+case object AlignBottom extends AlignV
+
+case object AlignMiddle extends AlignV
 
 
 class Track(val undoManager: Option[UndoManager]) {

@@ -82,6 +82,24 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
       maxWidth = Double.PositiveInfinity
       editable = true
     }
+    val beatScaleSpinner = UIUtils.editableSpinner(new Spinner[Double](0.0, 10.0, flyingConf.beatScale, 0.05) {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+    })
+    val beatDurationSpinner = UIUtils.editableSpinner(new Spinner[Double](0.0, 60.0, flyingConf.beatDuration, 0.05) {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+    })
+    val beatMarkerColorPicker = new ColorPicker(flyingConf.beatMarkerColor) {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+      editable = true
+    }
+    val backgroundColorPicker = new ColorPicker(flyingConf.backgroundColor) {
+      hgrow = Priority.Always
+      maxWidth = Double.PositiveInfinity
+      editable = true
+    }
     val messageFont = ObjectProperty(flyingConf.messageFont)
     val marginSpinner = UIUtils.editableSpinner(new Spinner[Int](0, 10000, flyingConf.margin, 1) {
       hgrow = Priority.Always
@@ -149,17 +167,25 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
       add(beatHighlightColorPicker, 1, 7)
       add(new Label("Beat Highlight Border Color"), 0, 8)
       add(beatHighlightBorderColorPicker, 1, 8)
+      add(new Label("Beat Scale"), 0, 9)
+      add(beatScaleSpinner, 1, 9)
+      add(new Label("Beat Duration"), 0, 10)
+      add(beatDurationSpinner, 1, 10)
+      add(new Label("Beat Marker Color"), 0, 11)
+      add(beatMarkerColorPicker, 1, 11)
+      add(new Label("Background Color"), 0, 12)
+      add(backgroundColorPicker, 1, 12)
       add(new Label("Beat Message Margin") {
         tooltip = Tooltip("Margin between beatmeter and messages in px")
-      }, 0, 10)
-      add(marginSpinner, 1, 10)
-      add(new Label("Message Text Color"), 0, 11)
-      add(messageColorPicker, 1, 11)
-      add(new Label("Message Border Color"), 0, 12)
-      add(messageBorderColorPicker, 1, 12)
-      add(new Label("Message Border Strength"), 0, 13)
-      add(messageBorderStrengthSpinner, 1, 13)
-      add(new Label("Message Font"), 0, 14)
+      }, 0, 13)
+      add(marginSpinner, 1, 13)
+      add(new Label("Message Text Color"), 0, 14)
+      add(messageColorPicker, 1, 14)
+      add(new Label("Message Border Color"), 0, 15)
+      add(messageBorderColorPicker, 1, 15)
+      add(new Label("Message Border Strength"), 0, 16)
+      add(messageBorderStrengthSpinner, 1, 16)
+      add(new Label("Message Font"), 0, 17)
       add(new HBox(
         new TextField {
           editable = false
@@ -184,16 +210,16 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
         },
       ) {
         spacing = 5
-      }, 1, 14)
-      add(new Label("Message Alignment"), 0, 15)
-      add(messageAlign, 1, 15)
+      }, 1, 17)
+      add(new Label("Message Alignment"), 0, 18)
+      add(messageAlign, 1, 18)
       add(new Label("Message Position") {
         tooltip = Tooltip("Horizontal position the message is aligned to as ratio of video width")
-      }, 0, 16)
-      add(messagePositionSpinner, 1, 16)
+      }, 0, 19)
+      add(messagePositionSpinner, 1, 19)
       add(new Label("Image Directory") {
         tooltip = Tooltip("Directory containing beat.svg and beat.anim.")
-      }, 0, 17)
+      }, 0, 20)
       add(new HBox(
         new ToggleButton("Select") {
           imageDirectory.onChange { (_, _, d) =>
@@ -216,7 +242,7 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
         }
       ) {
         spacing = 5
-      }, 1, 17)
+      }, 1, 20)
 
       columnConstraints = Seq(new ColumnConstraints(200), new ColumnConstraints {
         hgrow = Priority.Always
@@ -227,9 +253,9 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
     def getConf() = {
       FlyingBeatmeter.Conf_V0_2_3(widthSpinner.value(), heightSpinner.value(), framesSpinner.value(), speedSpinner.value(),
         positionSpinner.value(), beatColorPicker.value(), beatBorderColorPicker.value(), beatHighlightColorPicker.value(),
-        beatHighlightBorderColorPicker.value(), messageFont(), marginSpinner.value(),
-        messageColorPicker.value(), messageBorderColorPicker.value(), messageBorderStrengthSpinner.value(),
-        messageAlign.selectionModel().getSelectedIndex match {
+        beatHighlightBorderColorPicker.value(), beatScaleSpinner.value(), beatDurationSpinner.value(), beatMarkerColorPicker.value(), backgroundColorPicker.value(),
+        messageFont(), marginSpinner.value(), messageColorPicker.value(), messageBorderColorPicker.value(),
+        messageBorderStrengthSpinner.value(), messageAlign.selectionModel().getSelectedIndex match {
           case 0 => AlignLeft
           case 1 => AlignCenter
           case 2 => AlignRight

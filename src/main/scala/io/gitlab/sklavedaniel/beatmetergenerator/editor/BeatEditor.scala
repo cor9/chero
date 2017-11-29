@@ -33,9 +33,9 @@ import javax.sound.sampled.{AudioFileFormat, AudioInputStream, AudioSystem}
 
 import io.gitlab.sklavedaniel.beatmetergenerator._
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.Beatmeter.Timed
-import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.{Beatmeter2, FlyingBeatmeter, WaveformBeatmeter}
+import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.{Beatmeter, FlyingBeatmeter, WaveformBeatmeter}
 import io.gitlab.sklavedaniel.beatmetergenerator.bpmdetection.WaveletBPMDetection
-import io.gitlab.sklavedaniel.beatmetergenerator.editor.AudioPlayer2.BeatInfo
+import io.gitlab.sklavedaniel.beatmetergenerator.editor.AudioPlayer.BeatInfo
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.ImmutableTracks_V0_2_0._
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.{JsonSerialization, ObservableIntervalMap, _}
 import org.w3c.dom.events.EventTarget
@@ -90,7 +90,7 @@ object BeatEditor extends JFXApp {
 
   Font.loadFont(getClass.getResourceAsStream("/Courgette-Regular.ttf"), 20)
 
-  val player = new AudioPlayer2()
+  val player = new AudioPlayer()
 
   class WaveView(initPxPerSec: Double, initHeight: Double, sceneToContextX: Double => Double) extends Group {
     self =>
@@ -279,7 +279,7 @@ object BeatEditor extends JFXApp {
               fc.getExtensionFilters += new ExtensionFilter("wav audio file (16bit unsigned)", "*.wav")
               Option(fc.showOpenDialog(null)) match {
                 case Some(file) =>
-                  AudioPlayer2.readData(new BufferedInputStream(new FileInputStream(file))) match {
+                  AudioPlayer.readData(new BufferedInputStream(new FileInputStream(file))) match {
                     case Success(data) =>
                       track.beat() = Some((file.toURI, data))
                     case Failure(e) =>
@@ -1280,9 +1280,9 @@ object BeatEditor extends JFXApp {
             val end = position()._2
             val task = (callback: (Option[Double], Option[String]) => Boolean) => {
               val detection = new WaveletBPMDetection(WaveletBPMDetection.Daubechies4, 17)
-              val dataSlice = data.slice((start * AudioPlayer2.format.getFrameRate * 2).toInt, (end * AudioPlayer2.format.getFrameRate * 2).toInt + 1)
-              val monoData = dataSlice.toIterator.grouped(AudioPlayer2.format.getChannels).map(_.map(_.toDouble).sum / Short.MaxValue).toArray
-              val (bpm, bpms) = detection.detect(monoData, AudioPlayer2.format.getSampleRate, Some((t, d) => {
+              val dataSlice = data.slice((start * AudioPlayer.format.getFrameRate * 2).toInt, (end * AudioPlayer.format.getFrameRate * 2).toInt + 1)
+              val monoData = dataSlice.toIterator.grouped(AudioPlayer.format.getChannels).map(_.map(_.toDouble).sum / Short.MaxValue).toArray
+              val (bpm, bpms) = detection.detect(monoData, AudioPlayer.format.getSampleRate, Some((t, d) => {
                 callback(Some(t / (end - start)), Some(f"$d%.3f bpm after $t%.3f"))
               }))
               Success(Some(bpm))
@@ -1445,7 +1445,7 @@ object BeatEditor extends JFXApp {
         headerBox.children.add(i, h)
         val info = new BeatInfo()
         info.beat <== Bindings.createObjectBinding(() => {
-          t.beat().map(_._2).getOrElse(AudioPlayer2.defaultBeat)
+          t.beat().map(_._2).getOrElse(AudioPlayer.defaultBeat)
         }, t.beat)
         player.beats.add(i, (h.track.play, info, v.beats))
         if (h.track.snap()) {
@@ -1757,7 +1757,7 @@ object BeatEditor extends JFXApp {
                           val task = (callback: (Option[Double], Option[String]) => Boolean) => {
                             JsonSerialization.load(Source.fromFile(file, "utf-8").mkString).flatMap { ts =>
                               ts.toMutable(file.getParentFile.toURI, (uri: URI) => {
-                                Try(uri.toURL().openStream()).flatMap(in => AudioPlayer2.readData(new BufferedInputStream(in)))
+                                Try(uri.toURL().openStream()).flatMap(in => AudioPlayer.readData(new BufferedInputStream(in)))
                               }, Some(undoManager))
                             }.map(Some(_))
                           }
@@ -1827,7 +1827,7 @@ object BeatEditor extends JFXApp {
                     Option(fc.showOpenDialog(window())) match {
                       case Some(file) =>
                         val task = (callback: (Option[Double], Option[String]) => Boolean) => {
-                          AudioPlayer2.readData(new BufferedInputStream(new FileInputStream(file))).map(Some(_))
+                          AudioPlayer.readData(new BufferedInputStream(new FileInputStream(file))).map(Some(_))
                         }
                         val pd = new ProgressDialog[Array[Short]](Some(mainView().scene().windowProperty()()), "Loading audio", Some("Loading..."), false, task)
                         pd.showAndWait().get.asInstanceOf[Try[Option[Array[Short]]]] match {
@@ -1881,7 +1881,7 @@ object BeatEditor extends JFXApp {
                         try {
                           val (is, count) = player.generateStream()
                           val task = (callback: (Option[Double], Option[String]) => Boolean) => {
-                            val ais = new AudioInputStream(is(d => callback(Some(d), None)), AudioPlayer2.format, count)
+                            val ais = new AudioInputStream(is(d => callback(Some(d), None)), AudioPlayer.format, count)
                             Try(try {
                               AudioSystem.write(ais, AudioFileFormat.Type.WAVE, file)
                             } finally {
@@ -1932,7 +1932,7 @@ object BeatEditor extends JFXApp {
                       b => b._1)
 
                     if (beats.nonEmpty || messages.nonEmpty) {
-                      val beatmeter: Beatmeter2 = if (tracks().flying()) {
+                      val beatmeter: Beatmeter = if (tracks().flying()) {
                         new FlyingBeatmeter(tracks().flyingBeatmeter())
                       } else {
                         new WaveformBeatmeter(tracks().waveformBeatmeter())

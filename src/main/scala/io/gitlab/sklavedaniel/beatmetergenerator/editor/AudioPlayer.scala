@@ -24,7 +24,7 @@ import java.util.concurrent.{FutureTask, LinkedBlockingQueue}
 import javafx.beans.InvalidationListener
 import javax.sound.sampled._
 
-import io.gitlab.sklavedaniel.beatmetergenerator.editor.AudioPlayer2.BeatInfo
+import io.gitlab.sklavedaniel.beatmetergenerator.editor.AudioPlayer.BeatInfo
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap
 import io.gitlab.sklavedaniel.beatmetergenerator.utils._
 
@@ -39,7 +39,7 @@ import scalafx.collections.ObservableBuffer
 import scalafx.collections.ObservableBuffer.{Add, Remove}
 import scalafx.stage.Window
 
-object AudioPlayer2 {
+object AudioPlayer {
 
   sealed abstract class EventState
 
@@ -74,10 +74,10 @@ object AudioPlayer2 {
   val defaultBeat = readData(new BufferedInputStream(getClass.getResourceAsStream("/beats/click.wav"))).get
 }
 
-class AudioPlayer2() {
+class AudioPlayer() {
   self =>
 
-  import AudioPlayer2.format
+  import AudioPlayer.format
 
   val progressDialogWindow = ObjectProperty[Option[Window]](None)
 
