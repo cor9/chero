@@ -9,9 +9,9 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="10mm"
+   width="12mm"
    height="11.59713mm"
-   viewBox="0 0 35.43307 41.092191"
+   viewBox="0 0 42.519681 41.092191"
    id="svg2"
    version="1.1"
    inkscape:version="0.92.2 (unknown)"
@@ -25,9 +25,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="0"
      inkscape:pageshadow="2"
-     inkscape:zoom="11.2"
-     inkscape:cx="-26.185525"
-     inkscape:cy="12.791741"
+     inkscape:zoom="7.919596"
+     inkscape:cx="49.080945"
+     inkscape:cy="7.3150301"
      inkscape:document-units="px"
      inkscape:current-layer="g4704"
      showgrid="false"
@@ -35,9 +35,9 @@
      fit-margin-left="0"
      fit-margin-right="0"
      fit-margin-bottom="0"
-     inkscape:window-width="2560"
-     inkscape:window-height="1381"
-     inkscape:window-x="1366"
+     inkscape:window-width="1366"
+     inkscape:window-height="709"
+     inkscape:window-x="0"
      inkscape:window-y="0"
      inkscape:window-maximized="1"
      showguides="true"
@@ -82,12 +82,13 @@
      transform="translate(-118.86574,-456.65766)">
     <g
        id="g4704">
-      <circle class="marker stroke"
-         style="opacity:1;fill:#000000;fill-opacity:0;stroke:#000000;stroke-width:1.99406242;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:4.00312519;stroke-opacity:1"
-         id="path822"
-         cx="136.58228"
+      <circle
+         class="marker stroke"
+         style="opacity:1;fill:#000000;fill-opacity:0;stroke:#000000;stroke-width:5.08781242;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:4.00312519;stroke-opacity:1"
+         id="path822-3"
+         cx="140.12558"
          cy="477.20377"
-         r="14.824915" />
+         r="17.974329" />
     </g>
   </g>
 </svg>
