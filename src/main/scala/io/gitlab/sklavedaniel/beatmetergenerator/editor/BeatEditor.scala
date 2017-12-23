@@ -1931,7 +1931,9 @@ object BeatEditor extends JFXApp {
                                 val alert = new Alert(AlertType.Confirmation) {
                                   title = "Beatmeter Generator"
                                   headerText = "Output Directory is not empty!"
-                                  contentText = s"Delete all contents of\n${dir.getAbsolutePath}?"
+                                  dialogPane().content = new Text(s"Delete all contents of\n${dir.getAbsolutePath}?") {
+                                    wrappingWidth = 500
+                                  }
                                 }
 
                                 def deleteDir(file: File): Unit = {
