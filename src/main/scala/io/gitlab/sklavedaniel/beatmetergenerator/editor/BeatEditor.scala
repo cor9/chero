@@ -71,6 +71,8 @@ import scalafx.stage.FileChooser.ExtensionFilter
 import scalafx.stage.{DirectoryChooser, FileChooser}
 import scalafx.util.Duration
 
+import WithFailures._
+
 object BeatEditor extends JFXApp {
   val courgette = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, getClass.getResourceAsStream("/Courgette-Regular.ttf"))
   GraphicsEnvironment.getLocalGraphicsEnvironment.registerFont(courgette)
@@ -136,11 +138,11 @@ object BeatEditor extends JFXApp {
 
         if (stage.showing()) {
           val task = (callback: (Option[Double], Option[String]) => Boolean) => {
-            Success(Some(compute()))
+            success(Some(compute()))
           }
           val pd = new ProgressDialog[TraversableOnce[javafx.scene.Node]](Some(mainView().scene().windowProperty()()), "Generating waveform", Some("generating..."), false, task)
-          pd.showAndWait().get.asInstanceOf[Try[Option[TraversableOnce[javafx.scene.Node]]]] match {
-            case Success(Some(nodes)) =>
+          pd.showAndWait().get.asInstanceOf[WithFailures[Option[TraversableOnce[javafx.scene.Node]], Throwable]] match {
+            case WithFailures(Some(Some(nodes)), _) =>
               children ++= nodes
             case _ =>
               assert(false); ???
@@ -280,16 +282,10 @@ object BeatEditor extends JFXApp {
               Option(fc.showOpenDialog(null)) match {
                 case Some(file) =>
                   AudioPlayer.readData(new BufferedInputStream(new FileInputStream(file))) match {
-                    case Success(data) =>
+                    case WithFailures(Some(data), _) =>
                       track.beat() = Some((file.toURI, data))
-                    case Failure(e) =>
-                      val alert = new Alert(AlertType.Error) {
-                        title = "Beatmeter Generator"
-                        headerText = "Could not load file"
-                        contentText = e.getLocalizedMessage
-                      }
-                      alert.initOwner(mainView().scene().windowProperty()())
-                      alert.showAndWait()
+                    case WithFailures(None, e) =>
+                      alert("Could not load file", e.head.getLocalizedMessage)
                       selected() = false
                   }
                 case None =>
@@ -1285,18 +1281,15 @@ object BeatEditor extends JFXApp {
               val (bpm, bpms) = detection.detect(monoData, AudioPlayer.format.getSampleRate, Some((t, d) => {
                 callback(Some(t / (end - start)), Some(f"$d%.3f bpm after $t%.3f"))
               }))
-              Success(Some(bpm))
+              success(Some(bpm))
             }
             val pd = new ProgressDialog[Double](Some(mainView().scene().windowProperty()()), "Detecting BPM", Some("preparing..."), true, task)
-            pd.showAndWait().get.asInstanceOf[Try[Option[Double]]] match {
-              case Success(Some(bpm)) =>
+            pd.showAndWait().get.asInstanceOf[WithFailures[Option[Double], Throwable]] match {
+              case WithFailures(Some(Some(bpm)), _) =>
                 bpmPattern.bpm() = bpm
-              case Success(None) =>
-              case Failure(e) =>
-                val alert = new Alert(AlertType.Error)
-                alert.title = "Beatmeter Generator"
-                alert.headerText = "Error during beat detection"
-                alert.contentText = e.getLocalizedMessage
+              case WithFailures(Some(None), _) =>
+              case WithFailures(None, e) =>
+                alert("Error during beat detection", e.headOption.map(x => x.getLocalizedMessage).getOrElse(""))
             }
           }
 
@@ -1757,33 +1750,26 @@ object BeatEditor extends JFXApp {
                           val task = (callback: (Option[Double], Option[String]) => Boolean) => {
                             JsonSerialization.load(Source.fromFile(file, "utf-8").mkString).flatMap { ts =>
                               ts.toMutable(file.getParentFile.toURI, (uri: URI) => {
-                                Try(uri.toURL().openStream()).flatMap(in => AudioPlayer.readData(new BufferedInputStream(in)))
+                                withFailures(uri.toURL().openStream()).flatMap {
+                                  in => AudioPlayer.readData(new BufferedInputStream(in))
+                                }
                               }, Some(undoManager))
                             }.map(Some(_))
                           }
                           val pd = new ProgressDialog[Tracks](Some(mainView().scene().windowProperty()()), "Loading", Some("Loading..."), false, task)
-                          pd.showAndWait().get.asInstanceOf[Try[Option[Tracks]]] match {
-                            case Success(Some(ts)) =>
+                          pd.showAndWait().get.asInstanceOf[WithFailures[Option[Tracks], Throwable]] match {
+                            case WithFailures(Some(Some(ts)), e) =>
                               tracks() = ts
-                            case Failure(e) =>
-                              val alert = new Alert(AlertType.Error) {
-                                title = "Beatmeter Generator"
-                                headerText = "Could not load file"
-                                contentText = e.getLocalizedMessage
+                              if (e.nonEmpty) {
+                                alert("The following errors have been ignored", e.map(x => x.getLocalizedMessage).mkString("\n"))
                               }
-                              alert.initOwner(mainView().scene().windowProperty()())
-                              alert.showAndWait()
-                            case Success(None) =>
+                            case WithFailures(None, e) =>
+                              alert("Could not load file", e.headOption.map(x => x.getLocalizedMessage).getOrElse(""))
+                            case WithFailures(Some(None), _) =>
                           }
                         } catch {
                           case e: Exception =>
-                            val alert = new Alert(AlertType.Error) {
-                              title = "Beatmeter Generator"
-                              headerText = "Could not open file"
-                              contentText = e.getLocalizedMessage
-                            }
-                            alert.initOwner(mainView().scene().windowProperty()())
-                            alert.showAndWait()
+                            alert("Could not open file", e.getLocalizedMessage)
                         }
                       case None =>
                     }
@@ -1800,20 +1786,14 @@ object BeatEditor extends JFXApp {
                           val r = for (out <- resource.managed(new OutputStreamWriter(new FileOutputStream(file), "utf-8"))) yield {
                             out.write(s)
                           }
-                          r.tried.map(Some(_))
+                          fromTry(r.tried).map(Some(_))
                         }
                         val pd = new ProgressDialog[Unit](Some(mainView().scene().windowProperty()()), "Saving", Some("Saving..."), false, task)
-                        pd.showAndWait().get.asInstanceOf[Try[Option[Unit]]] match {
-                          case Success(Some(_)) =>
-                          case Failure(e) =>
-                            val alert = new Alert(AlertType.Error) {
-                              title = "Beatmeter Generator"
-                              headerText = "Could not save file"
-                              contentText = e.getLocalizedMessage
-                            }
-                            alert.initOwner(mainView().scene().windowProperty()())
-                            alert.showAndWait()
-                          case Success(None) =>
+                        pd.showAndWait().get.asInstanceOf[WithFailures[Option[Unit], Throwable]] match {
+                          case WithFailures(Some(Some(_)), _) =>
+                          case WithFailures(None, e) =>
+                            alert("Could not save file", e.headOption.map(x => x.getLocalizedMessage).getOrElse(""))
+                          case WithFailures(Some(None), _) =>
                         }
                       case None =>
                     }
@@ -1830,18 +1810,12 @@ object BeatEditor extends JFXApp {
                           AudioPlayer.readData(new BufferedInputStream(new FileInputStream(file))).map(Some(_))
                         }
                         val pd = new ProgressDialog[Array[Short]](Some(mainView().scene().windowProperty()()), "Loading audio", Some("Loading..."), false, task)
-                        pd.showAndWait().get.asInstanceOf[Try[Option[Array[Short]]]] match {
-                          case Success(Some(data)) =>
+                        pd.showAndWait().get.asInstanceOf[WithFailures[Option[Array[Short]], Throwable]] match {
+                          case WithFailures(Some(Some(data)), _) =>
                             tracks().audio() = Some((file.toURI, data))
-                          case Failure(e) =>
-                            val alert = new Alert(AlertType.Error) {
-                              title = "Beatmeter Generator"
-                              headerText = "Could not load file"
-                              contentText = e.getLocalizedMessage
-                            }
-                            alert.initOwner(mainView().scene().windowProperty()())
-                            alert.showAndWait()
-                          case Success(None) =>
+                          case WithFailures(None, e) =>
+                            alert("Could not load file", e.headOption.map(x => x.getLocalizedMessage).getOrElse(""))
+                          case WithFailures(Some(None), _) =>
                         }
                       case None =>
                     }
@@ -1882,34 +1856,22 @@ object BeatEditor extends JFXApp {
                           val (is, count) = player.generateStream()
                           val task = (callback: (Option[Double], Option[String]) => Boolean) => {
                             val ais = new AudioInputStream(is(d => callback(Some(d), None)), AudioPlayer.format, count)
-                            Try(try {
+                            withFailures(try {
                               AudioSystem.write(ais, AudioFileFormat.Type.WAVE, file)
                             } finally {
                               ais.close()
                             }).map(_ => Some(()))
                           }
                           val pd = new ProgressDialog[Unit](Some(mainView().scene().windowProperty()()), "Generating audio", Some("Generating..."), true, task)
-                          pd.showAndWait().get.asInstanceOf[Try[Option[Unit]]] match {
-                            case Success(Some(_)) =>
-                            case Failure(e) =>
-                              val alert = new Alert(AlertType.Error) {
-                                title = "Beatmeter Generator"
-                                headerText = "Could not generate audio"
-                                contentText = e.getLocalizedMessage
-                              }
-                              alert.initOwner(mainView().scene().windowProperty()())
-                              alert.showAndWait()
-                            case Success(None) =>
+                          pd.showAndWait().get.asInstanceOf[WithFailures[Option[Unit], Throwable]] match {
+                            case WithFailures(Some(Some(_)), _) =>
+                            case WithFailures(None, e) =>
+                              alert("Could not generate audio", e.headOption.map(x => x.getLocalizedMessage).getOrElse(""))
+                            case WithFailures(Some(None), _) =>
                           }
                         } catch {
                           case e: Throwable =>
-                            val alert = new Alert(AlertType.Error) {
-                              title = "Beatmeter Generator"
-                              headerText = "Could not generate audio"
-                              contentText = e.getLocalizedMessage
-                            }
-                            alert.initOwner(mainView().scene().windowProperty()())
-                            alert.showAndWait()
+                            alert("Could not generate audio", e.getLocalizedMessage)
                         }
                       case None =>
                     }
@@ -1948,21 +1910,9 @@ object BeatEditor extends JFXApp {
                         messages.sliding(2).filter { case Seq(a, b) => a._2 >= b._1 }
                       }
                       if (beatViolations.nonEmpty) {
-                        val alert = new Alert(AlertType.Error) {
-                          title = "Beatmeter Generator"
-                          headerText = s"Beat Distance is smaller than ${beatmeter.minimalBeatDistance}s."
-                          contentText = beatViolations.map { case Seq(a, b) => s"${a._1} ${b._1}" }.mkString("\n")
-                        }
-                        alert.initOwner(mainView().scene().windowProperty()())
-                        alert.showAndWait()
+                        alert(s"Beat Distance is smaller than ${beatmeter.minimalBeatDistance}s.", beatViolations.map { case Seq(a, b) => s"${a._1} ${b._1}" }.mkString("\n"))
                       } else if (messageViolations.nonEmpty) {
-                        val alert = new Alert(AlertType.Error) {
-                          title = "Beatmeter Generator"
-                          headerText = "Messages are overlapping."
-                          contentText = messageViolations.map { case Seq(a, b) => s"${a._1} ${b._1}" }.mkString("\n")
-                        }
-                        alert.initOwner(mainView().scene().windowProperty()())
-                        alert.showAndWait()
+                        alert("Messages are overlapping.", messageViolations.map { case Seq(a, b) => s"${a._1} ${b._1}" }.mkString("\n"))
                       } else {
                         val frameCount = (beatmeter.frames * player.duration()).round.toInt
 
@@ -2007,7 +1957,7 @@ object BeatEditor extends JFXApp {
                                 Files.createDirectories(dir.toPath)
                                 val task = (callback: (Option[Double], Option[String]) => Boolean) => {
                                   var compute = true
-                                  Try(for (i <- 0 until frameCount) {
+                                  withFailures(for (i <- 0 until frameCount) {
                                     if (compute) {
                                       compute = callback(Some((i + 1).toDouble / frameCount), Some(s"Encoding frame ${i + 1} of $frameCount"))
                                       val currentTime = i.toDouble / beatmeter.frames
@@ -2034,29 +1984,17 @@ object BeatEditor extends JFXApp {
                                   }).map(Some(_))
                                 }
                                 val pd = new ProgressDialog[Unit](Some(mainView().scene().windowProperty()()), "Generating Video", Some("Generating..."), true, task)
-                                pd.showAndWait().get.asInstanceOf[Try[Option[Unit]]] match {
-                                  case Success(Some(_)) =>
-                                  case Failure(e) =>
-                                    val alert = new Alert(AlertType.Error) {
-                                      title = "Beatmeter Generator"
-                                      headerText = "Could not generate video"
-                                      contentText = e.getLocalizedMessage
-                                    }
-                                    alert.initOwner(mainView().scene().windowProperty()())
-                                    alert.showAndWait()
-                                  case Success(None) =>
+                                pd.showAndWait().get.asInstanceOf[WithFailures[Option[Unit], Throwable]] match {
+                                  case WithFailures(Some(Some(_)), _) =>
+                                  case WithFailures(None, e) =>
+                                    alert("Could not generate video", e.headOption.map(x => x.getLocalizedMessage).getOrElse(""))
+                                  case WithFailures(Some(None), _) =>
                                 }
 
                               }
                             } catch {
                               case e: Throwable =>
-                                val alert = new Alert(AlertType.Error) {
-                                  title = "Beatmeter Generator"
-                                  headerText = "Could not generate video"
-                                  contentText = e.getLocalizedMessage
-                                }
-                                alert.initOwner(mainView().scene().windowProperty()())
-                                alert.showAndWait()
+                                alert("Could not generate video", e.getLocalizedMessage)
                             }
                           case None =>
                         }
@@ -2099,21 +2037,14 @@ object BeatEditor extends JFXApp {
                           val r = for (out <- resource.managed(new OutputStreamWriter(new FileOutputStream(file), "utf-8"))) yield {
                             out.write(s)
                           }
-                          r.tried.map(Some(_))
+                          fromTry(r.tried).map(Some(_))
                         }
                         val pd = new ProgressDialog[Unit](Some(mainView().scene().windowProperty()()), "Saving", Some("Saving..."), false, task)
-                        pd.showAndWait().get.asInstanceOf[Try[Option[Unit]]] match {
-                          case Success(Some(_)) =>
-                          case Failure(e) =>
-                            val alert = new Alert(AlertType.Error) {
-                              title = "Beatmeter Generator"
-                              headerText = "Could not save file"
-                              contentText = e.getLocalizedMessage
-                              buttonTypes = Seq(ButtonType.OK)
-                            }
-                            alert.initOwner(mainView().scene().windowProperty()())
-                            alert.showAndWait()
-                          case Success(None) =>
+                        pd.showAndWait().get.asInstanceOf[WithFailures[Option[Unit], Throwable]] match {
+                          case WithFailures(Some(Some(_)), _) =>
+                          case WithFailures(None, e) =>
+                            alert("Could not save file", e.headOption.map(x => x.getLocalizedMessage).getOrElse(""))
+                          case WithFailures(Some(None), _) =>
                         }
                       case None =>
                     }
@@ -2297,6 +2228,18 @@ object BeatEditor extends JFXApp {
     }
 
     impl(seq, ListBuffer.empty)
+  }
+
+  def alert(header: String, message: String) = {
+    val alert = new Alert(AlertType.Error) {
+      title = "Beatmeter Generator"
+      headerText = header
+      dialogPane().content = new Text(message) {
+        wrappingWidth = 500
+      }
+    }
+    alert.initOwner(mainView().scene().windowProperty()())
+    alert.showAndWait()
   }
 }
 

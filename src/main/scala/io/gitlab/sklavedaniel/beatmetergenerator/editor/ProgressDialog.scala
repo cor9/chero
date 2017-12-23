@@ -22,6 +22,8 @@ import java.util.concurrent.FutureTask
 import javafx.scene
 import javafx.scene.control
 
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.WithFailures
+
 import scala.util.Try
 import scalafx.Includes._
 import scalafx.application.Platform
@@ -30,7 +32,7 @@ import scalafx.scene.layout.{HBox, Priority, VBox}
 import scalafx.scene.text.Text
 import scalafx.stage.Window
 
-class ProgressDialog[A](ownerWindow: Option[Window], taskTitle: String, message: Option[String], cancelable: Boolean, task: ((Option[Double], Option[String]) => Boolean) => Try[Option[A]]) extends Dialog[Try[Option[A]]] {
+class ProgressDialog[A](ownerWindow: Option[Window], taskTitle: String, message: Option[String], cancelable: Boolean, task: ((Option[Double], Option[String]) => Boolean) => WithFailures[Option[A], Throwable]) extends Dialog[WithFailures[Option[A], Throwable]] {
   self =>
   title = "Beatmeter Generator"
   ownerWindow.foreach(initOwner)

@@ -20,8 +20,6 @@ package io.gitlab.sklavedaniel.beatmetergenerator.utils
 
 import java.net.URI
 
-import io.gitlab.sklavedaniel.beatmetergenerator.utils.ImmutableTracks_V0_2_0
-import io.gitlab.sklavedaniel.beatmetergenerator.utils.ImmutableTracks_V0_2_3
 import microjson._
 import prickle._
 
@@ -71,17 +69,17 @@ object JsonSerialization {
     Json.write(json)
   }
 
-  def load(tracks: String): Try[ImmutableTracks_V0_2_3.ImmutableTracks] = {
+  def load(tracks: String): WithFailures[ImmutableTracks_V0_2_3.ImmutableTracks, Throwable] = {
     val json = Json.read(tracks)
     val JsObject(map) = json
     val JsString(version) = map("version")
     version match {
       case "0.2.0" =>
-        Unpickle[ImmutableTracks_V0_2_0.ImmutableTracks].from(map("data")).map(_.toV_0_2_3)
+        WithFailures.fromTry(Unpickle[ImmutableTracks_V0_2_0.ImmutableTracks].from(map("data")).map(_.toV_0_2_3))
       case "0.2.3" =>
-        Unpickle[ImmutableTracks_V0_2_3.ImmutableTracks].from(map("data"))
+        WithFailures.fromTry(Unpickle[ImmutableTracks_V0_2_3.ImmutableTracks].from(map("data")))
       case _ =>
-        Failure(new Exception("Unsupported version " + version))
+        WithFailures.failure(new Exception("Unsupported version " + version))
     }
   }
 

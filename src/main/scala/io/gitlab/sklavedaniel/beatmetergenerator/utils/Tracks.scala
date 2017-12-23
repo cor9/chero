@@ -25,6 +25,7 @@ import io.gitlab.sklavedaniel.beatmetergenerator.utils.ImmutableTracks_V0_2_0._
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.ImmutableTracks_V0_2_3.ImmutableTracks
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap.Unscalable
 
+import scala.util.{Failure, Success, Try}
 import scalafx.beans.binding.{Bindings, ObjectBinding}
 import scalafx.beans.property._
 import scalafx.collections.ObservableBuffer
@@ -44,7 +45,7 @@ final class Tracks(val undoManager: Option[UndoManager]) {
   val waveformBeatmeter = ObjectProperty(WaveformBeatmeter.Conf_V0_2_0(1280, 40, 25.0, 0.3, 0.4, 1.0, 0.0, Color.web("#2a98ff"), Color.web("#ff3e2f"),
     Color.Transparent, Color.web("#070707BB"), Color.web("#ffe400"),
     ("Courgette", 60, true, false), 5, Color.web("#2a98ff"), Color.Black, 1.0, AlignCenter, 0.5,
-     None))
+    None))
   UndoManager.register(undoManager, waveformBeatmeter)
 
   def toImmutable(base: URI) = {
@@ -101,7 +102,6 @@ sealed trait TrackElement {
 }
 
 
-
 class Beat(override val undoManager: Option[UndoManager]) extends TrackElement with Unscalable[Double] {
   val highlight = BooleanProperty(false)
   UndoManager.register(undoManager, highlight)
@@ -109,7 +109,6 @@ class Beat(override val undoManager: Option[UndoManager]) extends TrackElement w
 
   override def toImmutable() = ImmutableBeat(highlight())
 }
-
 
 
 sealed trait BeatsGenerator extends TrackElement {
@@ -137,7 +136,6 @@ class BPMPattern(val beat: Beat, override val undoManager: Option[UndoManager]) 
 
   override def toImmutable() = ImmutableBPMPattern(highlightFirst(), bpm(), beat.toImmutable())
 }
-
 
 
 class BeatsPattern(override val undoManager: Option[UndoManager]) extends BeatsGenerator {
@@ -185,6 +183,40 @@ class Message(override val undoManager: Option[UndoManager]) extends TrackElemen
   override def toImmutable = ImmutableMessage(text())
 }
 
+case class WithFailures[+A, +B](value: Option[A], failures: List[B]) {
+  def flatMap[A2, B2 >: B](f: A => WithFailures[A2, B2]): WithFailures[A2, B2] = {
+    val tmp = value match {
+      case Some(v) => f(v)
+      case None => WithFailures(None, Nil)
+    }
+    WithFailures(tmp.value, failures ++ tmp.failures)
+  }
+  def withDefault[A2 >: A](a: => A2): WithFailures[A2, B] = value match {
+    case Some(_) => this
+    case None => WithFailures(Some(a), failures)
+  }
+  def map[A2](f: A => A2): WithFailures[A2, B] = flatMap(x => WithFailures(Some(f(x)), Nil))
+  def get = value.get
+}
+
+object WithFailures {
+
+  def success[A](value: A) = WithFailures(Some(value), Nil)
+
+  def failure[B](failure: B) = WithFailures(None, List(failure))
+
+  def withFailures[A](value: => A) = try {
+    WithFailures(Some(value), Nil)
+  } catch {
+    case e: Throwable =>
+      WithFailures(None, List(e))
+  }
+
+  def fromTry[A](value: Try[A]): WithFailures[A, Throwable] = value match {
+    case Success(v) => success(v)
+    case Failure(e) => failure(e)
+  }
+}
 
 
 

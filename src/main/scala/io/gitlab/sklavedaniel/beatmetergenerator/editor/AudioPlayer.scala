@@ -51,8 +51,8 @@ object AudioPlayer {
 
   val format = new AudioFormat(44100, 16, 2, true, false)
 
-  def readData(data: InputStream): Try[Array[Short]] = {
-    (for {
+  def readData(data: InputStream): WithFailures[Array[Short], Throwable] = {
+    WithFailures.fromTry((for {
       ais2 <- managed(AudioSystem.getAudioInputStream(format, AudioSystem.getAudioInputStream(data)))
     } yield {
       val array = IOUtils.toByteArray(ais2)
@@ -62,7 +62,7 @@ object AudioPlayer {
       val result = new Array[Short](buffer.limit() / 2)
       buffer.asShortBuffer().get(result)
       result
-    }).tried
+    }).tried)
   }
 
   class BeatInfo {
@@ -106,7 +106,7 @@ class AudioPlayer() {
 
     if (progressDialogWindow().isDefined) {
       val task = (callback: (Option[Double], Option[String]) => Boolean) => {
-        Success(Some(compute(callback)))
+        WithFailures.success(Some(compute(callback)))
       }
       val pd = new ProgressDialog[Array[((Double, Double), Double)]](progressDialogWindow(), "Analyzing audio", Some("analyzing..."), false, task)
       pd.showAndWait().get.asInstanceOf[Try[Option[Array[((Double, Double), Double)]]]] match {

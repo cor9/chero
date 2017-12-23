@@ -22,7 +22,7 @@ import java.net.URI
 
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.{FlyingBeatmeter, WaveformBeatmeter}
 
-import scala.util.{Success, Try}
+import WithFailures._
 
 object ImmutableTracks_V0_2_0 {
 
@@ -35,13 +35,13 @@ object ImmutableTracks_V0_2_0 {
   case class ImmutableTrack(title: String, play: Boolean, record: Boolean, display: Boolean, snap: Boolean,
     content: List[(Double, Double, ImmutableTrackElement)], beat: Option[URI]
   ) {
-    def toMutable(base: URI, load: URI => Try[Array[Short]], undoManager: Option[UndoManager]) = {
+    def toMutable(base: URI, load: URI => WithFailures[Array[Short], Throwable], undoManager: Option[UndoManager]) = {
       (beat match {
         case Some(uri) =>
           val auri = base.resolve(uri)
           load(auri).map(arr => Some((auri, arr)))
         case None =>
-          Success(None)
+          success(None)
       }).map { aud =>
         val tmp = new Track(undoManager)
         val cntnt = content.map { elem =>
