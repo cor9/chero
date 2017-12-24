@@ -119,23 +119,21 @@ class FlyingBeatmeter(conf: FlyingBeatmeter.Conf_V0_2_3) extends Beatmeter {
   val beatmeterBackgroundURI = conf.imageDirectory.map(_.resolve("background.svg")).getOrElse(getClass.getResource("/meter/waveform/background.svg").toURI)
   val beatmeterBackground = getImage(beatmeterBackgroundURI, (conf.height * conf.beatScale).toFloat, imageCSS)
   val beatmeterBeatURI = conf.imageDirectory.map(_.resolve("beat.svg")).getOrElse(getClass.getResource("/meter/flying/beat.svg").toURI)
-  val beatmeterBeat = getImage(beatmeterBeatURI, conf.height, imageCSS)
-  val beatmeterBeatHighlighted = getImage(beatmeterBeatURI, conf.height, imageCSSHighlighted)
+  val beatmeterBeat = new SVGDrawable(beatmeterBeatURI, conf.height, imageCSS, AlignCenter, AlignMiddle)
+  val beatmeterBeatHighlighted = new SVGDrawable(beatmeterBeatURI, conf.height, imageCSSHighlighted, AlignCenter, AlignMiddle)
   val beatmeterBeatAnimFrames = (conf.beatDuration * frames).ceil.toInt
   val beatmeterBeatAnim = (0 until beatmeterBeatAnimFrames).map { i =>
     val delta = (conf.beatScale - 1.0) * Math.sin(Math.PI * i / beatmeterBeatAnimFrames.toDouble)
-    val img = getImage(beatmeterBeatURI, (conf.height + conf.height * delta).toFloat, imageCSS)
-    ImageDrawable(img, AlignCenter, AlignMiddle)
+    new SVGDrawable(beatmeterBeatURI, conf.height + conf.height * delta, imageCSS, AlignCenter, AlignMiddle)
   }
   val beatmeterBeatHighlightedAnim = (0 until beatmeterBeatAnimFrames).map { i =>
     val delta = (conf.beatScale - 1.0) * i / beatmeterBeatAnimFrames.toDouble
-    val img = getImage(beatmeterBeatURI, (conf.height + conf.height * delta).toFloat, imageCSSHighlighted)
-    ImageDrawable(img, AlignCenter, AlignMiddle)
+    new SVGDrawable(beatmeterBeatURI, (conf.height + conf.height * delta).toFloat, imageCSSHighlighted, AlignCenter, AlignMiddle)
   }
   val beatmeterMarkerURI = conf.imageDirectory.map(_.resolve("marker.svg")).getOrElse(getClass.getResource("/meter/flying/marker.svg").toURI)
-  val beatmeterMarker = getImage(beatmeterMarkerURI, (conf.height * conf.beatScale).toFloat, imageCSSMarker)
+  val beatmeterMarker = new SVGDrawable(beatmeterMarkerURI, conf.height * conf.beatScale, imageCSSMarker, AlignCenter, AlignMiddle)
 
-  override val minimalBeatDistance: Double = beatmeterBeat.getWidth / conf.speed / conf.width
+  override val minimalBeatDistance: Double = beatmeterBeat.width / conf.speed / conf.width
 
   override def getElementStreams(beats: Seq[(Double, Boolean)], messages: Seq[(Double, Double, String)], frameCount: Int): List[TimedStream] = {
     val beatmeterStream = {
@@ -147,7 +145,7 @@ class FlyingBeatmeter(conf: FlyingBeatmeter.Conf_V0_2_3) extends Beatmeter {
           } else {
             beatmeterBeat
           }
-          Positioned((beat1._1, beatmeterY), 0.0, ImageDrawable(img, AlignCenter, AlignMiddle))
+          Positioned((beat1._1, beatmeterY), 0.0, img)
       })
     }
     val beatAnimStream = ElementStream((beats :+ (Double.PositiveInfinity, true)).sliding(2).toStream.map(b => (b.head._1 * conf.frames, b.head._2, b.tail.head._1 * conf.frames)).map { b =>
@@ -191,8 +189,6 @@ class FlyingBeatmeter(conf: FlyingBeatmeter.Conf_V0_2_3) extends Beatmeter {
             case AlignCenter => -bounds.getWidth / 2
             case AlignRight => -bounds.getWidth
           }
-          g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-            RenderingHints.VALUE_ANTIALIAS_ON);
           val outline = gv.getOutline(align.toFloat, -bounds.getY.toFloat)
           g.fill(outline)
           g.setColor(toAWTColor(conf.messageBorderColor, fade))
@@ -203,13 +199,12 @@ class FlyingBeatmeter(conf: FlyingBeatmeter.Conf_V0_2_3) extends Beatmeter {
     })
 
     List(
-      ElementStream(        Stream(
-          Fixed((0.0, beatmeterY), ImageDrawable(beatmeterBackground, AlignCenter, AlignMiddle))
-        )      ).toTimed(),
+      ElementStream(Stream(
+        Fixed((0.0, beatmeterY), ImageDrawable(beatmeterBackground, AlignCenter, AlignMiddle))
+      )).toTimed(),
       beatmeterStream.toTimed(conf.speed * conf.width / conf.frames, conf.position * conf.width, beatmeterWidth, 0.5),
-      beatAnimStream, messageStream, ElementStream(Fixed((conf.position * conf.width
-        , beatmeterY),
-        ImageDrawable(beatmeterMarker, AlignCenter, AlignMiddle))).toTimed()
+      beatAnimStream, messageStream,
+      ElementStream(Fixed((conf.position * conf.width, beatmeterY), beatmeterMarker)).toTimed()
     )
   }
 

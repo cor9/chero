@@ -26,7 +26,7 @@ import java.net.URI
 
 import io.gitlab.sklavedaniel.beatmetergenerator.utils._
 import org.apache.batik.anim.dom.{SAXSVGDocumentFactory, SVGDOMImplementation}
-import org.apache.batik.bridge.{BridgeContext, GVTBuilder, UserAgentAdapter}
+import org.apache.batik.bridge.{BridgeContext, DocumentLoader, GVTBuilder, UserAgentAdapter}
 import org.apache.batik.gvt.GraphicsNode
 import org.apache.batik.transcoder._
 import org.apache.batik.transcoder.image.ImageTranscoder
@@ -152,7 +152,42 @@ object Beatmeter {
     }
   }
 
-  case class NodeDrawable(node: GraphicsNode) extends Drawable {
+  case class SVGDrawable(uri: URI, height: Double, css: String, alignh: AlignH = AlignLeft, alignv: AlignV = AlignTop) extends Drawable {
+
+    val docfactory = new SAXSVGDocumentFactory(XMLResourceDescriptor.getXMLParserClassName)
+    val doc = docfactory.createDocument(uri.toString)
+    val style = doc.createElementNS("http://www.w3.org/2000/svg", "style")
+
+    style.setTextContent(css)
+    doc.getDocumentElement.appendChild(style)
+
+    val builder = new GVTBuilder()
+    val ua = new UserAgentAdapter()
+    val ctx = new BridgeContext(ua, new DocumentLoader(ua))
+    val node = builder.build(ctx, doc)
+
+    val bounds = node.getBounds
+    val ratio = bounds.getWidth / bounds.getHeight
+    val width = ratio * height
+    val scale = height / bounds.getHeight
+    val transform = AffineTransform.getTranslateInstance(-bounds.getX, -bounds.getY)
+    transform.preConcatenate(AffineTransform.getScaleInstance(scale, scale))
+    transform.preConcatenate(AffineTransform.getTranslateInstance((alignh match {
+      case AlignLeft => 0.0
+      case AlignRight => -1.0
+      case AlignCenter => -0.5
+    }) * width, (alignv match {
+      case AlignTop => 0.0
+      case AlignBottom => -1.0
+      case AlignMiddle => -0.5
+    }) * height))
+    println(node.getTransformedBounds(transform))
+    node.setTransform(transform)
+
+    println(node.getBounds)
+    println(s"$scale $width $height")
+
+
     def draw(frame: Int, g: Graphics2D): Unit = {
       node.paint(g)
     }
@@ -201,7 +236,7 @@ object Beatmeter {
     }
   }
 
-  case class FramesDrawable(frames: IndexedSeq[ImageDrawable]) extends Drawable {
+  case class FramesDrawable(frames: IndexedSeq[Drawable]) extends Drawable {
 
     override def draw(frame: Int, g: Graphics2D): Unit = {
       if (frame < frames.size) {
@@ -224,8 +259,8 @@ object Beatmeter {
 
     style.setTextContent(css)
     doc.getDocumentElement.appendChild(style)
-    val input = new TranscoderInput(doc)
 
+    val input = new TranscoderInput(doc)
 
     var image = None: Option[BufferedImage]
 

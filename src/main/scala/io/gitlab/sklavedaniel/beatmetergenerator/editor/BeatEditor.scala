@@ -1965,6 +1965,8 @@ object BeatEditor extends JFXApp {
                                       val currentTime = i.toDouble / beatmeter.frames
                                       val image = new BufferedImage(beatmeter.width, beatmeter.height, BufferedImage.TYPE_INT_ARGB)
                                       val g = image.createGraphics()
+                                      g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                                        RenderingHints.VALUE_ANTIALIAS_ON)
 
                                       for (state <- states) {
                                         state.current = state.current.filter { case Timed(_, endFrame, _) => endFrame > i }
