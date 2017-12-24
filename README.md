@@ -13,6 +13,8 @@ Please read through the features, basic workflow and hints to get a better idea 
 
 ![example](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/example2.png)
 
+![example](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/example.gif)
+
 ## Features
 
 - Generation of an audio track with beat sounds
