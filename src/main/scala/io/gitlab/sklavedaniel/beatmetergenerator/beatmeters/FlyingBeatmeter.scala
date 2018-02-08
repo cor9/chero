@@ -122,13 +122,14 @@ class FlyingBeatmeter(conf: FlyingBeatmeter.Conf_V0_2_3) extends Beatmeter {
   val beatmeterBeat = new SVGDrawable(beatmeterBeatURI, conf.height, imageCSS, AlignCenter, AlignMiddle)
   val beatmeterBeatHighlighted = new SVGDrawable(beatmeterBeatURI, conf.height, imageCSSHighlighted, AlignCenter, AlignMiddle)
   val beatmeterBeatAnimFrames = (conf.beatDuration * frames).ceil.toInt
+
+  def delta(i: Int) = (conf.beatScale - 1.0) * Math.sin(Math.PI * i / beatmeterBeatAnimFrames.toDouble)
+
   val beatmeterBeatAnim = (0 until beatmeterBeatAnimFrames).map { i =>
-    val delta = (conf.beatScale - 1.0) * Math.sin(Math.PI * i / beatmeterBeatAnimFrames.toDouble)
-    new SVGDrawable(beatmeterBeatURI, conf.height + conf.height * delta, imageCSS, AlignCenter, AlignMiddle)
+    new SVGDrawable(beatmeterBeatURI, conf.height + conf.height * delta(i), imageCSS, AlignCenter, AlignMiddle)
   }
   val beatmeterBeatHighlightedAnim = (0 until beatmeterBeatAnimFrames).map { i =>
-    val delta = (conf.beatScale - 1.0) * i / beatmeterBeatAnimFrames.toDouble
-    new SVGDrawable(beatmeterBeatURI, (conf.height + conf.height * delta).toFloat, imageCSSHighlighted, AlignCenter, AlignMiddle)
+    new SVGDrawable(beatmeterBeatURI, (conf.height + conf.height * delta(i)).toFloat, imageCSSHighlighted, AlignCenter, AlignMiddle)
   }
   val beatmeterMarkerURI = conf.imageDirectory.map(_.resolve("marker.svg")).getOrElse(getClass.getResource("/meter/flying/marker.svg").toURI)
   val beatmeterMarker = new SVGDrawable(beatmeterMarkerURI, conf.height * conf.beatScale, imageCSSMarker, AlignCenter, AlignMiddle)
