@@ -109,8 +109,8 @@ class AudioPlayer() {
         WithFailures.success(Some(compute(callback)))
       }
       val pd = new ProgressDialog[Array[((Double, Double), Double)]](progressDialogWindow(), "Analyzing audio", Some("analyzing..."), false, task)
-      pd.showAndWait().get.asInstanceOf[Try[Option[Array[((Double, Double), Double)]]]] match {
-        case Success(Some(result)) =>
+      pd.showAndWait().get.asInstanceOf[WithFailures[Option[Array[((Double, Double), Double)]], Throwable]] match {
+        case WithFailures(Some(Some(result)), _) =>
           result
         case _ =>
           assert(false); ???
