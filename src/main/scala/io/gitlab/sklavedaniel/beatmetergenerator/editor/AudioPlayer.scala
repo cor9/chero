@@ -87,29 +87,28 @@ class AudioPlayer() {
   val audioCount = Bindings.createObjectBinding[Int](() => audio().map(_.length / format.getChannels()).getOrElse(0), audio)
   val audioDuration = Bindings.createObjectBinding[Double](() => audioCount().toDouble / format.getFrameRate, audioCount)
 
-  val maximaDuration = 0.025
+  val maximaDuration = 0.02
   val maximaFrames = (maximaDuration * format.getFrameRate * format.getChannels).round.toInt
 
-  val maxima = Bindings.createObjectBinding[Option[Array[((Double, Double), Double)]]](() => audio().map { a =>
+  val maxima = Bindings.createObjectBinding[Option[(Array[Float], Array[Float])]](() => audio().map { a =>
     def compute(callback: (Option[Double], Option[String]) => Boolean) = {
-      val result = new Array[((Double, Double), Double)](a.length / maximaFrames)
+      val leftResult = new Array[Float](a.length / maximaFrames)
+      val rightResult = new Array[Float](a.length / maximaFrames)
       val limit = a.length / maximaFrames
       for (i <- 0 until limit) {
-        callback(Some(i.toDouble / limit), None)
-        val maxLeft = (for (j <- 0 until maximaFrames / 2) yield a(maximaFrames * i + 2 * j)).max
-        val maxRight = (for (j <- 0 until maximaFrames / 2) yield a(maximaFrames * i + 2 * j + 1)).max
-        val time = i * maximaDuration
-        result(i) = ((maxLeft, maxRight), time)
+        callback(Some(i.toFloat / limit), None)
+        leftResult(i) = (for (j <- 0 until maximaFrames / 2) yield a(maximaFrames * i + 2 * j).toFloat.abs).sum / maximaFrames * 2
+        rightResult(i) = (for (j <- 0 until maximaFrames / 2) yield a(maximaFrames * i + 2 * j + 1).toFloat.abs).sum / maximaFrames * 2
       }
-      result
+      (leftResult, rightResult)
     }
 
     if (progressDialogWindow().isDefined) {
       val task = (callback: (Option[Double], Option[String]) => Boolean) => {
         WithFailures.success(Some(compute(callback)))
       }
-      val pd = new ProgressDialog[Array[((Double, Double), Double)]](progressDialogWindow(), "Analyzing audio", Some("analyzing..."), false, task)
-      pd.showAndWait().get.asInstanceOf[WithFailures[Option[Array[((Double, Double), Double)]], Throwable]] match {
+      val pd = new ProgressDialog[(Array[Float], Array[Float])](progressDialogWindow(), "Analyzing audio", Some("analyzing..."), false, task)
+      pd.showAndWait().get.asInstanceOf[WithFailures[Option[(Array[Float], Array[Float])], Throwable]] match {
         case WithFailures(Some(Some(result)), _) =>
           result
         case _ =>

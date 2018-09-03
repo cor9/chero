@@ -23,14 +23,14 @@ import java.awt.{GraphicsEnvironment, RenderingHints, Shape, SplashScreen}
 import java.io._
 import java.net.URI
 import java.nio.file.Files
-import javafx.beans.binding.DoubleExpression
+
+import javafx.beans.binding.{DoubleBinding, DoubleExpression}
 import javafx.beans.value.{ChangeListener, WeakChangeListener}
 import javafx.beans.{InvalidationListener, WeakInvalidationListener}
 import javafx.geometry.VPos
 import javafx.scene.{Cursor, input}
 import javax.imageio.ImageIO
 import javax.sound.sampled.{AudioFileFormat, AudioInputStream, AudioSystem}
-
 import io.gitlab.sklavedaniel.beatmetergenerator._
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.Beatmeter.Timed
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.{Beatmeter, FlyingBeatmeter, WaveformBeatmeter}
@@ -66,11 +66,10 @@ import scalafx.scene.shape.{Line, Rectangle}
 import scalafx.scene.text.{Font, Text}
 import scalafx.scene.transform.Scale
 import scalafx.scene.web.WebView
-import scalafx.scene.{Group, Node, Scene}
+import scalafx.scene.{CacheHint, Group, Node, Scene}
 import scalafx.stage.FileChooser.ExtensionFilter
 import scalafx.stage.{DirectoryChooser, FileChooser}
 import scalafx.util.Duration
-
 import WithFailures._
 
 object BeatEditor extends JFXApp {
@@ -96,78 +95,63 @@ object BeatEditor extends JFXApp {
 
   class WaveView(initPxPerSec: Double, initHeight: Double, sceneToContextX: Double => Double) extends Group {
     self =>
-    val points = ObjectProperty[Option[Array[((Double, Double), Double)]]](None)
-    val pxPerSec = DoubleProperty(initPxPerSec)
-    val maxVolume = Bindings.createObjectBinding[Option[Double]](() => points().map(_.toIterator.map(v => v._1._1 max v._1._2).max), points)
+    val hvalue = DoubleProperty(0.0)
+    val visibleWidth = DoubleProperty(1.0)
+    val points = ObjectProperty[Option[(Array[Float], Array[Float])]](None)
+    val scale = DoubleProperty(1.0)
+    val pxPerSec = scale * initPxPerSec
+    val maxVolume = Bindings.createObjectBinding[Option[Float]](() => points().map(p => p._1.max max p._2.max), points)
     val height = DoubleProperty(initHeight)
     val duration = DoubleProperty(0.0)
+    val width = duration * pxPerSec
 
-    private def update() = {
-      children.clear()
-      children += new Rectangle {
-        x = 0.0
-        y = 0.0
-        width <== pxPerSec * duration
-        height <== self.height
-        fill = Color.Transparent
-      }.delegate
-      val pts = points()
+    val visibleTime = hvalue * (duration - visibleWidth / pxPerSec)
+    val visiblePos = hvalue * (pxPerSec * duration - visibleWidth)
+    val visibleDuration = visibleWidth / pxPerSec
 
-      pts.foreach { p =>
+    val rect = new Rectangle {
+      x = 0.0
+      y = 0.0
+      width <== pxPerSec * duration
+      height <== self.height
+      fill = Color.Transparent
+    }
+    val pane = new Group {
+
+    }
+    children = Seq(rect, pane)
+
+    val wave = Bindings.createObjectBinding[Seq[Node]](() => {
+      points().map { p =>
         val mv = maxVolume().get
 
-        def compute() = {
-          (for (Array((value1, time1), (value2, time2)) <- p.sliding(2)) yield {
-            new Line {
-              startX <== pxPerSec * time1
-              startY <== height * (mv + value1._1) / mv / 2
-              endX <== pxPerSec * time2
-              endY <== height * (mv + value2._1) / mv / 2
-              strokeWidth = 0.5
-            }.delegate
-          }) ++ (for (Array((value1, time1), (value2, time2)) <- p.sliding(2)) yield {
-            new Line {
-              startX <== pxPerSec * time1
-              startY <== height * (mv - value1._2) / mv / 2
-              endX <== pxPerSec * time2
-              endY <== height * (mv - value2._2) / mv / 2
-              strokeWidth = 0.5
-            }.delegate
-          })
-        }
+        val rate = p._1.length / duration.floatValue()
+        val fromPos = visiblePos.doubleValue().floor.toInt.max(0)
+        val toPos = (visiblePos.doubleValue().max(0.0) + visibleWidth.doubleValue()).ceil.toInt min width.doubleValue().ceil.toInt
 
-        if (stage.showing()) {
-          val task = (callback: (Option[Double], Option[String]) => Boolean) => {
-            success(Some(compute()))
+        (for (i <- fromPos until toPos) yield {
+          val from = (i / pxPerSec.doubleValue() * rate).floor.toInt
+          val to = ((i + 1) / pxPerSec.doubleValue() * rate).ceil.toInt
+          val max1 = p._1.slice(from, to).max
+          val max2 = p._2.slice(from, to).max
+          new Line {
+            startX = i + 0.5
+            endX = i + 0.5
+            startY <== self.height / 2 * (1 + max2 / mv)
+            endY <== self.height / 2 * (1 - max1 / mv)
           }
-          val pd = new ProgressDialog[TraversableOnce[javafx.scene.Node]](Some(mainView().scene().windowProperty()()), "Generating waveform", Some("generating..."), false, task)
-          pd.showAndWait().get.asInstanceOf[WithFailures[Option[TraversableOnce[javafx.scene.Node]], Throwable]] match {
-            case WithFailures(Some(Some(nodes)), _) =>
-              children ++= nodes
-            case _ =>
-              assert(false); ???
-          }
-        } else {
-          children ++= compute()
-        }
-      }
-    }
+        }).toList
+      }.getOrElse(Nil)
+    }, points, duration, visibleWidth, hvalue, scale)
 
-    update()
-
-    points.onChange(update())
-    duration.onChange(update())
-
-    val scale = {
-      val s = new Scale(1.0, 1.0, 0.0, 0.0)
-      transforms = Seq(s)
-      s.x
+    wave.onChange { (_, _, v) =>
+      pane.children = v
     }
 
     val onAction = ObjectProperty((p: Double) => ())
 
     onMouseClicked = mouseHandler(_ => (), e => {
-      onAction()(sceneToContextX(e.getSceneX) / pxPerSec() / scale())
+      onAction()(sceneToContextX(e.getSceneX) / pxPerSec.doubleValue())
     })
   }
 
@@ -1399,7 +1383,11 @@ object BeatEditor extends JFXApp {
       focusTraversable = false
 
       val sceeneToContextX = (x: Double) => sceneToLocal(x, 0.0).getX + scrollX
+
+      val vwidth = Bindings.createDoubleBinding(() => viewportBounds().getWidth, viewportBounds)
       val waveView = new WaveView(20, 200, sceeneToContextX) {
+        hvalue <== self.hvalue
+        visibleWidth <== vwidth
         points <== player.maxima
         duration <== Bindings.createDoubleBinding(() => 10.0.max(player.audioDuration().max(tracksDuration())), player.duration, tracksDuration)
       }
@@ -1564,7 +1552,7 @@ object BeatEditor extends JFXApp {
         e.consume()
         if (e.isControlDown) {
           val oldPosition = (scrollX + e.getX) / waveView.scale()
-          waveView.scale() = (waveView.scale() * (1 + e.getDeltaY / 400)).max(1.0).min(10.0)
+          waveView.scale() = (waveView.scale() * (1 + e.getDeltaY / 400)).max(0.25).min(40.0)
           scrollX = oldPosition * waveView.scale() - e.getX()
         } else if (e.isShiftDown) {
           scrollY -= e.getDeltaY()
