@@ -103,6 +103,10 @@ You will need the Java 8 Runtime Environment (JRE) to run the application. You c
 After installing the JRE you should be able to start the jar by double clicking on it.
 If you can't try starting it from the command line using `java -jar beatmeter-generator.jar`.
 
+### WARNING: Java 11 not supported
+The Beatmeter Generator requires JavaFX. Starting with Java 11, JavaFX is no longer include with Oracle JDK/JRE.
+Make sure to use an earlier JDK (8 has been tested). JavaFX will probably be shipped with Beatmeter Generator in the future.
+
 ### Notes on Linux
 If you are using Linux, your distribution will usually include OpenJRE 8.
 Note, that under Linux you usually have to install OpenJFX as a separate package.
