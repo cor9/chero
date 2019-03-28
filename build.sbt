@@ -6,7 +6,7 @@ name := "Beatmeter Generator"
 
 version := "0.2.4"
 
-scalaVersion := "2.12.3"
+scalaVersion := "2.12.8"
 
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-Xcheckinit", "-encoding", "utf8")
 
@@ -16,7 +16,7 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= Seq(
-  "org.scalafx" %% "scalafx" % "8.0.102-R11",
+  "org.scalafx" %% "scalafx" % "11-R16",
   "org.apache.xmlgraphics" % "batik-transcoder" % "1.9",
   "org.apache.xmlgraphics" % "batik-svg-dom" % "1.9",
   "commons-io" % "commons-io" % "2.5",
@@ -24,6 +24,10 @@ libraryDependencies ++= Seq(
   "com.github.benhutchison" %% "prickle" % "1.1.13"
 )
 
+lazy val javaFXModules = Seq("base", "controls", "fxml", "graphics", "media", "swing", "web")
+libraryDependencies ++= Seq("linux", "mac", "win").flatMap(os => javaFXModules.map( m =>
+  "org.openjfx" % s"javafx-$m" % "11" classifier os
+))
 
 unmanagedSourceDirectories in Compile += baseDirectory.value / "lib/JWave/src"
 
