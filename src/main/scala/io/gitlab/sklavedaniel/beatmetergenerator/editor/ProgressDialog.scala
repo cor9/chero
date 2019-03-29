@@ -35,6 +35,9 @@ import scalafx.stage.Window
 class ProgressDialog[A](ownerWindow: Option[Window], taskTitle: String, message: Option[String], cancelable: Boolean, task: ((Option[Double], Option[String]) => Boolean) => WithFailures[Option[A], Throwable]) extends Dialog[WithFailures[Option[A], Throwable]] {
   self =>
   title = "Beatmeter Generator"
+  resizable = true
+  width = 200
+  height = 150
   ownerWindow.foreach(initOwner)
   val messageNode = new Text
   private var computing = true

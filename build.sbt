@@ -33,7 +33,7 @@ unmanagedSourceDirectories in Compile += baseDirectory.value / "lib/JWave/src"
 
 fork := true
 
-javaOptions := Seq("-splash:src/main/resources/splash.png")
+javaOptions := Seq("-splash:src/main/resources/splash.png", "-Djdk.gtk.version=2")
 
 mainClass in assembly := Some("io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor")
 mainClass in Compile := Some("io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor")

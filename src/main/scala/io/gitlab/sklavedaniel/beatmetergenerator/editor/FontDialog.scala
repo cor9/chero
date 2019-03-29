@@ -32,6 +32,9 @@ import scalafx.stage.Window
 class FontDialog(ownerWindow: Option[Window], initFont: (String, Int, Boolean, Boolean)) extends Dialog[(String, Int, Boolean, Boolean)] {
   self =>
   title = "Beatmeter Generator"
+  resizable = true
+  width = 400
+  height = 500
   ownerWindow.foreach(initOwner)
   val families = new ListView[String](Font.families.sorted) {
     cellFactory = _ => {

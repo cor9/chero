@@ -34,6 +34,9 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
   extends Dialog[(Boolean, FlyingBeatmeter.Conf_V0_2_3, WaveformBeatmeter.Conf_V0_2_0)] {
   ownerWindow.foreach(initOwner)
   title = "Beatmeter Generator"
+  resizable = true
+  width = 400
+  height = 500
 
   object Flying {
     val widthSpinner = UIUtils.editableSpinner(new Spinner[Int](1, 10000, flyingConf.width, 1) {
