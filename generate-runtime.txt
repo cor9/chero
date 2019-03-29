@@ -1,0 +1,2 @@
+jlink --no-header-files --no-man-pages --add-modules java.desktop,jdk.jsobject,jdk.localedata,jdk.net,jdk.unsupported,jdk.unsupported.desktop --output java-runtime
+

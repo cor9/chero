@@ -53,6 +53,11 @@ import scala.collection.immutable.Queue
 import scala.io.Source
 
 object BeatEditor extends JFXApp {
+  override def main(args: Array[String]): Unit = {
+    System.setProperty("jdk.gtk.version", "2");
+    super.main(args)
+  }
+
   val courgette = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, getClass.getResourceAsStream("/Courgette-Regular.ttf"))
   GraphicsEnvironment.getLocalGraphicsEnvironment.registerFont(courgette)
   Font.loadFont(getClass.getResourceAsStream("/Courgette-Regular.ttf"), 20)

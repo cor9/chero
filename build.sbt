@@ -4,7 +4,7 @@ import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 
 name := "Beatmeter Generator"
 
-version := "0.2.4"
+version := "0.3.0"
 
 scalaVersion := "2.12.8"
 
@@ -32,8 +32,6 @@ libraryDependencies ++= Seq("linux", "mac", "win").flatMap(os => javaFXModules.m
 unmanagedSourceDirectories in Compile += baseDirectory.value / "lib/JWave/src"
 
 fork := true
-
-javaOptions := Seq("-splash:src/main/resources/splash.png", "-Djdk.gtk.version=2")
 
 mainClass in assembly := Some("io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor")
 mainClass in Compile := Some("io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor")
@@ -73,9 +71,7 @@ val packageMSI = taskKey[Unit]("Generate msi package.")
 
 packageMSI := {
   val winjdks = List(("x64", "ProgramFiles64Folder", "25ec46a1-f39c-4b67-be83-9aeb3c67e923",
-    "fa217e1d-c1f3-41e2-91f9-5be8f47462fd", new File("/root/jre64/")),
-    ("x86", "ProgramFilesFolder", "2a2288d8-5c74-4a1a-9f86-54191de8c608",
-      "de98e92e-ac24-4a82-9fc1-03f528480b45", new File("/root/jre32/")))
+    "e4f4b924-5279-11e9-9a85-3c970ec1ef9e", new File("/root/jre-11-win-64/")))
   val ico = sourceDirectory.value / "main" / "resources" / "icon" / "icon-128x128.ico"
   val lcname = name.value.toLowerCase.replace(" ", "-")
   val icoName = s"$lcname.ico"
