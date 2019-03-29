@@ -2,3 +2,5 @@ target/
 bin/
 local.properties
 .idea/
+stuff/
+out/
