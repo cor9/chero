@@ -23,7 +23,8 @@ import io.gitlab.sklavedaniel.beatmetergenerator.utils.{ObservableIntervalMap, T
 import javafx.beans.binding.DoubleExpression
 import javafx.scene.input
 import scalafx.Includes._
-import scalafx.beans.property.DoubleProperty
+import scalafx.beans.binding.{Bindings, BooleanBinding}
+import scalafx.beans.property.{DoubleProperty, ObjectProperty}
 import scalafx.collections.ObservableSet
 import scalafx.collections.ObservableSet.{Add, Remove}
 import scalafx.scene.Group
@@ -34,6 +35,8 @@ import scalafx.scene.shape.Rectangle
 trait SelectionContainer[A <: TrackElement] {
   self: Group =>
   def clazz: Class[_]
+
+  def selectionContainer: ObjectProperty[Option[SelectionContainer[_]]]
 
   def undoManager: UndoManager
 
@@ -98,6 +101,16 @@ trait SelectionContainer[A <: TrackElement] {
         a.selected() = true
       case Remove(r) =>
         r.selected() = false
+    }
+  }
+  val hasSelectedElements = Bindings.createBooleanBinding(() => selectedElements.nonEmpty, selectedElements)
+  hasSelectedElements.onChange { (_, _, v) =>
+    println(this + ": " + v + ", " + selectionContainer().contains(this))
+    if (v) {
+      selectionContainer() = Some(this)
+    } else if (selectionContainer().contains(this)) {
+      selectionContainer() = None
+
     }
   }
 

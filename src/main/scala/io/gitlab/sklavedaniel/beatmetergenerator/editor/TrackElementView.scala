@@ -176,6 +176,8 @@ final class BeatsPatternView[B >: BeatsPattern <: TrackElement](val beatsPattern
   val content = beatsPattern.pattern
   val clazz = classOf[ImmutableBeat]
 
+  override val selectionContainer = context.selectionContainer
+
   override val undoManager = context.undoManager
 
   override def scaled = context.scaled

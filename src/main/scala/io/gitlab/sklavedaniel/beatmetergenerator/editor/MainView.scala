@@ -52,6 +52,12 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
   val snaps = ObjectProperty[Option[ObservableIntervalMap[Double, Beat]]](None)
   val record = ObjectProperty[Option[Track]](None)
 
+  val selectionContainer = ObjectProperty[Option[SelectionContainer[_]]](None)
+  selectionContainer.onChange {(_,c,_) =>
+    println(c.getOrElse(null))
+    c.foreach(_.selectedElements.clear())
+  }
+
   val headerBox = new VBox {
     spacing = 5
   }
@@ -96,7 +102,7 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
 
     private def addTrack(i: Int, t: Track): Unit = {
       t.content.addListener(tracksListener)
-      val v = new TrackView(20, t, snaps, undoManager, player.audio, digitDown) {
+      val v = new TrackView(20, t, snaps, undoManager, player.audio, digitDown, selectionContainer) {
         scaled <== waveView.scale
         duration <== Bindings.createDoubleBinding(() => 10.0.max(player.audioDuration().max(tracksDuration())), player.duration, tracksDuration)
       }

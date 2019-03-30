@@ -318,7 +318,7 @@ object BeatEditor extends JFXApp {
             },
             new Menu("Move") {
               items = Seq(
-                new MenuItem("Selection forward") {
+                new MenuItem("Move to position") {
                   disable <== !undoManager.undoable
                   onAction = handle {
 

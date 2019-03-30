@@ -35,8 +35,9 @@ import scalafx.scene.transform.Scale
 import scala.collection.mutable
 import Utils._
 
-class TrackView(initPxPerSec: Double, val track: Track, snaps: ObjectProperty[Option[ObservableIntervalMap[Double, Beat]]], override val undoManager: UndoManager, audio: ObjectProperty[Option[Array[Short]]],
-  digitDown: ObjectBinding[Option[Int]]) extends Group with SelectionContainer[TrackElement] {
+class TrackView(initPxPerSec: Double, val track: Track, snaps: ObjectProperty[Option[ObservableIntervalMap[Double, Beat]]],
+  override val undoManager: UndoManager, audio: ObjectProperty[Option[Array[Short]]],
+  digitDown: ObjectBinding[Option[Int]], override val selectionContainer: ObjectProperty[Option[SelectionContainer[_]]]) extends Group with SelectionContainer[TrackElement] {
   self =>
   val content = track.content
   val clazz = classOf[ImmutableTrackElement]
