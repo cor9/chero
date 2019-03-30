@@ -92,6 +92,7 @@ object BeatEditor extends JFXApp {
     self =>
     title = "Beatmeter Generator"
     icons ++= Seq(16, 32, 64, 128).map(r => new Image(getClass.getResourceAsStream(s"/icon/icon-${r}x${r}.png")).delegate)
+    val down = IndexedSeq.fill(10)(BooleanProperty(false))
     val down_0 = BooleanProperty(false)
     val down_1 = BooleanProperty(false)
     val down_2 = BooleanProperty(false)
@@ -102,46 +103,22 @@ object BeatEditor extends JFXApp {
     val down_7 = BooleanProperty(false)
     val down_8 = BooleanProperty(false)
     val down_9 = BooleanProperty(false)
-    val digitDown = Bindings.createObjectBinding(() => {
-      if (down_0()) {
-        None
-      } else if (down_1()) {
-        Some(1)
-      } else if (down_2()) {
-        Some(2)
-      } else if (down_3()) {
-        Some(3)
-      } else if (down_4()) {
-        Some(4)
-      } else if (down_5()) {
-        Some(5)
-      } else if (down_6()) {
-        Some(6)
-      } else if (down_7()) {
-        Some(7)
-      } else if (down_8()) {
-        Some(8)
-      } else if (down_9()) {
-        Some(9)
-      } else {
-        Some(0)
-      }
-    }, down_0, down_1, down_2, down_3, down_4, down_5, down_6, down_7, down_8, down_9)
+    val digitDown = Bindings.createObjectBinding(() => down.zipWithIndex.map(d => if (d._1()) Some(d._2) else None).foldLeft(Option.empty[Int])(_.orElse(_)), down: _*)
 
     val mainView = Bindings.createObjectBinding(() => new MainView(tracks(), undoManager, player, Stage.digitDown), tracks)
 
     scene = new Scene {
       filterEvent(KeyEvent.KeyPressed) { (e: KeyEvent) =>
         if (e.code == KeyCode.Digit0 || e.code == KeyCode.Numpad0) {
-          down_0() = true
+          down(0)() = true
         } else if (e.code == KeyCode.Digit1 || e.code == KeyCode.Numpad1) {
-          down_1() = true
+          down(1)() = true
         } else if (e.code == KeyCode.Digit2 || e.code == KeyCode.Numpad2) {
-          down_2() = true
+          down(2)() = true
         } else if (e.code == KeyCode.Digit3 || e.code == KeyCode.Numpad3) {
-          down_3() = true
+          down(3)() = true
         } else if (e.code == KeyCode.Digit4 || e.code == KeyCode.Numpad4) {
-          down_4() = true
+          down(4)() = true
         } else if (e.code == KeyCode.Digit5 || e.code == KeyCode.Numpad5) {
           down_5() = true
         } else if (e.code == KeyCode.Digit6 || e.code == KeyCode.Numpad6) {
@@ -280,14 +257,74 @@ object BeatEditor extends JFXApp {
                   onAction = handle {
                     undoManager.undoAction()
                   }
+                  accelerator = new KeyCodeCombination(KeyCode.Z, KeyCombination.ControlDown)
                 },
                 new MenuItem("Redo") {
                   disable <== !undoManager.redoable
                   onAction = handle {
                     undoManager.redoAction()
                   }
+                  accelerator = new KeyCodeCombination(KeyCode.Y, KeyCombination.ControlDown)
                 }
               )
+            },
+            new Menu("Navigate") {
+              items = Seq(
+                new MenuItem("play/pause") {
+                  disable <== !undoManager.undoable
+                  onAction = handle {
+                    player.playing() = !player.playing()
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.Space, KeyCombination.ControlDown)
+                },
+                new MenuItem("Audio forward") {
+                  disable <== !undoManager.undoable
+                  onAction = handle {
+                    player.position() = ((player.position()._1 + 1.0 / mainView().pxPerSec().doubleValue()).max(0.0), true)
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.Right, KeyCombination.ControlDown)
+                },
+                new MenuItem("Audio backward") {
+                  onAction = handle {
+                    player.position() = ((player.position()._1 - 1.0 / mainView().pxPerSec().doubleValue()).max(0.0), true)
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.Left, KeyCombination.ControlDown)
+                },
+                new MenuItem("Audio fast forward") {
+                  disable <== !undoManager.undoable
+                  onAction = handle {
+                    player.position() = ((player.position()._1 + 10 * 1.0 / mainView().pxPerSec().doubleValue()).max(0.0), true)
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.Right, KeyCombination.ControlDown, KeyCombination.ShiftDown)
+                },
+                new MenuItem("Audio fast backward") {
+                  onAction = handle {
+                    player.position() = ((player.position()._1 - 10 * 1.0 / mainView().pxPerSec().doubleValue()).max(0.0), true)
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.Left, KeyCombination.ControlDown, KeyCombination.ShiftDown)
+                },
+                new MenuItem("Zoom in") {
+                  onAction = handle {
+                    mainView().scale() = (mainView().scale() * (1 + 1.0 / 40)).max(0.25).min(40.0)
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.Plus, KeyCombination.ControlDown)
+                },
+                new MenuItem("Zoom out") {
+                  onAction = handle {
+                    mainView().scale() = (mainView().scale() * (1 - 1.0 / 40)).max(0.25).min(40.0)
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.Minus, KeyCombination.ControlDown)
+                })
+            },
+            new Menu("Move") {
+              items = Seq(
+                new MenuItem("Selection forward") {
+                  disable <== !undoManager.undoable
+                  onAction = handle {
+
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.Up, KeyCombination.ControlDown)
+                })
             },
             new Menu("Tools") {
               items = Seq(

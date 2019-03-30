@@ -230,16 +230,17 @@ class AudioPlayer() {
 
           sourceLine.open(rateFormat(format, currentRate))
           sourceLine.start()
-          updatePosition(currentPosition + sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * currentRate, true)
+          val lineOffset = sourceLine.getMicrosecondPosition
+          updatePosition(currentPosition + (sourceLine.getMicrosecondPosition - lineOffset).toDouble / 1000000.0 * currentRate, true)
 
           while (sync.isEmpty && pos < currentCount) {
             val (newbs, l) = fillBuffer(bufferSize, pos, currentCount, currentAudio, currentAudioCount, currentRatio, bbuffer, bs, currentBeats)
             bs = newbs
             pos += sourceLine.write(bbuffer.array(), 0, l * format.getFrameSize) / format.getFrameSize
-            updatePosition(currentPosition + sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * currentRate, false)
+            updatePosition(currentPosition + (sourceLine.getMicrosecondPosition - lineOffset).toDouble / 1000000.0 * currentRate, false)
           }
           sourceLine.drain()
-          updatePosition(currentPosition + sourceLine.getMicrosecondPosition.toDouble / 1000000.0 * currentRate, false)
+          updatePosition(currentPosition + (sourceLine.getMicrosecondPosition - lineOffset).toDouble / 1000000.0 * currentRate, false)
           sourceLine.stop()
           sourceLine.close()
           if (pos >= currentCount) {

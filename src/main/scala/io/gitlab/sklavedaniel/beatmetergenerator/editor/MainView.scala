@@ -261,6 +261,9 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
 
   }
 
+  val scale = scrollPane.waveView.scale
+  val pxPerSec = scrollPane.waveView.pxPerSec
+
   val headerGroup = new Pane {
     self =>
     val box = new Group {
