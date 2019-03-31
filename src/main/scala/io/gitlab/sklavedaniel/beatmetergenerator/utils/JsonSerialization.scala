@@ -18,14 +18,18 @@
 
 package io.gitlab.sklavedaniel.beatmetergenerator.utils
 
+import java.io.{File, FileOutputStream, IOException, OutputStreamWriter}
 import java.net.URI
 
+import io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor.{applicationSettings, applicationSettingsFile}
 import microjson._
 import prickle._
 
 import scala.collection.mutable
 import scala.util.{Failure, Try}
 import scalafx.scene.paint.Color
+
+import scala.io.Source
 
 object JsonSerialization {
 
@@ -96,4 +100,29 @@ object JsonSerialization {
     Json.write(json)
   }
 
+  def saveApplicationSettings(applicationSettings: ApplicationSettings, applicationSettingsFile: File): Unit = {
+    try {
+      applicationSettingsFile.getParentFile().mkdirs()
+      val out = new OutputStreamWriter(new FileOutputStream(applicationSettingsFile), "utf-8")
+      try {
+        out.write(Pickle.intoString(applicationSettings))
+      } finally {
+        out.close()
+      }
+    } catch {
+      case e: IOException =>
+        System.err.println("Could not write application setting file: " + e.getMessage)
+    }
+  }
+
+  def loadApplicationSettings(applicationSettingsFile: File): ApplicationSettings = {
+    WithFailures.withFailures {
+      val src = Source.fromFile(applicationSettingsFile, "utf-8")
+      try {
+        Unpickle[ApplicationSettings].fromString(src.mkString).toOption
+      } finally {
+        src.close()
+      }
+    }.value.flatten.getOrElse(new ApplicationSettings())
+  }
 }

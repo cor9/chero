@@ -181,12 +181,7 @@ object Beatmeter {
       case AlignBottom => -1.0
       case AlignMiddle => -0.5
     }) * height))
-    println(node.getTransformedBounds(transform))
     node.setTransform(transform)
-
-    println(node.getBounds)
-    println(s"$scale $width $height")
-
 
     def draw(frame: Int, g: Graphics2D): Unit = {
       node.paint(g)

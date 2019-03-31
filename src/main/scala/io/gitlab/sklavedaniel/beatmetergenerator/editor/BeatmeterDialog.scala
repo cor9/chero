@@ -18,10 +18,12 @@
 
 package io.gitlab.sklavedaniel.beatmetergenerator.editor
 
+import java.io.File
+
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.FlyingBeatmeter
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.WaveformBeatmeter
+import io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor.tracks
 import io.gitlab.sklavedaniel.beatmetergenerator.utils._
-
 import scalafx.Includes._
 import scalafx.beans.binding.Bindings
 import scalafx.beans.property._
@@ -30,7 +32,8 @@ import scalafx.scene.control._
 import scalafx.scene.layout._
 import scalafx.stage.{DirectoryChooser, Window}
 
-class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: FlyingBeatmeter.Conf_V0_2_3, waveformConf: WaveformBeatmeter.Conf_V0_2_0)
+class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: FlyingBeatmeter.Conf_V0_2_3,
+  waveformConf: WaveformBeatmeter.Conf_V0_2_0, baseDir: Option[File])
   extends Dialog[(Boolean, FlyingBeatmeter.Conf_V0_2_3, WaveformBeatmeter.Conf_V0_2_0)] {
   ownerWindow.foreach(initOwner)
   title = "Beatmeter Generator"
@@ -231,6 +234,9 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
           selected.onChange { (_, old, current) =>
             if (!old && current) {
               val dialog = new DirectoryChooser()
+              baseDir.foreach {f =>
+                dialog.initialDirectory = f
+              }
               dialog.title = "Beatmeter Generator: Image Directory"
               imageDirectory() = Option(dialog.showDialog(scene().windowProperty()())).filter(_.exists()).map(_.toURI)
             } else if (old && !current) {
@@ -451,6 +457,9 @@ class BeatmeterDialog(ownerWindow: Option[Window], flying: Boolean, flyingConf: 
           selected.onChange { (_, old, current) =>
             if (!old && current) {
               val dialog = new DirectoryChooser()
+              baseDir.foreach {f =>
+                dialog.initialDirectory = f
+              }
               dialog.title = "Beatmeter Generator: Image Directory"
               imageDirectory() = Option(dialog.showDialog(scene().windowProperty()())).filter(_.exists()).map(_.toURI)
             } else if (old && !current) {

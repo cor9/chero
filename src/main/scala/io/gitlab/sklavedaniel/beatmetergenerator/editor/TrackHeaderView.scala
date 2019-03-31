@@ -21,7 +21,7 @@ package io.gitlab.sklavedaniel.beatmetergenerator.editor
 import java.io.{BufferedInputStream, FileInputStream}
 import java.net.URI
 
-import io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor._
+import io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor.{tracks, _}
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.{Track, Tracks, UndoManager, WithFailures}
 import javafx.beans.value.ChangeListener
 import javafx.geometry.VPos
@@ -59,6 +59,9 @@ class TrackHeaderView(val track: Track, tracks: Tracks, undoManager: UndoManager
         if (current) {
           if (track.beat().isEmpty) {
             val fc = new FileChooser()
+            tracks.file().foreach {f =>
+              fc.initialDirectory = f.getParentFile
+            }
             fc.title = "Beatmeter Generator: Open audio file"
             fc.getExtensionFilters += new ExtensionFilter("wav audio file (16bit unsigned)", "*.wav")
             Option(fc.showOpenDialog(null)) match {

@@ -22,7 +22,7 @@ import java.awt.image.BufferedImage
 import java.awt.{GraphicsEnvironment, RenderingHints, Shape, SplashScreen}
 import java.io._
 import java.net.URI
-import java.nio.file.Files
+import java.nio.file.{Files, Paths}
 
 import io.gitlab.sklavedaniel.beatmetergenerator._
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.Beatmeter.Timed
@@ -73,6 +73,10 @@ object BeatEditor extends JFXApp {
     g.drawString(Information.version, sb.width - fb.getWidth.toFloat - 18, sb.height - fb.getHeight.toFloat - fb.getMinY.toFloat - 7)
     splash.update()
   }
+
+  val applicationSettingsFile = Paths.get(System.getProperty("user.home")).resolve(".config").resolve("beatmeter_generator").resolve(Information.version).resolve("application.json")
+
+  val applicationSettings = ObjectProperty(JsonSerialization.loadApplicationSettings(applicationSettingsFile.toFile))
 
   private val player = new AudioPlayer()
   private val undoManager = new UndoManager()
@@ -145,6 +149,76 @@ object BeatEditor extends JFXApp {
         }
       }
 
+      def accessedFile(file: File): Unit = {
+        val s = file.getAbsolutePath
+        val tmp = (s :: applicationSettings().recentFiles.filterNot(_ == s)).take(20)
+        applicationSettings() = applicationSettings().copy(recentFiles = tmp)
+      }
+
+      def save(oldFile: Option[File]): Unit = {
+        val fc = new FileChooser()
+        fc.title = "Beatmeter Generator: Save"
+        tracks().file().foreach { f =>
+          fc.initialDirectory = f.getParentFile
+          fc.initialFileName = f.getName
+        }
+        oldFile.orElse(Option(fc.showSaveDialog(window()))) match {
+          case Some(file) =>
+            val task = (callback: (Option[Double], Option[String]) => Boolean) => {
+              val s = JsonSerialization.save(tracks().toImmutable(file.getParentFile.toURI))
+              val r = for (out <- resource.managed(new OutputStreamWriter(new FileOutputStream(file), "utf-8"))) yield {
+                out.write(s)
+              }
+              fromTry(r.tried).map(Some(_))
+            }
+            val pd = new ProgressDialog[Unit](Some(mainView().scene().windowProperty()()), "Saving", Some("Saving..."), false, task)
+            pd.showAndWait().get.asInstanceOf[WithFailures[Option[Unit], Throwable]] match {
+              case WithFailures(Some(Some(_)), _) =>
+              case WithFailures(None, e) =>
+                alert("Could not save file", e.headOption.map(x => x.getLocalizedMessage).getOrElse(""), scene().windowProperty()())
+              case WithFailures(Some(None), _) =>
+            }
+            tracks().file() = Some(file)
+            accessedFile(file)
+          case None =>
+        }
+      }
+
+      def open(file: File): Unit = {
+        try {
+          val task = (callback: (Option[Double], Option[String]) => Boolean) => {
+            val src = Source.fromFile(file, "utf-8")
+            try {
+              JsonSerialization.load(src.mkString).flatMap { ts =>
+                ts.toMutable(file.getParentFile.toURI, (uri: URI) => {
+                  withFailures(uri.toURL().openStream()).flatMap {
+                    in => AudioPlayer.readData(new BufferedInputStream(in))
+                  }
+                }, Some(undoManager))
+              }.map(Some(_))
+            } finally {
+              src.close()
+            }
+          }
+          val pd = new ProgressDialog[Tracks](Some(mainView().scene().windowProperty()()), "Loading", Some("Loading..."), false, task)
+          pd.showAndWait().get.asInstanceOf[WithFailures[Option[Tracks], Throwable]] match {
+            case WithFailures(Some(Some(ts)), e) =>
+              ts.file() = Some(file)
+              tracks() = ts
+              if (e.nonEmpty) {
+                alert("The following errors have been ignored", e.map(x => x.getLocalizedMessage).mkString("\n"), scene().windowProperty()())
+              }
+              accessedFile(file)
+            case WithFailures(None, e) =>
+              alert("Could not load file", e.headOption.map(x => x.getLocalizedMessage).getOrElse(""), scene().windowProperty()())
+            case WithFailures(Some(None), _) =>
+          }
+        } catch {
+          case e: Exception =>
+            alert("Could not open file", e.getLocalizedMessage, scene().windowProperty()())
+        }
+      }
+
       root = new BorderPane {
         prefWidth = 800
         prefHeight = 600
@@ -155,65 +229,48 @@ object BeatEditor extends JFXApp {
                 new MenuItem("Open") {
                   onAction = handle {
                     val fc = new FileChooser()
+                    tracks().file().foreach { f =>
+                      fc.initialDirectory = f.getParentFile
+                    }
                     fc.title = "Beatmeter Generator: Open"
                     Option(fc.showOpenDialog(window())) match {
                       case Some(file) =>
-                        try {
-                          val task = (callback: (Option[Double], Option[String]) => Boolean) => {
-                            JsonSerialization.load(Source.fromFile(file, "utf-8").mkString).flatMap { ts =>
-                              ts.toMutable(file.getParentFile.toURI, (uri: URI) => {
-                                withFailures(uri.toURL().openStream()).flatMap {
-                                  in => AudioPlayer.readData(new BufferedInputStream(in))
-                                }
-                              }, Some(undoManager))
-                            }.map(Some(_))
-                          }
-                          val pd = new ProgressDialog[Tracks](Some(mainView().scene().windowProperty()()), "Loading", Some("Loading..."), false, task)
-                          pd.showAndWait().get.asInstanceOf[WithFailures[Option[Tracks], Throwable]] match {
-                            case WithFailures(Some(Some(ts)), e) =>
-                              tracks() = ts
-                              if (e.nonEmpty) {
-                                alert("The following errors have been ignored", e.map(x => x.getLocalizedMessage).mkString("\n"), scene().windowProperty()())
-                              }
-                            case WithFailures(None, e) =>
-                              alert("Could not load file", e.headOption.map(x => x.getLocalizedMessage).getOrElse(""), scene().windowProperty()())
-                            case WithFailures(Some(None), _) =>
-                          }
-                        } catch {
-                          case e: Exception =>
-                            alert("Could not open file", e.getLocalizedMessage, scene().windowProperty()())
-                        }
+                        open(file)
                       case None =>
                     }
+                  }
+                },
+                new Menu("Open recent") {
+                  disable <== Bindings.createBooleanBinding(() => applicationSettings().recentFiles.isEmpty, applicationSettings)
+                  def computeItems(): Unit = {
+                    items = applicationSettings().recentFiles.map(s => new MenuItem(s) {
+                      onAction = handle {
+                        open(new File(s))
+                      }
+                    })
+                  }
+                  computeItems()
+                  applicationSettings.onChange { (_, _, _) =>
+                    computeItems()
+                  }
+                },
+                new MenuItem("Save as") {
+                  onAction = handle {
+                    save(None)
                   }
                 },
                 new MenuItem("Save") {
                   onAction = handle {
-                    val fc = new FileChooser()
-                    fc.title = "Beatmeter Generator: Save"
-                    Option(fc.showSaveDialog(window())) match {
-                      case Some(file) =>
-                        val task = (callback: (Option[Double], Option[String]) => Boolean) => {
-                          val s = JsonSerialization.save(tracks().toImmutable(file.getParentFile.toURI))
-                          val r = for (out <- resource.managed(new OutputStreamWriter(new FileOutputStream(file), "utf-8"))) yield {
-                            out.write(s)
-                          }
-                          fromTry(r.tried).map(Some(_))
-                        }
-                        val pd = new ProgressDialog[Unit](Some(mainView().scene().windowProperty()()), "Saving", Some("Saving..."), false, task)
-                        pd.showAndWait().get.asInstanceOf[WithFailures[Option[Unit], Throwable]] match {
-                          case WithFailures(Some(Some(_)), _) =>
-                          case WithFailures(None, e) =>
-                            alert("Could not save file", e.headOption.map(x => x.getLocalizedMessage).getOrElse(""), scene().windowProperty()())
-                          case WithFailures(Some(None), _) =>
-                        }
-                      case None =>
-                    }
+                    save(tracks().file())
                   }
+                  accelerator = new KeyCodeCombination(KeyCode.S, KeyCombination.ControlDown)
                 },
                 new MenuItem("Load Audio") {
                   onAction = handle {
                     val fc = new FileChooser()
+                    tracks().file().foreach { f =>
+                      fc.initialDirectory = f.getParentFile
+                    }
                     fc.title = "Beatmeter Generator: Open audio file"
                     fc.getExtensionFilters += new ExtensionFilter("wav audio file (16bit unsigned)", "*.wav")
                     Option(fc.showOpenDialog(window())) match {
@@ -243,6 +300,7 @@ object BeatEditor extends JFXApp {
                   }
                   accelerator = new KeyCodeCombination(KeyCode.T, KeyCombination.ControlDown)
                 },
+                new SeparatorMenuItem(),
                 new MenuItem("Undo") {
                   disable <== !undoManager.undoable
                   onAction = handle {
@@ -257,6 +315,7 @@ object BeatEditor extends JFXApp {
                   }
                   accelerator = new KeyCodeCombination(KeyCode.Y, KeyCombination.ControlDown)
                 },
+                new SeparatorMenuItem(),
                 new MenuItem("Copy") {
                   onAction = handle {
                     mainView().selectionContainer().foreach { sc =>
@@ -300,6 +359,7 @@ object BeatEditor extends JFXApp {
                   }
                   accelerator = new KeyCodeCombination(KeyCode.Delete, KeyCombination.ControlDown)
                 },
+                new SeparatorMenuItem(),
                 new MenuItem("Insert Beat") {
                   onAction = handle {
                     mainView().record().foreach { track =>
@@ -311,7 +371,7 @@ object BeatEditor extends JFXApp {
                   }
                   accelerator = new KeyCodeCombination(KeyCode.B, KeyCombination.ControlDown)
                 },
-                new MenuItem("New BPM Pattern") {
+                new MenuItem("Insert BPM Pattern") {
                   onAction = handle {
                     mainView().record().foreach { track =>
                       val x = player.position()._1
@@ -324,7 +384,7 @@ object BeatEditor extends JFXApp {
                   }
                   accelerator = new KeyCodeCombination(KeyCode.P, KeyCombination.ControlDown)
                 },
-                new MenuItem("New Beat Pattern") {
+                new MenuItem("Insert Beat Pattern") {
                   onAction = handle {
                     mainView().record().foreach { track =>
                       val x = player.position()._1
@@ -333,7 +393,7 @@ object BeatEditor extends JFXApp {
                   }
                   accelerator = new KeyCodeCombination(KeyCode.P, KeyCombination.ControlDown, KeyCombination.ShiftDown)
                 },
-                new MenuItem("New Message") {
+                new MenuItem("Insert Message") {
                   onAction = handle {
                     mainView().record().foreach { track =>
                       val x = player.position()._1
@@ -356,6 +416,7 @@ object BeatEditor extends JFXApp {
                   }
                   accelerator = new KeyCodeCombination(KeyCode.Space, KeyCombination.ControlDown)
                 },
+                new SeparatorMenuItem(),
                 new MenuItem("Audio forward") {
                   onAction = handle {
                     player.position() = ((player.position()._1 + 1.0 / mainView().pxPerSec().doubleValue()).max(0.0), true)
@@ -404,6 +465,7 @@ object BeatEditor extends JFXApp {
                   }
                   accelerator = new KeyCodeCombination(KeyCode.Left, KeyCombination.ControlDown, KeyCombination.MetaDown)
                 },
+                new SeparatorMenuItem(),
                 new MenuItem("Zoom in") {
                   onAction = handle {
                     val x = mainView().scrollPane.width() / 2.0
@@ -428,6 +490,9 @@ object BeatEditor extends JFXApp {
                 new MenuItem("Generate Audio") {
                   onAction = handle {
                     val fc = new FileChooser()
+                    tracks().file().foreach { f =>
+                      fc.initialDirectory = f.getParentFile
+                    }
                     fc.title = "Beatmeter Generator: Generate Audio"
                     Option(fc.showSaveDialog(window())) match {
                       case Some(file) =>
@@ -502,6 +567,9 @@ object BeatEditor extends JFXApp {
                         val states: List[State] = beatmeter.getElementStreams(beats, messages, frameCount).map(tl => new State(tl.clip, tl.stream))
 
                         val fc = new DirectoryChooser()
+                        tracks().file().foreach { f =>
+                          fc.initialDirectory = f.getParentFile
+                        }
                         fc.title = "Beatmeter Generator: Generate Video"
                         Option(fc.showDialog(window())) match {
                           case Some(dir) =>
@@ -588,7 +656,7 @@ object BeatEditor extends JFXApp {
                 new MenuItem("Beatmeter Settings") {
                   onAction = handle {
                     val dialog = new BeatmeterDialog(Some(mainView().scene().windowProperty()()), tracks().flying(),
-                      tracks().flyingBeatmeter(), tracks().waveformBeatmeter())
+                      tracks().flyingBeatmeter(), tracks().waveformBeatmeter(), tracks().file().map(_.getParentFile))
                     val r = dialog.showAndWait().get.asInstanceOf[(Boolean, FlyingBeatmeter.Conf_V0_2_3, WaveformBeatmeter.Conf_V0_2_0)]
                     undoManager.startGroup()
                     tracks().flying() = r._1
@@ -612,6 +680,9 @@ object BeatEditor extends JFXApp {
                       }),
                       b => b._1)
                     val fc = new FileChooser()
+                    tracks().file().foreach { f =>
+                      fc.initialDirectory = f.getParentFile
+                    }
                     fc.title = "Beatmeter Generator: Export audio and messages"
                     Option(fc.showSaveDialog(window())) match {
                       case Some(file) =>
@@ -735,4 +806,7 @@ object BeatEditor extends JFXApp {
 
   player.progressDialogWindow() = Some(stage.scene().windowProperty()())
 
+  override def stopApp(): Unit = {
+    JsonSerialization.saveApplicationSettings(applicationSettings(), applicationSettingsFile.toFile)
+  }
 }

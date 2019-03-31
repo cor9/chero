@@ -18,6 +18,7 @@
 
 package io.gitlab.sklavedaniel.beatmetergenerator.utils
 
+import java.io.File
 import java.net.URI
 
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.{FlyingBeatmeter, WaveformBeatmeter}
@@ -47,6 +48,8 @@ final class Tracks(val undoManager: Option[UndoManager]) {
     ("Courgette", 60, true, false), 5, Color.web("#2a98ff"), Color.Black, 1.0, AlignCenter, 0.5,
     None))
   UndoManager.register(undoManager, waveformBeatmeter)
+
+  val file = ObjectProperty[Option[File]](None)
 
   def toImmutable(base: URI) = {
     ImmutableTracks(content.toList.map(_.toImmutable(base)), audio().map(u => base.relativize(u._1)), flying(), flyingBeatmeter(), waveformBeatmeter())
