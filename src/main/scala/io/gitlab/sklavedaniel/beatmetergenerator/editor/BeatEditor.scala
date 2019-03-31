@@ -406,13 +406,19 @@ object BeatEditor extends JFXApp {
                 },
                 new MenuItem("Zoom in") {
                   onAction = handle {
+                    val x = mainView().scrollPane.width() / 2.0
+                    val oldPosition = (mainView().scrollPane.scrollX + x) / mainView().scrollPane.waveView.scale()
                     mainView().scale() = (mainView().scale() * (1 + 1.0 / 40)).max(0.25).min(40.0)
+                    mainView().scrollPane.scrollX = oldPosition * mainView().scrollPane.waveView.scale() - x
                   }
                   accelerator = new KeyCodeCombination(KeyCode.Plus, KeyCombination.ControlDown)
                 },
                 new MenuItem("Zoom out") {
                   onAction = handle {
+                    val x = mainView().scrollPane.width() / 2.0
+                    val oldPosition = (mainView().scrollPane.scrollX + x) / mainView().scrollPane.waveView.scale()
                     mainView().scale() = (mainView().scale() * (1 - 1.0 / 40)).max(0.25).min(40.0)
+                    mainView().scrollPane.scrollX = oldPosition * mainView().scrollPane.waveView.scale() - x
                   }
                   accelerator = new KeyCodeCombination(KeyCode.Minus, KeyCombination.ControlDown)
                 })
