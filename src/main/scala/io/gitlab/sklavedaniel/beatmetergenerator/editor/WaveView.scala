@@ -61,7 +61,6 @@ class WaveView(initPxPerSec: Double, initHeight: Double, sceneToContextX: Double
       val rate = p._1.length / duration.floatValue()
       val fromPos = visiblePos.doubleValue().floor.toInt.max(0)
       val toPos = (visiblePos.doubleValue().max(0.0) + visibleWidth.doubleValue()).ceil.toInt min width.doubleValue().ceil.toInt
-
       (for (i <- fromPos until toPos) yield {
         val from = (i / pxPerSec.doubleValue() * rate).floor.toInt
         val to = ((i + 1) / pxPerSec.doubleValue() * rate).ceil.toInt

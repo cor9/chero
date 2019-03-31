@@ -217,7 +217,8 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
       height <== box.height
     }
 
-    content = new Group {
+    content = new Pane {
+      this.maxWidth <== waveView.width
       children = Seq(
         box,
         positionLineView
