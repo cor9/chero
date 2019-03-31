@@ -83,7 +83,7 @@ class WaveView(initPxPerSec: Double, initHeight: Double, sceneToContextX: Double
 
   val onAction = ObjectProperty((p: Double) => ())
 
-  onMouseClicked = mouseHandler(_ => (), e => {
+  onMouseClicked = mouseHandler(e => {
     onAction()(sceneToContextX(e.getSceneX) / pxPerSec.doubleValue())
-  })
+  }, _ => ())
 }

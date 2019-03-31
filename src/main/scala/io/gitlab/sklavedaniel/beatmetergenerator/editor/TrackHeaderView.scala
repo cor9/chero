@@ -165,8 +165,8 @@ class TrackHeaderView(val track: Track, tracks: Tracks, undoManager: UndoManager
           track.snap.addListener(weak(listener))
         },
         new ToggleButton {
-          text = "R"
-          tooltip = new Tooltip("record beats to track") {
+          text = "I"
+          tooltip = new Tooltip("insert into this track") {
             font = Font(10)
           }
           font = Font(8)

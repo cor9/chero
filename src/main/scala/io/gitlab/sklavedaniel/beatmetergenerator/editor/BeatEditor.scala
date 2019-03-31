@@ -240,8 +240,8 @@ object BeatEditor extends JFXApp {
                 new MenuItem("New Track") {
                   onAction = handle {
                     tracks().content += new Track(Some(undoManager))
-                    accelerator = new KeyCodeCombination(KeyCode.T, KeyCombination.ControlDown)
                   }
+                  accelerator = new KeyCodeCombination(KeyCode.T, KeyCombination.ControlDown)
                 },
                 new MenuItem("Undo") {
                   disable <== !undoManager.undoable
@@ -322,6 +322,7 @@ object BeatEditor extends JFXApp {
                       mainView().track2view(track).newResizableElement(x, b)
                     }
                   }
+                  accelerator = new KeyCodeCombination(KeyCode.P, KeyCombination.ControlDown)
                 },
                 new MenuItem("New Beat Pattern") {
                   onAction = handle {
@@ -330,6 +331,7 @@ object BeatEditor extends JFXApp {
                       mainView().track2view(track).newBeatPattern(x, 1.0, Seq(0.0))
                     }
                   }
+                  accelerator = new KeyCodeCombination(KeyCode.P, KeyCombination.ControlDown, KeyCombination.ShiftDown)
                 },
                 new MenuItem("New Message") {
                   onAction = handle {
@@ -342,6 +344,7 @@ object BeatEditor extends JFXApp {
                       mainView().track2view(track).newResizableElement(x, b)
                     }
                   }
+                  accelerator = new KeyCodeCombination(KeyCode.M, KeyCombination.ControlDown)
                 }
               )
             },
