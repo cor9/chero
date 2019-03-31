@@ -76,6 +76,12 @@ class ObservableIntervalMap[A, B](implicit fractional: Fractional[A]) extends Ob
   def apply(a: A): Option[(A, A, B)] =
     ends.from(a).headOption.map(_._2).filter(_._1 <= a)
 
+  def increase(a: A): Option[(A, A, B)] =
+    starts.from(a).take(2).values.find(_._1 > a)
+
+  def decrease(a: A): Option[(A, A, B)] =
+    starts.to(a).takeRight(2).values.find(_._1 < a)
+
   def apply(startA: A, endA: A): List[(A, A, B)] =
     starts.from(startA).iterator.map(_._2).takeWhile(_._2 <= endA).toList
 

@@ -54,13 +54,15 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
 
   val selectionContainer = ObjectProperty[Option[SelectionContainer[_]]](None)
   selectionContainer.onChange {(_,c,_) =>
-    println(c.getOrElse(null))
     c.foreach(_.selectedElements.clear())
   }
 
   val headerBox = new VBox {
     spacing = 5
   }
+
+  val track2view = mutable.Map[Track, TrackView]()
+  val track2headerView = mutable.Map[Track, TrackHeaderView]()
 
   object scrollPane extends ScrollPane {
     self =>
@@ -92,9 +94,6 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
     val tracksBox = new VBox {
       spacing = 5
     }
-
-    val track2view = mutable.Map[Track, TrackView]()
-    val track2headerView = mutable.Map[Track, TrackHeaderView]()
 
     private val tracksListener: InvalidationListener = _ => {
       calcTracksDuration()

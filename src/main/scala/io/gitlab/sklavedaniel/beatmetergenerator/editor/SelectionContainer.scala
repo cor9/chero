@@ -64,6 +64,10 @@ trait SelectionContainer[A <: TrackElement] {
     }
   }
 
+  def deleteSelectedElemts(): Unit = {
+      content --= selectedElements.map(_.position())
+  }
+
   def copy(view: TrackElementView[A, A]): Unit = {
     val data: List[(Double, Double, ImmutableTrackElement)] = if (view.selected()) {
       val offset = view.position()._1
@@ -76,6 +80,19 @@ trait SelectionContainer[A <: TrackElement] {
     cc.put(BeatEditor.dataformat, data)
     cb.setContent(cc)
   }
+
+  def copySlected(): Unit = {
+    if (selectedElements.nonEmpty) {
+      val offset = selectedElements.toList.map(_.position()._1).min
+      val data: List[(Double, Double, ImmutableTrackElement)] = selectedElements.toList.map(
+        elem => (elem.position()._1 - offset, elem.position()._2 - offset, elem.element.toImmutable()))
+      val cb = Clipboard.systemClipboard
+      val cc = new ClipboardContent()
+      cc.put(BeatEditor.dataformat, data)
+      cb.setContent(cc)
+    }
+  }
+
 
   def insert(x: Double): Unit = {
     Clipboard.systemClipboard.content.get(BeatEditor.dataformat).foreach { data =>
@@ -105,7 +122,6 @@ trait SelectionContainer[A <: TrackElement] {
   }
   val hasSelectedElements = Bindings.createBooleanBinding(() => selectedElements.nonEmpty, selectedElements)
   hasSelectedElements.onChange { (_, _, v) =>
-    println(this + ": " + v + ", " + selectionContainer().contains(this))
     if (v) {
       selectionContainer() = Some(this)
     } else if (selectionContainer().contains(this)) {

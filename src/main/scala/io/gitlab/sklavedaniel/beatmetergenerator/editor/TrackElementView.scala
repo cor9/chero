@@ -316,7 +316,7 @@ final class BeatsPatternView[B >: BeatsPattern <: TrackElement](val beatsPattern
   override def selectionActive(x: => Double) = x / pxPerSec() <= beatsPattern.patternDuration()
 
 
-  var contextMenuX = 0.0
+  private var contextMenuX = 0.0
   val contextMenu = new ContextMenu(
     new MenuItem("New Beat") {
       onAction = handle {

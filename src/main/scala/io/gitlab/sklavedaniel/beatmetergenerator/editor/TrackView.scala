@@ -37,7 +37,8 @@ import Utils._
 
 class TrackView(initPxPerSec: Double, val track: Track, snaps: ObjectProperty[Option[ObservableIntervalMap[Double, Beat]]],
   override val undoManager: UndoManager, audio: ObjectProperty[Option[Array[Short]]],
-  digitDown: ObjectBinding[Option[Int]], override val selectionContainer: ObjectProperty[Option[SelectionContainer[_]]]) extends Group with SelectionContainer[TrackElement] {
+  digitDown: ObjectBinding[Option[Int]], override val selectionContainer: ObjectProperty[Option[SelectionContainer[_]]]
+) extends Group with SelectionContainer[TrackElement] {
   self =>
   val content = track.content
   val clazz = classOf[ImmutableTrackElement]
@@ -62,7 +63,7 @@ class TrackView(initPxPerSec: Double, val track: Track, snaps: ObjectProperty[Op
 
   override def startPosition = 0.0
 
-  def snap(pos: Double, offset: Double, atStart: Boolean) = digitDown().flatMap {
+  def snap(pos: Double, offset: Double, atStart: Boolean) = digitDown().orElse(Some(0)).flatMap {
     extraSnaps =>
       snaps().flatMap {
         snaps =>
@@ -158,21 +159,24 @@ class TrackView(initPxPerSec: Double, val track: Track, snaps: ObjectProperty[Op
 
   var contextMenuX = 0.0
 
-  def newResizableElement(elem: TrackElement): Unit = {
-    val duration = content.starting(contextMenuX, contextMenuX + 5).headOption.map(x => 0.5.max(x._1 - contextMenuX - 0.5)).getOrElse(5.0)
-    if (content.intersecting(contextMenuX, contextMenuX + duration).isEmpty) {
-      content ++= Iterator((contextMenuX, contextMenuX + duration, elem))
+  def newResizableElement(elem: TrackElement): Unit = newResizableElement(contextMenuX, elem)
+  def newResizableElement(pos: Double, elem: TrackElement): Unit = {
+    val duration = content.starting(pos, pos + 5).headOption.map(x => 0.5.max(x._1 - pos - 0.5)).getOrElse(5.0)
+    if (content.intersecting(pos, pos + duration).isEmpty) {
+      content ++= Iterator((pos, pos + duration, elem))
     }
   }
 
-  def newBeatPattern(duration: Double, beats: Seq[Double]): Unit = {
+  def newBeatPattern(duration: Double, beats: Seq[Double]): Unit = newBeatPattern(contextMenuX, duration, beats)
+
+  def newBeatPattern(x: Double, duration: Double, beats: Seq[Double]): Unit = {
     val b = new BeatsPattern(Some(undoManager))
     val tmp = beats.map(d => (d, d + 0.05, new Beat(Some(undoManager))))
     undoManager.active = false
     b.pattern ++= tmp
     b.patternDuration() = duration
     undoManager.active = true
-    newResizableElement(b)
+    newResizableElement(x, b)
   }
 
   val contextMenu: ContextMenu = new ContextMenu(

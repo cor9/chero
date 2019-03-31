@@ -93,16 +93,6 @@ object BeatEditor extends JFXApp {
     title = "Beatmeter Generator"
     icons ++= Seq(16, 32, 64, 128).map(r => new Image(getClass.getResourceAsStream(s"/icon/icon-${r}x${r}.png")).delegate)
     val down = IndexedSeq.fill(10)(BooleanProperty(false))
-    val down_0 = BooleanProperty(false)
-    val down_1 = BooleanProperty(false)
-    val down_2 = BooleanProperty(false)
-    val down_3 = BooleanProperty(false)
-    val down_4 = BooleanProperty(false)
-    val down_5 = BooleanProperty(false)
-    val down_6 = BooleanProperty(false)
-    val down_7 = BooleanProperty(false)
-    val down_8 = BooleanProperty(false)
-    val down_9 = BooleanProperty(false)
     val digitDown = Bindings.createObjectBinding(() => down.zipWithIndex.map(d => if (d._1()) Some(d._2) else None).foldLeft(Option.empty[Int])(_.orElse(_)), down: _*)
 
     val mainView = Bindings.createObjectBinding(() => new MainView(tracks(), undoManager, player, Stage.digitDown), tracks)
@@ -120,38 +110,38 @@ object BeatEditor extends JFXApp {
         } else if (e.code == KeyCode.Digit4 || e.code == KeyCode.Numpad4) {
           down(4)() = true
         } else if (e.code == KeyCode.Digit5 || e.code == KeyCode.Numpad5) {
-          down_5() = true
+          down(5)() = true
         } else if (e.code == KeyCode.Digit6 || e.code == KeyCode.Numpad6) {
-          down_6() = true
+          down(6)() = true
         } else if (e.code == KeyCode.Digit7 || e.code == KeyCode.Numpad7) {
-          down_7() = true
+          down(7)() = true
         } else if (e.code == KeyCode.Digit8 || e.code == KeyCode.Numpad8) {
-          down_8() = true
+          down(8)() = true
         } else if (e.code == KeyCode.Digit9 || e.code == KeyCode.Numpad9) {
-          down_9() = true
+          down(9)() = true
         }
       }
       filterEvent(KeyEvent.KeyReleased) { (e: KeyEvent) =>
         if (e.code == KeyCode.Digit0 || e.code == KeyCode.Numpad0) {
-          down_0() = false
+          down(0)() = false
         } else if (e.code == KeyCode.Digit1 || e.code == KeyCode.Numpad1) {
-          down_1() = false
+          down(1)() = false
         } else if (e.code == KeyCode.Digit2 || e.code == KeyCode.Numpad2) {
-          down_2() = false
+          down(2)() = false
         } else if (e.code == KeyCode.Digit3 || e.code == KeyCode.Numpad3) {
-          down_3() = false
+          down(3)() = false
         } else if (e.code == KeyCode.Digit4 || e.code == KeyCode.Numpad4) {
-          down_4() = false
+          down(4)() = false
         } else if (e.code == KeyCode.Digit5 || e.code == KeyCode.Numpad5) {
-          down_5() = false
+          down(5)() = false
         } else if (e.code == KeyCode.Digit6 || e.code == KeyCode.Numpad6) {
-          down_6() = false
+          down(6)() = false
         } else if (e.code == KeyCode.Digit7 || e.code == KeyCode.Numpad7) {
-          down_7() = false
+          down(7)() = false
         } else if (e.code == KeyCode.Digit8 || e.code == KeyCode.Numpad8) {
-          down_8() = false
+          down(8)() = false
         } else if (e.code == KeyCode.Digit9 || e.code == KeyCode.Numpad9) {
-          down_9() = false
+          down(9)() = false
         }
       }
 
@@ -250,6 +240,7 @@ object BeatEditor extends JFXApp {
                 new MenuItem("New Track") {
                   onAction = handle {
                     tracks().content += new Track(Some(undoManager))
+                    accelerator = new KeyCodeCombination(KeyCode.T, KeyCombination.ControlDown)
                   }
                 },
                 new MenuItem("Undo") {
@@ -265,20 +256,104 @@ object BeatEditor extends JFXApp {
                     undoManager.redoAction()
                   }
                   accelerator = new KeyCodeCombination(KeyCode.Y, KeyCombination.ControlDown)
+                },
+                new MenuItem("Copy") {
+                  onAction = handle {
+                    mainView().selectionContainer().foreach { sc =>
+                      sc.copySlected()
+                    }
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.C, KeyCombination.ControlDown)
+                },
+                new MenuItem("Cut") {
+                  onAction = handle {
+                    mainView().selectionContainer().foreach { sc =>
+                      sc.copySlected()
+                      sc.deleteSelectedElemts()
+                    }
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.X, KeyCombination.ControlDown)
+                },
+                new MenuItem("Insert") {
+                  onAction = handle {
+                    mainView().record().foreach { t =>
+                      val v = mainView().track2view(t)
+                      t.content(player.position()._1) match {
+                        case Some((p, _, e)) =>
+                          v.element2view((p, e)) match {
+                            case sc: SelectionContainer[_] =>
+                              sc.insert(player.position()._1 - sc.startPosition)
+                            case _ =>
+                          }
+                        case None =>
+                          v.insert(player.position()._1)
+                      }
+                    }
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.V, KeyCombination.ControlDown)
+                },
+                new MenuItem("Delete") {
+                  onAction = handle {
+                    mainView().selectionContainer().foreach { sc =>
+                      sc.deleteSelectedElemts()
+                    }
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.Delete, KeyCombination.ControlDown)
+                },
+                new MenuItem("Insert Beat") {
+                  onAction = handle {
+                    mainView().record().foreach { track =>
+                      val x = player.position()._1
+                      if (track.content.intersecting(x, x + 0.05).isEmpty) {
+                        track.content ++= Iterator((x, x + 0.05, new Beat(Some(undoManager))))
+                      }
+                    }
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.B, KeyCombination.ControlDown)
+                },
+                new MenuItem("New BPM Pattern") {
+                  onAction = handle {
+                    mainView().record().foreach { track =>
+                      val x = player.position()._1
+                      val b = new BPMPattern(Some(undoManager))
+                      undoManager.active = false
+                      b.bpm() = 60
+                      undoManager.active = true
+                      mainView().track2view(track).newResizableElement(x, b)
+                    }
+                  }
+                },
+                new MenuItem("New Beat Pattern") {
+                  onAction = handle {
+                    mainView().record().foreach { track =>
+                      val x = player.position()._1
+                      mainView().track2view(track).newBeatPattern(x, 1.0, Seq(0.0))
+                    }
+                  }
+                },
+                new MenuItem("New Message") {
+                  onAction = handle {
+                    mainView().record().foreach { track =>
+                      val x = player.position()._1
+                      val b = new Message(Some(undoManager))
+                      undoManager.active = false
+                      b.text() = "Hello!"
+                      undoManager.active = true
+                      mainView().track2view(track).newResizableElement(x, b)
+                    }
+                  }
                 }
               )
             },
             new Menu("Navigate") {
               items = Seq(
                 new MenuItem("play/pause") {
-                  disable <== !undoManager.undoable
                   onAction = handle {
                     player.playing() = !player.playing()
                   }
                   accelerator = new KeyCodeCombination(KeyCode.Space, KeyCombination.ControlDown)
                 },
                 new MenuItem("Audio forward") {
-                  disable <== !undoManager.undoable
                   onAction = handle {
                     player.position() = ((player.position()._1 + 1.0 / mainView().pxPerSec().doubleValue()).max(0.0), true)
                   }
@@ -291,7 +366,6 @@ object BeatEditor extends JFXApp {
                   accelerator = new KeyCodeCombination(KeyCode.Left, KeyCombination.ControlDown)
                 },
                 new MenuItem("Audio fast forward") {
-                  disable <== !undoManager.undoable
                   onAction = handle {
                     player.position() = ((player.position()._1 + 10 * 1.0 / mainView().pxPerSec().doubleValue()).max(0.0), true)
                   }
@@ -302,6 +376,30 @@ object BeatEditor extends JFXApp {
                     player.position() = ((player.position()._1 - 10 * 1.0 / mainView().pxPerSec().doubleValue()).max(0.0), true)
                   }
                   accelerator = new KeyCodeCombination(KeyCode.Left, KeyCombination.ControlDown, KeyCombination.ShiftDown)
+                },
+                new MenuItem("Audio snap forward") {
+                  onAction = handle {
+                    mainView().snaps().foreach { s =>
+                      s.increase(player.position()._1).foreach { x =>
+                        player.position() = (x._1.max(0.0)
+                          , true
+                        )
+                      }
+                    }
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.Right, KeyCombination.ControlDown, KeyCombination.MetaDown)
+                },
+                new MenuItem("Audio snap backward") {
+                  onAction = handle {
+                    mainView().snaps().foreach { s =>
+                      s.decrease(player.position()._1).foreach { x =>
+                        player.position() = (x._1.max(0.0)
+                          , true
+                        )
+                      }
+                    }
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.Left, KeyCombination.ControlDown, KeyCombination.MetaDown)
                 },
                 new MenuItem("Zoom in") {
                   onAction = handle {
@@ -314,16 +412,6 @@ object BeatEditor extends JFXApp {
                     mainView().scale() = (mainView().scale() * (1 - 1.0 / 40)).max(0.25).min(40.0)
                   }
                   accelerator = new KeyCodeCombination(KeyCode.Minus, KeyCombination.ControlDown)
-                })
-            },
-            new Menu("Move") {
-              items = Seq(
-                new MenuItem("Move to position") {
-                  disable <== !undoManager.undoable
-                  onAction = handle {
-
-                  }
-                  accelerator = new KeyCodeCombination(KeyCode.Up, KeyCombination.ControlDown)
                 })
             },
             new Menu("Tools") {
@@ -364,7 +452,7 @@ object BeatEditor extends JFXApp {
                 new MenuItem("Generate Video") {
                   onAction = handle {
 
-                    val beats = merge[(Double, Boolean), Double](mainView().scrollPane.track2view.values.toList.filter(_.track.display()).map(_.beats.toList.map(b => (b._1, b._3.highlight()))),
+                    val beats = merge[(Double, Boolean), Double](mainView().track2view.values.toList.filter(_.track.display()).map(_.beats.toList.map(b => (b._1, b._3.highlight()))),
                       b => b._1)
                     val messages = merge[(Double, Double, String), Double](
                       tracks().content.toList.filter(_.display()).map(_.content.toList.flatMap { b =>
@@ -502,9 +590,9 @@ object BeatEditor extends JFXApp {
                 },
                 new MenuItem("Export Beats and Messages") {
                   onAction = handle {
-                    val videoBeats = merge[(Double, Boolean), Double](mainView().scrollPane.track2view.values.toList.filter(_.track.display()).map(_.beats.toList.map(b => (b._1, b._3.highlight()))),
+                    val videoBeats = merge[(Double, Boolean), Double](mainView().track2view.values.toList.filter(_.track.display()).map(_.beats.toList.map(b => (b._1, b._3.highlight()))),
                       b => b._1)
-                    val audioBeats = merge[(Double, Boolean, Option[URI]), Double](mainView().scrollPane.track2view.values.toList.filter(_.track.play()).map(t => t.beats.toList.map(b => (b._1, b._3.highlight(), t.track.beat().map(_._1)))),
+                    val audioBeats = merge[(Double, Boolean, Option[URI]), Double](mainView().track2view.values.toList.filter(_.track.play()).map(t => t.beats.toList.map(b => (b._1, b._3.highlight(), t.track.beat().map(_._1)))),
                       b => b._1)
                     val messages = merge[(Double, Double, String), Double](
                       tracks().content.toList.filter(_.display()).map(_.content.toList.flatMap { b =>
