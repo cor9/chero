@@ -63,7 +63,11 @@ class TrackView(initPxPerSec: Double, val track: Track, snaps: ObjectProperty[Op
 
   override def startPosition = 0.0
 
-  def snap(pos: Double, offset: Double, atStart: Boolean) = digitDown().orElse(Some(0)).flatMap {
+  def snap(pos: Double, offset: Double, atStart: Boolean) = (digitDown() match {
+    case None => Some(0)
+    case Some(0) => None
+    case s => s
+  }).flatMap {
     extraSnaps =>
       snaps().flatMap {
         snaps =>
