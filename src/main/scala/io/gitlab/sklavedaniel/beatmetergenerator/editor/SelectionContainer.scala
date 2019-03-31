@@ -56,6 +56,8 @@ trait SelectionContainer[A <: TrackElement] {
 
   def snap(pos: Double, offset: Double, atStart: Boolean): Double
 
+  def propagateDragOver()
+
   def delete(view: TrackElementView[A, A]): Unit = {
     if (view.selected()) {
       content --= selectedElements.map(_.position())
@@ -65,7 +67,7 @@ trait SelectionContainer[A <: TrackElement] {
   }
 
   def deleteSelectedElemts(): Unit = {
-      content --= selectedElements.map(_.position())
+    content --= selectedElements.map(_.position())
   }
 
   def copy(view: TrackElementView[A, A]): Unit = {
@@ -194,6 +196,7 @@ trait SelectionContainer[A <: TrackElement] {
   }
   var dragBox: Option[Rectangle] = None
   onDragOver = e => {
+    propagateDragOver()
     if (selectionActive(e.getX)) {
       val db = e.getDragboard
       if (db.getContentTypes.contains(BeatEditor.dataformat)) {
@@ -217,16 +220,27 @@ trait SelectionContainer[A <: TrackElement] {
           } else {
             dragBox.get.fill = Color.DarkRed.opacity(0.5)
           }
+        } else {
+          dragExit()
         }
+      } else {
+        dragExit()
       }
-      e.consume()
+    } else {
+      dragExit()
     }
+    e.consume()
   }
 
   onDragExited = e => {
+    dragExit()
+  }
+
+  def dragExit(): Unit = {
     dragBox.foreach(children.remove)
     dragBox = None
   }
+
   onDragDropped = e => {
     if (selectionActive(e.getX)) {
       dragBox.foreach(children.remove)

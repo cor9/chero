@@ -284,4 +284,6 @@ class TrackView(initPxPerSec: Double, val track: Track, snaps: ObjectProperty[Op
     },
     elementGroup
   )
+
+  override def propagateDragOver(): Unit = {}
 }

@@ -193,6 +193,10 @@ final class BeatsPatternView[B >: BeatsPattern <: TrackElement](val beatsPattern
 
   override def startPosition = position()._1
 
+  override def propagateDragOver(): Unit = {
+    context.dragExit()
+  }
+
   val scaleRect = new Rectangle {
     width <== when(self.width < 5) choose 5 otherwise self.width
     height = 20
