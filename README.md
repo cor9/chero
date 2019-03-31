@@ -1,4 +1,5 @@
 # Beatmeter Generator
+##### 0.3.0
 
 A graphical editor to generate so called beatmeters for videos.
 The editor lets you edit beats and beat patters visually and then generade an audio track and image sequences for video generation (one image per frame).
@@ -14,6 +15,7 @@ Please read through the features, basic workflow and hints to get a better idea 
 ![example](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/example2.png)
 
 ![example](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/example.gif)
+
 
 ## Features
 
@@ -81,46 +83,41 @@ Please read through the features, basic workflow and hints to get a better idea 
 - You can chose a custom beat sound from the context menu on the left of the tracks.
 - You can select to highlight single beats, the first beats of patterns, or the first repetition of a pattern. These beats will be highlighted in the generated beatmeter.
 - When saving, paths refering to external files (e.g. audio files) will be stored relatively if they are in the same directory or a subdirectory. 
+- Marking a track with "I" sets it as insert target: you can now insert and paste to that track at the current position using short-cuts
+
+## New features in 0.3.0
+- Support for Java 11
+- Faster and nicer Waveform
+- Shortcuts for common functions (move position, insert, copy, ...)
+- Mark track with "I" and copy at current playback position
+- List of recently accessed files
+- File dialogs open at location of save file
 
 ## Download
 ### Windows
-There is a windows installer available (32bit and 64bit versions) at:
-
-[beatmeter-generator-x86.msi](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/builds/artifacts/master/raw/target/msiPackage/beatmeter-generator-x86.msi?job=build)
+There is a windows installer available (64bit only) at:
 
 [beatmeter-generator-x64.msi](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/builds/artifacts/master/raw/target/msiPackage/beatmeter-generator-x64.msi?job=build)
 
-It is larger than the platform independent build below but it contains everything you need.
+It is larger than the platform independent build below but it contains the Java runtime as well.
 It should work on Windows 7 and later.
 
 ### Platform independent version
 A platform independet .jar file can be downloaded at:
 [beatmeter-generator.jar](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/builds/artifacts/master/raw/target/scala-2.12/beatmeter-generator.jar?job=build)
 
-You will need the Java 8 Runtime Environment (JRE) to run the application. You can download it at:
-[Oracle Java 8](http://www.oracle.com/technetwork/java/javase/downloads/index.html)
+You will need the Java 11 JDK (separate JRE has been droped by Oracle) to run the application. You can download it at:
+[Oracle Java 11](https://www.oracle.com/technetwork/java/javase/downloads/jdk11-downloads-5066655.html)
 
 After installing the JRE you should be able to start the jar by double clicking on it.
 If you can't try starting it from the command line using `java -jar beatmeter-generator.jar`.
 
-### WARNING: Java 11 not supported
-The Beatmeter Generator requires JavaFX. Starting with Java 11, JavaFX is no longer include with Oracle JDK/JRE.
-Make sure to use an earlier JDK (8 has been tested). JavaFX will probably be shipped with Beatmeter Generator in the future.
-
-### Notes on Linux
-If you are using Linux, your distribution will usually include OpenJRE 8.
-Note, that under Linux you usually have to install OpenJFX as a separate package.
-Also, there seems to be a bug in OpenJFX in some versions that sometimes causes UI cliches.
-I hope this will go away as it does not happen with the Oracle JDK.
-If it does happen to you, consider installing the Oracle JRE. If it is availabel as a package for your distribution you can get it directly form Oracle as well.
+### Other Java Versions
+Beatmeter Generator should run on any JRE since Java 8, but it has not been tested on these versions.
 
 ## Screenshot
-![main](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/screenshot.png)
+![main](https://gitlab.com/SklaveDaniel/BeatmeterGenerator/wikis/screenshot-0.3.0.png)
 
 ## Ideas
 - Counters
 - Speedup/Slowdown Beat Pattern
-- Show Timestamps when dragging
-- Save last position
-- Reopen last file
-- Save to last location
