@@ -25,6 +25,7 @@ import scalafx.scene.paint.Color
 import scalafx.scene.shape.{Line, Rectangle}
 import scalafx.scene.{Group, Node}
 import Utils._
+import scalafx.scene.layout.{Background, BackgroundFill}
 
 class WaveView(initPxPerSec: Double, initHeight: Double, sceneToContextX: Double => Double) extends Group {
   self =>

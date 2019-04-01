@@ -66,6 +66,7 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
 
   object scrollPane extends ScrollPane {
     self =>
+
     override def requestFocus() {
 
     }
@@ -171,7 +172,10 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
       spacing = 5
       children = Seq(
         waveView,
-        tracksBox
+        new Pane {
+          maxWidth <== waveView.width
+          children = Seq(tracksBox)
+        }
       )
       filterEvent(DragEvent.DragOver) { (e: DragEvent) =>
         if (e.getX < scrollX + 10) {
@@ -217,18 +221,26 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
       height <== box.height
     }
 
-    content = new Pane {
-      this.maxWidth <== waveView.width
+    waveView.width.onChange((_,_,v) => {
+      println("width " + v)
+    })
+
+    val contentPane = new Pane {
+      //this.maxWidth <== waveView.width
+      width.onChange((_,_,v) => {
+        println("content width " + v)
+      })
       children = Seq(
         box,
         positionLineView
       )
     }
+    content = contentPane
 
-    def scrollX = hvalue() * (content().boundsInLocal().getWidth - viewportBounds().getWidth).max(0.0)
+    def scrollX: Double = hvalue() * (contentPane.width.doubleValue() - viewportBounds().getWidth).max(0.0)
 
     def scrollX_=(x: Double): Unit = {
-      hvalue() = (x / (content().boundsInLocal().getWidth - viewportBounds().getWidth)).max(hmin()).min(hmax())
+      hvalue() = (x / (contentPane.width.doubleValue() - viewportBounds().getWidth)).max(hmin()).min(hmax())
     }
 
     def scrollY = vvalue() * (content().boundsInLocal().getHeight - viewportBounds().getHeight).max(0.0)
