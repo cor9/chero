@@ -69,12 +69,12 @@ class WaveView(initPxPerSec: Double, initHeight: Double, sceneToContextX: Double
         new Line {
           startX = i + 0.5
           endX = i + 0.5
-          startY <== self.height / 2 * (1 + max2 / mv)
-          endY <== self.height / 2 * (1 - max1 / mv)
+          startY = self.height() / 2 * (1 + max2 / mv)
+          endY = self.height() / 2 * (1 - max1 / mv)
         }
       }).toList
     }.getOrElse(Nil)
-  }, points, duration, visibleWidth, hvalue, scale)
+  }, points, duration, visibleWidth, hvalue, scale, self.height)
 
   wave.onChange { (_, _, v) =>
     pane.children = v
