@@ -221,15 +221,7 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
       height <== box.height
     }
 
-    waveView.width.onChange((_,_,v) => {
-      println("width " + v)
-    })
-
     val contentPane = new Pane {
-      //this.maxWidth <== waveView.width
-      width.onChange((_,_,v) => {
-        println("content width " + v)
-      })
       children = Seq(
         box,
         positionLineView
