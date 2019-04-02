@@ -25,7 +25,8 @@ import scalafx.scene.paint.Color
 import scalafx.scene.shape.{Line, Rectangle}
 import scalafx.scene.{Group, Node}
 import Utils._
-import scalafx.scene.layout.{Background, BackgroundFill}
+import scalafx.scene.canvas.Canvas
+import scalafx.scene.layout.{Background, BackgroundFill, Pane}
 
 class WaveView(initPxPerSec: Double, initHeight: Double, sceneToContextX: Double => Double) extends Group {
   self =>
@@ -47,18 +48,24 @@ class WaveView(initPxPerSec: Double, initHeight: Double, sceneToContextX: Double
     x = 0.0
     y = 0.0
     width <== pxPerSec * duration
-    height <== self.height
+    height = initHeight
     fill = Color.Transparent
   }
-  val pane = new Group {
-
+  val canvas = new Canvas {
+    layoutX <== visiblePos
+    layoutY = 0.0
+    width <== visibleWidth
+    height <== initHeight
   }
-  children = Seq(rect, pane)
+  children = Seq(rect, new Pane {
+    children = Seq(canvas)
+    maxWidth <== pxPerSec * duration
+  })
+  //maxWidth <== pxPerSec * duration
 
-  val wave = Bindings.createObjectBinding[Seq[Node]](() => {
+  val wave = Bindings.createObjectBinding[Seq[(Double, Double, Double)]](() => {
     points().map { p =>
       val mv = maxVolume().get
-
       val rate = p._1.length / duration.floatValue()
       val fromPos = visiblePos.doubleValue().floor.toInt.max(0)
       val toPos = (visiblePos.doubleValue().max(0.0) + visibleWidth.doubleValue()).ceil.toInt min width.doubleValue().ceil.toInt
@@ -67,18 +74,18 @@ class WaveView(initPxPerSec: Double, initHeight: Double, sceneToContextX: Double
         val to = ((i + 1) / pxPerSec.doubleValue() * rate).ceil.toInt
         val max1 = p._1.slice(from, to).max
         val max2 = p._2.slice(from, to).max
-        new Line {
-          startX = i + 0.5
-          endX = i + 0.5
-          startY = self.height() / 2 * (1 + max2 / mv)
-          endY = self.height() / 2 * (1 - max1 / mv)
-        }
+        (i + 0.5 - fromPos, self.height() / 2 * (1 + max2 / mv), self.height() / 2 * (1 - max1 / mv))
       }).toList
     }.getOrElse(Nil)
-  }, points, duration, visibleWidth, hvalue, scale, self.height)
+  }, points, duration, visibleWidth, visiblePos, scale, hvalue)
 
   wave.onChange { (_, _, v) =>
-    pane.children = v
+    //pane.children = v
+    val gc = canvas.getGraphicsContext2D()
+    gc.clearRect(0.0, 0.0, visibleWidth(), initHeight)
+    for ((x,y1,y2) <- v) {
+      gc.strokeLine(x,y1,x,y2)
+    }
   }
 
   val onAction = ObjectProperty((p: Double) => ())

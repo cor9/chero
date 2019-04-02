@@ -4,7 +4,7 @@ import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 
 name := "Beatmeter Generator"
 
-version := "0.3.0"
+version := "0.3.1"
 
 scalaVersion := "2.12.8"
 
