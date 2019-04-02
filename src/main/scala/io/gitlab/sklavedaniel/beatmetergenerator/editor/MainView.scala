@@ -38,6 +38,7 @@ import scala.collection.mutable
 import Utils._
 
 class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer, digitDown: ObjectBinding[Option[Int]]) extends GridPane {
+  main =>
 
   private val tracksDuration_ = ReadOnlyDoubleWrapper(0.0)
   val tracksDuration = tracksDuration_.readOnlyProperty
@@ -53,7 +54,7 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
   val record = ObjectProperty[Option[Track]](None)
 
   val selectionContainer = ObjectProperty[Option[SelectionContainer[_]]](None)
-  selectionContainer.onChange {(_,c,_) =>
+  selectionContainer.onChange { (_, c, _) =>
     c.foreach(_.selectedElements.clear())
   }
 
@@ -64,8 +65,13 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
   val track2view = mutable.Map[Track, TrackView]()
   val track2headerView = mutable.Map[Track, TrackHeaderView]()
 
+  val scale = DoubleProperty(1.0)
+  val pxPerSec = scale * 20
+
   object scrollPane extends ScrollPane {
     self =>
+
+    vgrow = Priority.Always
 
     override def requestFocus() {
 
@@ -76,12 +82,7 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
     val sceeneToContextX = (x: Double) => sceneToLocal(x, 0.0).getX + scrollX
 
     val vwidth = Bindings.createDoubleBinding(() => viewportBounds().getWidth, viewportBounds)
-    val waveView = new WaveView(20, 200, sceeneToContextX) {
-      hvalue <== self.hvalue
-      visibleWidth <== vwidth
-      points <== player.maxima
-      duration <== Bindings.createDoubleBinding(() => 10.0.max(player.audioDuration().max(tracksDuration())), player.duration, tracksDuration)
-    }
+
 
     private var scrollDelta: Double = 0.0
 
@@ -103,7 +104,7 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
     private def addTrack(i: Int, t: Track): Unit = {
       t.content.addListener(tracksListener)
       val v = new TrackView(20, t, snaps, undoManager, player.audio, digitDown, selectionContainer) {
-        scaled <== waveView.scale
+        scaled <== main.scale
         duration <== Bindings.createDoubleBinding(() => 10.0.max(player.audioDuration().max(tracksDuration())), player.duration, tracksDuration)
       }
       val h = new TrackHeaderView(t, tracks, undoManager) {
@@ -168,15 +169,11 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
     }
     calcTracksDuration()
 
-    val box = new VBox {
-      spacing = 5
-      children = Seq(
-        waveView,
-        new Pane {
-          maxWidth <== waveView.width
-          children = Seq(tracksBox)
-        }
-      )
+    val box = new Pane {
+      maxWidth <== player.duration * pxPerSec
+      minWidth <== player.duration * pxPerSec
+      children = Seq(tracksBox)
+
       filterEvent(DragEvent.DragOver) { (e: DragEvent) =>
         if (e.getX < scrollX + 10) {
           scrollDelta = e.getX - scrollX - 10
@@ -216,7 +213,7 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
 
     val positionLineView = new PositionLineView(20, 10, sceeneToContextX) {
       position <==> player.position
-      scale <== waveView.scale
+      scale <== main.scale
       duration <== Bindings.createDoubleBinding(() => 10.0.max(player.audioDuration().max(tracksDuration())), player.duration, tracksDuration)
       height <== box.height
     }
@@ -244,9 +241,9 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
     filterEvent(ScrollEvent.Scroll) { (e: ScrollEvent) =>
       e.consume()
       if (e.isControlDown) {
-        val oldPosition = (scrollX + e.getX) / waveView.scale()
-        waveView.scale() = (waveView.scale() * (1 + e.getDeltaY / 400)).max(0.25).min(40.0)
-        scrollX = oldPosition * waveView.scale() - e.getX()
+        val oldPosition = (scrollX + e.getX) / scale()
+        scale() = (scale() * (1 + e.getDeltaY / 400)).max(0.25).min(40.0)
+        scrollX = oldPosition * scale() - e.getX()
       } else if (e.isShiftDown) {
         scrollY -= e.getDeltaY()
       } else {
@@ -265,14 +262,22 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
       }
     }
 
-    waveView.onAction() = p => {
-      positionLineView.position() = (p, true)
-    }
-
   }
 
-  val scale = scrollPane.waveView.scale
-  val pxPerSec = scrollPane.waveView.pxPerSec
+  val waveView = new WaveView(d => scrollPane.sceeneToContextX(d)) {
+    points <== player.maxima
+    duration <== Bindings.createDoubleBinding(() => 10.0.max(player.audioDuration().max(tracksDuration())), player.duration, tracksDuration)
+    pxPerSec <== main.pxPerSec
+    prefHeight = 200
+    minHeight = 200
+    maxHeight = 200
+    onAction() = p => {
+      scrollPane.positionLineView.position() = (p, true)
+    }
+  }
+
+  waveView.hvalue <== scrollPane.hvalue
+  waveView.visibleWidth <== scrollPane.vwidth
 
   val headerGroup = new Pane {
     self =>
@@ -299,7 +304,10 @@ class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer
   }
 
   add(headerGroup, 0, 0)
-  add(scrollPane, 1, 0)
+  add(new VBox {
+    spacing = 5
+    children = Seq(waveView, scrollPane)
+  }, 1, 0)
 
   columnConstraints = Seq(new ColumnConstraints(), new ColumnConstraints {
     hgrow = Priority.Always

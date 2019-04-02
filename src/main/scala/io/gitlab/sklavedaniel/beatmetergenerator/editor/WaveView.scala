@@ -18,57 +18,40 @@
 
 package io.gitlab.sklavedaniel.beatmetergenerator.editor
 
+import io.gitlab.sklavedaniel.beatmetergenerator.editor.Utils._
 import scalafx.Includes._
-import scalafx.beans.binding.Bindings
+import scalafx.beans.binding.{Bindings, NumberBinding}
 import scalafx.beans.property.{DoubleProperty, ObjectProperty}
-import scalafx.scene.paint.Color
-import scalafx.scene.shape.{Line, Rectangle}
-import scalafx.scene.{Group, Node}
-import Utils._
 import scalafx.scene.canvas.Canvas
-import scalafx.scene.layout.{Background, BackgroundFill, Pane}
+import scalafx.scene.layout.Pane
 
-class WaveView(initPxPerSec: Double, initHeight: Double, sceneToContextX: Double => Double) extends Group {
+class WaveView(sceneToContextX: Double => Double) extends Pane {
   self =>
+  val pxPerSec = DoubleProperty(1.0)
   val hvalue = DoubleProperty(0.0)
   val visibleWidth = DoubleProperty(1.0)
   val points = ObjectProperty[Option[(Array[Float], Array[Float])]](None)
-  val scale = DoubleProperty(1.0)
-  val pxPerSec = scale * initPxPerSec
-  val maxVolume = Bindings.createObjectBinding[Option[Float]](() => points().map(p => p._1.max max p._2.max), points)
-  val height = DoubleProperty(initHeight)
   val duration = DoubleProperty(0.0)
-  val width = duration * pxPerSec
 
+  val maxVolume = Bindings.createObjectBinding[Option[Float]](() => points().map(p => p._1.max max p._2.max), points)
   val visibleTime = hvalue * (duration - visibleWidth / pxPerSec)
   val visiblePos = hvalue * (pxPerSec * duration - visibleWidth)
-  val visibleDuration = visibleWidth / pxPerSec
+  val visibleDuration = width / pxPerSec
 
-  val rect = new Rectangle {
-    x = 0.0
-    y = 0.0
-    width <== pxPerSec * duration
-    height = initHeight
-    fill = Color.Transparent
-  }
   val canvas = new Canvas {
-    layoutX <== visiblePos
+    layoutX = 0.0
     layoutY = 0.0
-    width <== visibleWidth
-    height <== initHeight
+    width <== self.width
+    height <== self.height
   }
-  children = Seq(rect, new Pane {
-    children = Seq(canvas)
-    maxWidth <== pxPerSec * duration
-  })
-  //maxWidth <== pxPerSec * duration
+  children = Seq(canvas)
 
   val wave = Bindings.createObjectBinding[Seq[(Double, Double, Double)]](() => {
     points().map { p =>
       val mv = maxVolume().get
       val rate = p._1.length / duration.floatValue()
       val fromPos = visiblePos.doubleValue().floor.toInt.max(0)
-      val toPos = (visiblePos.doubleValue().max(0.0) + visibleWidth.doubleValue()).ceil.toInt min width.doubleValue().ceil.toInt
+      val toPos = (visiblePos.doubleValue().max(0.0) + width.doubleValue()).ceil.toInt min (duration() * pxPerSec.doubleValue()).ceil.toInt
       (for (i <- fromPos until toPos) yield {
         val from = (i / pxPerSec.doubleValue() * rate).floor.toInt
         val to = ((i + 1) / pxPerSec.doubleValue() * rate).ceil.toInt
@@ -77,12 +60,11 @@ class WaveView(initPxPerSec: Double, initHeight: Double, sceneToContextX: Double
         (i + 0.5 - fromPos, self.height() / 2 * (1 + max2 / mv), self.height() / 2 * (1 - max1 / mv))
       }).toList
     }.getOrElse(Nil)
-  }, points, duration, visibleWidth, visiblePos, scale, hvalue)
+  }, points, duration, width, visiblePos, hvalue)
 
   wave.onChange { (_, _, v) =>
-    //pane.children = v
     val gc = canvas.getGraphicsContext2D()
-    gc.clearRect(0.0, 0.0, visibleWidth(), initHeight)
+    gc.clearRect(0.0, 0.0, self.width(), self.height())
     for ((x,y1,y2) <- v) {
       gc.strokeLine(x,y1,x,y2)
     }

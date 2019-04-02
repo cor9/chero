@@ -469,18 +469,18 @@ object BeatEditor extends JFXApp {
                 new MenuItem("Zoom in") {
                   onAction = handle {
                     val x = mainView().scrollPane.width() / 2.0
-                    val oldPosition = (mainView().scrollPane.scrollX + x) / mainView().scrollPane.waveView.scale()
+                    val oldPosition = (mainView().scrollPane.scrollX + x) / mainView().scale()
                     mainView().scale() = (mainView().scale() * (1 + 1.0 / 40)).max(0.25).min(40.0)
-                    mainView().scrollPane.scrollX = oldPosition * mainView().scrollPane.waveView.scale() - x
+                    mainView().scrollPane.scrollX = oldPosition * mainView().scale() - x
                   }
                   accelerator = new KeyCodeCombination(KeyCode.Plus, KeyCombination.ControlDown)
                 },
                 new MenuItem("Zoom out") {
                   onAction = handle {
                     val x = mainView().scrollPane.width() / 2.0
-                    val oldPosition = (mainView().scrollPane.scrollX + x) / mainView().scrollPane.waveView.scale()
+                    val oldPosition = (mainView().scrollPane.scrollX + x) / mainView().scale()
                     mainView().scale() = (mainView().scale() * (1 - 1.0 / 40)).max(0.25).min(40.0)
-                    mainView().scrollPane.scrollX = oldPosition * mainView().scrollPane.waveView.scale() - x
+                    mainView().scrollPane.scrollX = oldPosition * mainView().scale() - x
                   }
                   accelerator = new KeyCodeCombination(KeyCode.Minus, KeyCombination.ControlDown)
                 })
@@ -558,7 +558,7 @@ object BeatEditor extends JFXApp {
                       } else if (messageViolations.nonEmpty) {
                         alert("Messages are overlapping.", messageViolations.map { case Seq(a, b) => s"${a._1} ${b._1}" }.mkString("\n"), scene().windowProperty()())
                       } else {
-                        val frameCount = (beatmeter.frames * player.duration()).round.toInt
+                        val frameCount = (beatmeter.frames * player.duration.doubleValue()).round.toInt
 
                         class State(val clip: Option[Shape], var remaining: Stream[Timed]) {
                           var current: Queue[Timed] = Queue()
@@ -768,7 +768,7 @@ object BeatEditor extends JFXApp {
                 tooltip = Tooltip("Current player position in mm:ss.ms")
               }, 0, 1)
               add(new Label {
-                text <== Bindings.createStringBinding(() => formatTime(player.duration()), player.duration)
+                text <== Bindings.createStringBinding(() => formatTime(player.duration.doubleValue()), player.duration)
               }, 1, 1)
             },
             new GridPane {

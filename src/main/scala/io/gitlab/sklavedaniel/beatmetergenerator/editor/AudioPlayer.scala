@@ -90,37 +90,34 @@ class AudioPlayer() {
   val maximaDuration = 0.02
   val maximaFrames = (maximaDuration * format.getFrameRate * format.getChannels).round.toInt
 
-  val maxima = ObjectProperty[Option[(Array[Float], Array[Float])]](None)
-  audio.onChange { (_, _, aud) =>
-    maxima() = aud.map { a =>
-      def compute(callback: (Option[Double], Option[String]) => Boolean) = {
-        val leftResult = new Array[Float](a.length / maximaFrames)
-        val rightResult = new Array[Float](a.length / maximaFrames)
-        val limit = a.length / maximaFrames
-        for (i <- 0 until limit) {
-          callback(Some(i.toFloat / limit), None)
-          leftResult(i) = (for (j <- 0 until maximaFrames / 2) yield a(maximaFrames * i + 2 * j).toFloat.abs).sum / maximaFrames * 2
-          rightResult(i) = (for (j <- 0 until maximaFrames / 2) yield a(maximaFrames * i + 2 * j + 1).toFloat.abs).sum / maximaFrames * 2
-        }
-        (leftResult, rightResult)
+  val maxima = Bindings.createObjectBinding[Option[(Array[Float], Array[Float])]](() => audio().map { a =>
+    def compute(callback: (Option[Double], Option[String]) => Boolean) = {
+      val leftResult = new Array[Float](a.length / maximaFrames)
+      val rightResult = new Array[Float](a.length / maximaFrames)
+      val limit = a.length / maximaFrames
+      for (i <- 0 until limit) {
+        callback(Some(i.toFloat / limit), None)
+        leftResult(i) = (for (j <- 0 until maximaFrames / 2) yield a(maximaFrames * i + 2 * j).toFloat.abs).sum / maximaFrames * 2
+        rightResult(i) = (for (j <- 0 until maximaFrames / 2) yield a(maximaFrames * i + 2 * j + 1).toFloat.abs).sum / maximaFrames * 2
       }
-
-      if (progressDialogWindow().isDefined) {
-        val task = (callback: (Option[Double], Option[String]) => Boolean) => {
-          WithFailures.success(Some(compute(callback)))
-        }
-        val pd = new ProgressDialog[(Array[Float], Array[Float])](progressDialogWindow(), "Analyzing audio", Some("analyzing..."), false, task)
-        pd.showAndWait().get.asInstanceOf[WithFailures[Option[(Array[Float], Array[Float])], Throwable]] match {
-          case WithFailures(Some(Some(result)), _) =>
-            result
-          case _ =>
-            assert(false); ???
-        }
-      } else {
-        compute((_, _) => true)
-      }
+      (leftResult, rightResult)
     }
-  }
+
+    if (progressDialogWindow().isDefined) {
+      val task = (callback: (Option[Double], Option[String]) => Boolean) => {
+        WithFailures.success(Some(compute(callback)))
+      }
+      val pd = new ProgressDialog[(Array[Float], Array[Float])](progressDialogWindow(), "Analyzing audio", Some("analyzing..."), false, task)
+      pd.showAndWait().get.asInstanceOf[WithFailures[Option[(Array[Float], Array[Float])], Throwable]] match {
+        case WithFailures(Some(Some(result)), _) =>
+          result
+        case _ =>
+          assert(false); ???
+      }
+    } else {
+      compute((_, _) => true)
+    }
+  }, audio)
 
 
   private val sync = new LinkedBlockingQueue[Unit]()
@@ -176,7 +173,7 @@ class AudioPlayer() {
     }
   }
 
-  val duration = Bindings.createObjectBinding[Double](() => audioDuration().max(beatsDuration()), audioDuration, beatsDuration)
+  val duration = Bindings.createDoubleBinding(() => audioDuration().max(beatsDuration()), audioDuration, beatsDuration)
   val count = Bindings.createObjectBinding[Int](() => audioCount().max(beatsCount()), audioCount, beatsCount)
 
 
@@ -316,7 +313,7 @@ class AudioPlayer() {
           val result = bbuffer.get(bbufferPos) & 0xff
           bbufferPos += 1
           if (bbufferPos == bbufferLimit) {
-            if (callback(pos.toDouble / currentCount)) {
+            if(callback(pos.toDouble / currentCount)) {
               generate()
             }
           }
