@@ -18,7 +18,9 @@
 
 package io.gitlab.sklavedaniel.beatmetergenerator.editor
 
+import io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor.{stage, tracks}
 import io.gitlab.sklavedaniel.beatmetergenerator.utils._
+import javafx.beans.InvalidationListener
 import javafx.scene.layout
 import scalafx.Includes._
 import scalafx.beans.binding.{Bindings, ObjectBinding}
@@ -30,8 +32,14 @@ import scalafx.scene.layout._
 import scalafx.scene.paint.Color
 import scalafx.scene.shape.Rectangle
 
-class MainView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlayer, digitDown: ObjectBinding[Option[Int]]) extends GridPane {
+class MainView(val tracks: Tracks, digitDown: ObjectBinding[Option[Int]]) extends GridPane {
   main =>
+
+  val player = new AudioPlayer()
+  //player.progressDialogWindow() = Some(stage.scene().windowProperty()())
+
+  val undoManager = tracks.undoManager.get
+  player.audio <== Bindings.createObjectBinding(() => tracks.audio().map(_._2), tracks.audio)
 
   val scale = DoubleProperty(1.0)
   val pxPerSec = scale * 20
