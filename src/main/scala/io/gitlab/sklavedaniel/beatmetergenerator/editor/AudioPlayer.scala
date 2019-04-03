@@ -21,17 +21,14 @@ package io.gitlab.sklavedaniel.beatmetergenerator.editor
 import java.io.{BufferedInputStream, InputStream}
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.concurrent.{FutureTask, LinkedBlockingQueue}
-import javafx.beans.InvalidationListener
-import javax.sound.sampled._
 
 import io.gitlab.sklavedaniel.beatmetergenerator.editor.AudioPlayer.BeatInfo
-import io.gitlab.sklavedaniel.beatmetergenerator.utils.ObservableIntervalMap
-import io.gitlab.sklavedaniel.beatmetergenerator.utils._
-
+import io.gitlab.sklavedaniel.beatmetergenerator.utils.{ObservableIntervalMap, _}
+import javafx.beans.InvalidationListener
+import javax.sound.sampled._
 import org.apache.commons.io.IOUtils
 import resource._
-
-import scala.util.{Success, Try}
+import scalafx.Includes._
 import scalafx.application.Platform
 import scalafx.beans.binding.Bindings
 import scalafx.beans.property._
@@ -85,7 +82,7 @@ class AudioPlayer() {
 
   val audio = ObjectProperty[Option[Array[Short]]](None)
   val audioCount = Bindings.createObjectBinding[Int](() => audio().map(_.length / format.getChannels()).getOrElse(0), audio)
-  val audioDuration = Bindings.createObjectBinding[Double](() => audioCount().toDouble / format.getFrameRate, audioCount)
+  val audioDuration = Bindings.createDoubleBinding(() => audioCount().toDouble / format.getFrameRate, audioCount)
 
   val maximaDuration = 0.02
   val maximaFrames = (maximaDuration * format.getFrameRate * format.getChannels).round.toInt
@@ -173,7 +170,7 @@ class AudioPlayer() {
     }
   }
 
-  val duration = Bindings.createDoubleBinding(() => audioDuration().max(beatsDuration()), audioDuration, beatsDuration)
+  val duration = Bindings.createDoubleBinding(() => audioDuration.doubleValue().max(beatsDuration.doubleValue()), audioDuration, beatsDuration)
   val count = Bindings.createObjectBinding[Int](() => audioCount().max(beatsCount()), audioCount, beatsCount)
 
 

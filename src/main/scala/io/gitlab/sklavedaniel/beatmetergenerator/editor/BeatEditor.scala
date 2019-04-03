@@ -318,7 +318,7 @@ object BeatEditor extends JFXApp {
                 new SeparatorMenuItem(),
                 new MenuItem("Copy") {
                   onAction = handle {
-                    mainView().selectionContainer().foreach { sc =>
+                    mainView().tracksView.selectionContainer().foreach { sc =>
                       sc.copySlected()
                     }
                   }
@@ -326,7 +326,7 @@ object BeatEditor extends JFXApp {
                 },
                 new MenuItem("Cut") {
                   onAction = handle {
-                    mainView().selectionContainer().foreach { sc =>
+                    mainView().tracksView.selectionContainer().foreach { sc =>
                       sc.copySlected()
                       sc.deleteSelectedElemts()
                     }
@@ -335,8 +335,8 @@ object BeatEditor extends JFXApp {
                 },
                 new MenuItem("Insert") {
                   onAction = handle {
-                    mainView().record().foreach { t =>
-                      val v = mainView().track2view(t)
+                    mainView().tracksView.record().foreach { t =>
+                      val v = mainView().tracksView.getView(t)
                       t.content(player.position()._1) match {
                         case Some((p, _, e)) =>
                           v.element2view((p, e)) match {
@@ -353,7 +353,7 @@ object BeatEditor extends JFXApp {
                 },
                 new MenuItem("Delete") {
                   onAction = handle {
-                    mainView().selectionContainer().foreach { sc =>
+                    mainView().tracksView.selectionContainer().foreach { sc =>
                       sc.deleteSelectedElemts()
                     }
                   }
@@ -362,7 +362,7 @@ object BeatEditor extends JFXApp {
                 new SeparatorMenuItem(),
                 new MenuItem("Insert Beat") {
                   onAction = handle {
-                    mainView().record().foreach { track =>
+                    mainView().tracksView.record().foreach { track =>
                       val x = player.position()._1
                       if (track.content.intersecting(x, x + 0.05).isEmpty) {
                         track.content ++= Iterator((x, x + 0.05, new Beat(Some(undoManager))))
@@ -373,35 +373,35 @@ object BeatEditor extends JFXApp {
                 },
                 new MenuItem("Insert BPM Pattern") {
                   onAction = handle {
-                    mainView().record().foreach { track =>
+                    mainView().tracksView.record().foreach { track =>
                       val x = player.position()._1
                       val b = new BPMPattern(Some(undoManager))
                       undoManager.active = false
                       b.bpm() = 60
                       undoManager.active = true
-                      mainView().track2view(track).newResizableElement(x, b)
+                      mainView().tracksView.getView(track).newResizableElement(x, b)
                     }
                   }
                   accelerator = new KeyCodeCombination(KeyCode.P, KeyCombination.ControlDown)
                 },
                 new MenuItem("Insert Beat Pattern") {
                   onAction = handle {
-                    mainView().record().foreach { track =>
+                    mainView().tracksView.record().foreach { track =>
                       val x = player.position()._1
-                      mainView().track2view(track).newBeatPattern(x, 1.0, Seq(0.0))
+                      mainView().tracksView.getView(track).newBeatPattern(x, 1.0, Seq(0.0))
                     }
                   }
                   accelerator = new KeyCodeCombination(KeyCode.P, KeyCombination.ControlDown, KeyCombination.ShiftDown)
                 },
                 new MenuItem("Insert Message") {
                   onAction = handle {
-                    mainView().record().foreach { track =>
+                    mainView().tracksView.record().foreach { track =>
                       val x = player.position()._1
                       val b = new Message(Some(undoManager))
                       undoManager.active = false
                       b.text() = "Hello!"
                       undoManager.active = true
-                      mainView().track2view(track).newResizableElement(x, b)
+                      mainView().tracksView.getView(track).newResizableElement(x, b)
                     }
                   }
                   accelerator = new KeyCodeCombination(KeyCode.M, KeyCombination.ControlDown)
@@ -443,7 +443,7 @@ object BeatEditor extends JFXApp {
                 },
                 new MenuItem("Audio snap forward") {
                   onAction = handle {
-                    mainView().snaps().foreach { s =>
+                    mainView().tracksView.snaps().foreach { s =>
                       s.increase(player.position()._1).foreach { x =>
                         player.position() = (x._1.max(0.0)
                           , true
@@ -455,7 +455,7 @@ object BeatEditor extends JFXApp {
                 },
                 new MenuItem("Audio snap backward") {
                   onAction = handle {
-                    mainView().snaps().foreach { s =>
+                    mainView().tracksView.snaps().foreach { s =>
                       s.decrease(player.position()._1).foreach { x =>
                         player.position() = (x._1.max(0.0)
                           , true
@@ -468,19 +468,19 @@ object BeatEditor extends JFXApp {
                 new SeparatorMenuItem(),
                 new MenuItem("Zoom in") {
                   onAction = handle {
-                    val x = mainView().scrollPane.width() / 2.0
-                    val oldPosition = (mainView().scrollPane.scrollX + x) / mainView().scale()
+                    val x = mainView().tracksView.width() / 2.0
+                    val oldPosition = (mainView().tracksView.scrollX + x) / mainView().scale()
                     mainView().scale() = (mainView().scale() * (1 + 1.0 / 40)).max(0.25).min(40.0)
-                    mainView().scrollPane.scrollX = oldPosition * mainView().scale() - x
+                    mainView().tracksView.scrollX = oldPosition * mainView().scale() - x
                   }
                   accelerator = new KeyCodeCombination(KeyCode.Plus, KeyCombination.ControlDown)
                 },
                 new MenuItem("Zoom out") {
                   onAction = handle {
-                    val x = mainView().scrollPane.width() / 2.0
-                    val oldPosition = (mainView().scrollPane.scrollX + x) / mainView().scale()
+                    val x = mainView().tracksView.width() / 2.0
+                    val oldPosition = (mainView().tracksView.scrollX + x) / mainView().scale()
                     mainView().scale() = (mainView().scale() * (1 - 1.0 / 40)).max(0.25).min(40.0)
-                    mainView().scrollPane.scrollX = oldPosition * mainView().scale() - x
+                    mainView().tracksView.scrollX = oldPosition * mainView().scale() - x
                   }
                   accelerator = new KeyCodeCombination(KeyCode.Minus, KeyCombination.ControlDown)
                 })
@@ -526,7 +526,7 @@ object BeatEditor extends JFXApp {
                 new MenuItem("Generate Video") {
                   onAction = handle {
 
-                    val beats = merge[(Double, Boolean), Double](mainView().track2view.values.toList.filter(_.track.display()).map(_.beats.toList.map(b => (b._1, b._3.highlight()))),
+                    val beats = merge[(Double, Boolean), Double](mainView().tracksView.views.toList.filter(_.track.display()).map(_.beats.toList.map(b => (b._1, b._3.highlight()))),
                       b => b._1)
                     val messages = merge[(Double, Double, String), Double](
                       tracks().content.toList.filter(_.display()).map(_.content.toList.flatMap { b =>
@@ -667,9 +667,9 @@ object BeatEditor extends JFXApp {
                 },
                 new MenuItem("Export Beats and Messages") {
                   onAction = handle {
-                    val videoBeats = merge[(Double, Boolean), Double](mainView().track2view.values.toList.filter(_.track.display()).map(_.beats.toList.map(b => (b._1, b._3.highlight()))),
+                    val videoBeats = merge[(Double, Boolean), Double](mainView().tracksView.views.filter(_.track.display()).map(_.beats.toList.map(b => (b._1, b._3.highlight()))),
                       b => b._1)
-                    val audioBeats = merge[(Double, Boolean, Option[URI]), Double](mainView().track2view.values.toList.filter(_.track.play()).map(t => t.beats.toList.map(b => (b._1, b._3.highlight(), t.track.beat().map(_._1)))),
+                    val audioBeats = merge[(Double, Boolean, Option[URI]), Double](mainView().tracksView.views.filter(_.track.play()).map(t => t.beats.toList.map(b => (b._1, b._3.highlight(), t.track.beat().map(_._1)))),
                       b => b._1)
                     val messages = merge[(Double, Double, String), Double](
                       tracks().content.toList.filter(_.display()).map(_.content.toList.flatMap { b =>
@@ -741,7 +741,7 @@ object BeatEditor extends JFXApp {
               tooltip = Tooltip("Insert beat at current position")
               focusTraversable = false
               onAction = handle {
-                mainView().record().foreach { track =>
+                mainView().tracksView.record().foreach { track =>
                   val x = player.position()._1
                   if (track.content.intersecting(x, x + 0.05).isEmpty) {
                     track.content ++= Iterator((x, x + 0.05, new Beat(Some(undoManager))))
