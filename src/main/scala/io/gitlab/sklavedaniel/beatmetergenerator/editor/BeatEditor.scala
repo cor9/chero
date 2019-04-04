@@ -96,15 +96,20 @@ object BeatEditor extends JFXApp {
     val duration = DoubleProperty(0.0)
     val position = DoubleProperty(0.0)
 
-    mainView.onChange {(_,_,mv) =>
+    def bindMainView(mv: MainView): Unit = {
       ratio <==> mv.player.ratio
       rate <==> mv.player.rate
       playing <==> mv.player.playing
-      undoable <== mv.undoManager.redoable
-      redoable <== mv.undoManager.undoable
+      undoable <== mv.undoManager.undoable
+      redoable <== mv.undoManager.redoable
       duration <== mv.player.duration
       position <== Bindings.createDoubleBinding(() => mv.player.position()._1, mv.player.position)
     }
+
+    mainView.onChange { (_, _, mv) =>
+      bindMainView(mv)
+    }
+    bindMainView(mainView())
 
     scene = new Scene {
       filterEvent(KeyEvent.KeyPressed) { (e: KeyEvent) =>
@@ -247,6 +252,7 @@ object BeatEditor extends JFXApp {
                 },
                 new Menu("Open recent") {
                   disable <== Bindings.createBooleanBinding(() => applicationSettings().recentFiles.isEmpty, applicationSettings)
+
                   def computeItems(): Unit = {
                     items = applicationSettings().recentFiles.map(s => new MenuItem(s) {
                       onAction = handle {
@@ -254,6 +260,7 @@ object BeatEditor extends JFXApp {
                       }
                     })
                   }
+
                   computeItems()
                   applicationSettings.onChange { (_, _, _) =>
                     computeItems()
@@ -471,6 +478,31 @@ object BeatEditor extends JFXApp {
                   accelerator = new KeyCodeCombination(KeyCode.Left, KeyCombination.ControlDown, KeyCombination.MetaDown)
                 },
                 new SeparatorMenuItem(),
+                new MenuItem("To start") {
+                  onAction = handle {
+                    mainView().player.position() = (0.0, true)
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.Home, KeyCombination.ControlDown)
+                },
+                new MenuItem("To end") {
+                  onAction = handle {
+                    mainView().player.position() = (mainView().player.duration.doubleValue(), true)
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.End, KeyCombination.ControlDown)
+                },
+                new MenuItem("To audio end") {
+                  onAction = handle {
+                    mainView().player.position() = (mainView().player.audioDuration.doubleValue(), true)
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.End, KeyCombination.ControlDown, KeyCombination.ShiftDown)
+                },
+                new MenuItem("To beats end") {
+                  onAction = handle {
+                    mainView().player.position() = (mainView().player.beatsDuration.doubleValue(), true)
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.End, KeyCombination.ControlDown, KeyCombination.MetaDown)
+                },
+                new SeparatorMenuItem(),
                 new MenuItem("Zoom in") {
                   onAction = handle {
                     val x = mainView().tracksView.width() / 2.0
@@ -485,6 +517,7 @@ object BeatEditor extends JFXApp {
                     val x = mainView().tracksView.width() / 2.0
                     val oldPosition = (mainView().tracksView.scrollX + x) / mainView().scale()
                     mainView().scale() = (mainView().scale() * (1 - 1.0 / 40)).max(0.25).min(40.0)
+                    println(mainView().scale())
                     mainView().tracksView.scrollX = oldPosition * mainView().scale() - x
                   }
                   accelerator = new KeyCodeCombination(KeyCode.Minus, KeyCombination.ControlDown)

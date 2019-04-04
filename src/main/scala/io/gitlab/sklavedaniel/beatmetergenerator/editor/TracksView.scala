@@ -45,11 +45,12 @@ class TracksView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlay
   private val tracksDuration_ = ReadOnlyDoubleWrapper(0.0)
   val tracksDuration = tracksDuration_.readOnlyProperty
 
-  val totalDuration = Bindings.createDoubleBinding(() => player.duration.doubleValue().max(player.position()._1).max(tracksDuration()) + 10.0, player.duration, tracksDuration, player.position)
-  val visiblePosition = when(visibleDuration < totalDuration) choose hvalue * (totalDuration - visibleDuration) otherwise 0.0
+  val totalDuration = Bindings.createDoubleBinding(() => ((player.duration.doubleValue() max player.position()._1 max tracksDuration()) + 10.0) max visibleDuration.doubleValue(), visibleDuration, player.duration, tracksDuration, player.position)
+  val totalWidth = Bindings.createDoubleBinding(() => (pxPerSec() * (player.duration.doubleValue() max player.position()._1 max tracksDuration()) + 10.0) max vwidth.doubleValue(), vwidth, pxPerSec, player.duration, tracksDuration, player.position)
+  val visiblePosition = hvalue * (totalDuration - visibleDuration)
 
   val snaps = ObjectProperty[Option[ObservableIntervalMap[Double, Beat]]](None)
-  val record = ObjectProperty[Option[Track]](None)
+  val record = ObjectProperty[Option[Track]](tracks.content.find(_.record()))
 
   val selectionContainer = ObjectProperty[Option[SelectionContainer[_]]](None)
   selectionContainer.onChange { (_, c, _) =>
@@ -70,8 +71,6 @@ class TracksView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlay
   }
 
   focusTraversable = false
-
-  val sceeneToContextX = (x: Double) => sceneToLocal(x, 0.0).getX + scrollX
 
   private var scrollDelta: Double = 0.0
 
@@ -166,9 +165,9 @@ class TracksView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlay
   calcTracksDuration()
 
   val contentPane = new Pane {
-    maxWidth <== totalDuration * pxPerSec
-    prefWidth <== totalDuration * pxPerSec
-    minWidth <== totalDuration * pxPerSec
+    maxWidth <== totalWidth
+    prefWidth <== totalWidth
+    minWidth <== totalWidth
     children = Seq(tracksBox)
 
     filterEvent(DragEvent.DragOver) { e: DragEvent =>
@@ -197,14 +196,14 @@ class TracksView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlay
 
   def scrollX: Double = hvalue() * (contentPane.width.doubleValue() - viewportBounds().getWidth).max(0.0)
 
-  def scrollX_=(x: Double): Unit = {
+  def scrollX_=(x: Double): Unit = if (contentPane.width.doubleValue() - viewportBounds().getWidth > 0) {
     hvalue() = (x / (contentPane.width.doubleValue() - viewportBounds().getWidth)).max(hmin()).min(hmax())
   }
 
-  def scrollY = vvalue() * (content().boundsInLocal().getHeight - viewportBounds().getHeight).max(0.0)
+  def scrollY = vvalue() * (contentPane.height.doubleValue() - viewportBounds().getHeight).max(0.0)
 
-  def scrollY_=(x: Double): Unit = if ((content().boundsInLocal().getHeight - viewportBounds().getHeight) > 0) {
-    vvalue() = (x / (content().boundsInLocal().getHeight - viewportBounds().getHeight)).max(vmin()).min(vmax())
+  def scrollY_=(x: Double): Unit = if (contentPane.height.doubleValue() - viewportBounds().getHeight > 0) {
+    vvalue() = (x / (contentPane.height.doubleValue() - viewportBounds().getHeight)).max(vmin()).min(vmax())
   }
 
 }

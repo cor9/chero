@@ -18,9 +18,7 @@
 
 package io.gitlab.sklavedaniel.beatmetergenerator.editor
 
-import io.gitlab.sklavedaniel.beatmetergenerator.editor.BeatEditor.{stage, tracks}
 import io.gitlab.sklavedaniel.beatmetergenerator.utils._
-import javafx.beans.InvalidationListener
 import javafx.scene.layout
 import scalafx.Includes._
 import scalafx.beans.binding.{Bindings, ObjectBinding}
@@ -61,7 +59,7 @@ class MainView(val tracks: Tracks, digitDown: ObjectBinding[Option[Int]]) extend
       scale() = (scale() * (1 + e.getDeltaY / 400)).max(0.25).min(40.0)
       tracksView.scrollX = oldPosition * scale() - x
     } else if (e.isShiftDown) {
-      tracksView.scrollY -= e.getDeltaY()
+      tracksView.scrollY -= e.getDeltaX()
     } else {
       tracksView.scrollX += e.getDeltaY()
     }
