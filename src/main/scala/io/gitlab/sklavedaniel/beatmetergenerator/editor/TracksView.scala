@@ -65,7 +65,7 @@ class TracksView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlay
 
   private val track2headerView = mutable.Map[Track, TrackHeaderView]()
 
-  vgrow = Priority.Always
+  vgrow = Priority.Sometimes
 
   override def requestFocus() {
 

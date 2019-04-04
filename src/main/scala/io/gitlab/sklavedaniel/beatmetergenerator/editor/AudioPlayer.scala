@@ -93,7 +93,9 @@ class AudioPlayer() {
       val rightResult = new Array[Float](a.length / maximaFrames)
       val limit = a.length / maximaFrames
       for (i <- 0 until limit) {
-        callback(Some(i.toFloat / limit), None)
+        if (i % 1000 == 0) {
+          callback(Some(i.toFloat / limit), None)
+        }
         leftResult(i) = (for (j <- 0 until maximaFrames / 2) yield a(maximaFrames * i + 2 * j).toFloat.abs).sum / maximaFrames * 2
         rightResult(i) = (for (j <- 0 until maximaFrames / 2) yield a(maximaFrames * i + 2 * j + 1).toFloat.abs).sum / maximaFrames * 2
       }

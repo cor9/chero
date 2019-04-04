@@ -31,9 +31,10 @@ class PositionOverlay extends Pane {
   val duration = DoubleProperty(0.0)
   val position = DoubleProperty(0.0)
   val visiblePosition = DoubleProperty(0.0)
+  val lineHeight = DoubleProperty(0.0)
 
   val realWidth = Bindings.createDoubleBinding(() => width.value - padding().getLeft - padding().getRight, width, padding)
-  val realHeight = Bindings.createDoubleBinding(() => height.value - padding().getTop - padding().getBottom, height, padding)
+  val realHeight = Bindings.createDoubleBinding(() => lineHeight.value - padding().getTop - padding().getBottom, lineHeight, padding)
   val realX = Bindings.createDoubleBinding(() => padding().getLeft, padding)
   val realY = Bindings.createDoubleBinding(() => padding().getTop, padding)
 

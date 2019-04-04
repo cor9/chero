@@ -94,9 +94,7 @@ class MainView(player: AudioPlayer, val tracks: Tracks, digitDown: ObjectBinding
     visiblePosition <== tracksView.visiblePosition
     padding = Insets(1.0)
     val h = Bindings.createDoubleBinding(() => tracksView.viewportBounds().getHeight + waveHeight + 3, tracksView.viewportBounds)
-    prefHeight <== h
-    minHeight <== h
-    maxHeight <== h
+    lineHeight <== h
   }
 
   val headerGroup = new Pane {
@@ -128,6 +126,7 @@ class MainView(player: AudioPlayer, val tracks: Tracks, digitDown: ObjectBinding
     alignment = Pos.TopCenter
     hgrow = Priority.Always
     vgrow = Priority.Always
+
     children = Seq(
       new VBox {
         spacing = 1
@@ -140,9 +139,11 @@ class MainView(player: AudioPlayer, val tracks: Tracks, digitDown: ObjectBinding
   columnConstraints = Seq(new ColumnConstraints(), new ColumnConstraints {
     hgrow = Priority.Always
     maxWidth = Double.PositiveInfinity
+    fillWidth = true
   })
   rowConstraints = Seq(new RowConstraints() {
     vgrow = Priority.Always
     maxHeight = Double.PositiveInfinity
+    fillHeight = true
   })
 }

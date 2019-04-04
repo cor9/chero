@@ -79,6 +79,8 @@ object BeatEditor extends JFXApp {
 
   private val tracks = ObjectProperty(new Tracks(Some(new UndoManager())))
 
+  val player = new AudioPlayer()
+
   private object Stage extends PrimaryStage {
     self =>
     title = "Beatmeter Generator"
@@ -86,7 +88,6 @@ object BeatEditor extends JFXApp {
     val down = IndexedSeq.fill(10)(BooleanProperty(false))
     val digitDown = Bindings.createObjectBinding(() => down.zipWithIndex.map(d => if (d._1()) Some(d._2) else None).foldLeft(Option.empty[Int])(_.orElse(_)), down: _*)
 
-    val player = new AudioPlayer()
     val mainView = Bindings.createObjectBinding(() => new MainView(player, tracks(), Stage.digitDown), tracks)
 
     val undoable = BooleanProperty(false)
@@ -832,6 +833,8 @@ object BeatEditor extends JFXApp {
   }
 
   stage = Stage
+
+  player.progressDialogWindow() = Some(stage.scene().getWindow)
 
   override def stopApp(): Unit = {
     JsonSerialization.saveApplicationSettings(applicationSettings(), applicationSettingsFile.toFile)

@@ -19,12 +19,10 @@
 package io.gitlab.sklavedaniel.beatmetergenerator.editor
 
 import java.util.concurrent.FutureTask
-import javafx.scene
-import javafx.scene.control
 
 import io.gitlab.sklavedaniel.beatmetergenerator.utils.WithFailures
-
-import scala.util.Try
+import javafx.scene
+import javafx.scene.control
 import scalafx.Includes._
 import scalafx.application.Platform
 import scalafx.scene.control.{Button, Dialog, DialogPane, ProgressBar}
