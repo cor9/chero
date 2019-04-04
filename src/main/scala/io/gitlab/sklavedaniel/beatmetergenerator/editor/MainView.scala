@@ -29,15 +29,14 @@ import scalafx.scene.input.ScrollEvent
 import scalafx.scene.layout._
 import scalafx.scene.paint.Color
 import scalafx.scene.shape.Rectangle
+import scalafx.stage.Window
 
-class MainView(val tracks: Tracks, digitDown: ObjectBinding[Option[Int]]) extends GridPane {
+class MainView(player: AudioPlayer, val tracks: Tracks, digitDown: ObjectBinding[Option[Int]]) extends GridPane {
   main =>
-
-  val player = new AudioPlayer()
-  //player.progressDialogWindow() = Some(stage.scene().windowProperty()())
 
   val undoManager = tracks.undoManager.get
   player.audio <== Bindings.createObjectBinding(() => tracks.audio().map(_._2), tracks.audio)
+  player.beats.clear()
 
   val scale = DoubleProperty(1.0)
   val pxPerSec = scale * 20
