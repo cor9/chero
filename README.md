@@ -85,7 +85,7 @@ Please read through the features, basic workflow and hints to get a better idea 
 - When saving, paths refering to external files (e.g. audio files) will be stored relatively if they are in the same directory or a subdirectory. 
 - Marking a track with "I" sets it as insert target: you can now insert and paste to that track at the current position using short-cuts
 
-## New features in 0.3.0
+## New features in 0.3.0 and 0.3.1
 - Support for Java 11
 - Faster and nicer Waveform
 - Shortcuts for common functions (move position, insert, copy, ...)
