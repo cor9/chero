@@ -46,7 +46,7 @@ class TracksView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlay
   val tracksDuration = tracksDuration_.readOnlyProperty
 
   val totalDuration = Bindings.createDoubleBinding(() => ((player.duration.doubleValue() max player.position()._1 max tracksDuration()) + 10.0) max visibleDuration.doubleValue(), visibleDuration, player.duration, tracksDuration, player.position)
-  val totalWidth = Bindings.createDoubleBinding(() => (pxPerSec() * (player.duration.doubleValue() max player.position()._1 max tracksDuration()) + 10.0) max vwidth.doubleValue(), vwidth, pxPerSec, player.duration, tracksDuration, player.position)
+  val totalWidth = Bindings.createDoubleBinding(() => (pxPerSec() * ((player.duration.doubleValue() max player.position()._1 max tracksDuration()) + 10.0)) max vwidth.doubleValue(), vwidth, pxPerSec, player.duration, tracksDuration, player.position)
   val visiblePosition = hvalue * (totalDuration - visibleDuration)
 
   val snaps = ObjectProperty[Option[ObservableIntervalMap[Double, Beat]]](None)
@@ -60,6 +60,7 @@ class TracksView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlay
   private val track2view = mutable.Map[Track, TrackView]()
 
   def getView(track: Track) = track2view(track)
+
   def views = track2view.values.toList
 
   private val track2headerView = mutable.Map[Track, TrackHeaderView]()
@@ -194,10 +195,10 @@ class TracksView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlay
 
   content = contentPane
 
-  def scrollX: Double = hvalue() * (contentPane.width.doubleValue() - viewportBounds().getWidth).max(0.0)
+  def scrollX: Double = hvalue() * (totalWidth.doubleValue() - viewportBounds().getWidth).max(0.0)
 
-  def scrollX_=(x: Double): Unit = if (contentPane.width.doubleValue() - viewportBounds().getWidth > 0) {
-    hvalue() = (x / (contentPane.width.doubleValue() - viewportBounds().getWidth)).max(hmin()).min(hmax())
+  def scrollX_=(x: Double): Unit = if (totalWidth.doubleValue() - viewportBounds().getWidth > 0) {
+    hvalue() = (x / (totalWidth.doubleValue() - viewportBounds().getWidth)).max(hmin()).min(hmax())
   }
 
   def scrollY = vvalue() * (contentPane.height.doubleValue() - viewportBounds().getHeight).max(0.0)
