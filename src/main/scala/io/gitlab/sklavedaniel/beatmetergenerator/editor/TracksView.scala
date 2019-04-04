@@ -195,10 +195,10 @@ class TracksView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlay
 
   content = contentPane
 
-  def scrollX: Double = hvalue() * (totalWidth.doubleValue() - viewportBounds().getWidth).max(0.0)
+  def scrollX: Double = hvalue() * (contentPane.width.doubleValue() - viewportBounds().getWidth).max(0.0)
 
-  def scrollX_=(x: Double): Unit = if (totalWidth.doubleValue() - viewportBounds().getWidth > 0) {
-    hvalue() = (x / (totalWidth.doubleValue() - viewportBounds().getWidth)).max(hmin()).min(hmax())
+  def scrollX_=(x: Double): Unit = if (contentPane.width.doubleValue() - viewportBounds().getWidth > 0) {
+    hvalue() = (x / (contentPane.width.doubleValue() - viewportBounds().getWidth)).max(hmin()).min(hmax())
   }
 
   def scrollY = vvalue() * (contentPane.height.doubleValue() - viewportBounds().getHeight).max(0.0)
