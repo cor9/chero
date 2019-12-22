@@ -23,6 +23,8 @@ import java.awt.{GraphicsEnvironment, RenderingHints, Shape, SplashScreen}
 import java.io._
 import java.net.URI
 import java.nio.file.{Files, Paths}
+import java.util
+import java.util.{LinkedHashMap, LinkedList}
 
 import io.gitlab.sklavedaniel.beatmetergenerator._
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.Beatmeter.Timed
@@ -47,9 +49,13 @@ import scalafx.scene.layout._
 import scalafx.scene.text.{Font, Text}
 import scalafx.stage.FileChooser.ExtensionFilter
 import scalafx.stage.{DirectoryChooser, FileChooser}
+import v4lk.lwbd.BeatDetector
+import v4lk.lwbd.BeatDetector.{AudioFunctions, DetectorSensitivity, ProcessingFunctions}
+import v4lk.lwbd.decoders.Decoder
 
 import scala.collection.immutable.Queue
 import scala.io.Source
+import scala.util.Success
 
 object BeatEditor extends JFXApp {
   override def main(args: Array[String]): Unit = {
@@ -301,6 +307,52 @@ object BeatEditor extends JFXApp {
                 new MenuItem("New Track") {
                   onAction = handle {
                     tracks().content += new Track(Some(mainView().undoManager))
+                  }
+                  accelerator = new KeyCodeCombination(KeyCode.T, KeyCombination.ControlDown)
+                },
+                new MenuItem("Detect beats") {
+                  onAction = handle {
+                    player.audio().foreach { data =>
+                      val task = (callback: (Option[Double], Option[String]) => Boolean) => {
+                        val monoData = Array.ofDim[Short](data.length / AudioPlayer.format.getChannels)
+                        for (i <- monoData.indices) {
+                          monoData(i) = data(i * AudioPlayer.format.getChannels)
+                        }
+                        val tmp = BeatDetector.detectBeats(new Decoder {
+                          private var i = 0
+                          override def nextMonoFrame(): Array[Short] = {
+                            callback(Some(i.toDouble / monoData.length), Some(s"Analyzing position $i of ${monoData.length}."))
+                            if (i + 1024 < monoData.length) {
+                              val result = monoData.slice(i, i + 1024)
+                              i += 1024
+                              result
+                            } else {
+                              null
+                            }
+                          }
+                        }, DetectorSensitivity.LOW)
+                        println("done")
+                        WithFailures.success(Some(tmp.map(_.timeMs / 1000.0)))
+                      }
+                      val pd = new ProgressDialog[Array[Double]](Some(mainView().scene().windowProperty()()), "Detecting beats", Some("Analyzing..."), false, task)
+                      pd.showAndWait().get.asInstanceOf[WithFailures[Option[Array[Double]], Throwable]] match {
+                        case WithFailures(Some(Some(beats)), _) =>
+                          val filtered = (Iterator.single(-1.0) ++ beats.toIterator ++ Iterator.single(Double.MaxValue)).sliding(2).filter { case Seq(a: Double, b: Double) =>
+                            a + 0.1 < b
+                          }.map(_.head).toList.tail
+
+                          println(filtered.mkString(", "))
+
+                          mainView().undoManager.startGroup()
+                          val t = new Track(Some(mainView().undoManager))
+                          tracks().content += t
+                          t.content ++= filtered.map(x => (x.toDouble, x + 0.05, new Beat(Some(mainView().undoManager))))
+                          mainView().undoManager.endGroup()
+                        case WithFailures(None, e) =>
+                          alert("Could not load file", e.headOption.map(x => x.getLocalizedMessage).getOrElse(""), scene().windowProperty()())
+                        case WithFailures(Some(None), _) =>
+                      }
+                    }
                   }
                   accelerator = new KeyCodeCombination(KeyCode.T, KeyCombination.ControlDown)
                 },
