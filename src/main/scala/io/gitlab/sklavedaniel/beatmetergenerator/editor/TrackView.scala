@@ -71,6 +71,7 @@ class TrackView(initPxPerSec: Double, val track: Track, snaps: ObjectProperty[Op
     extraSnaps =>
       snaps().flatMap {
         snaps =>
+          import Ordering.Double.TotalOrdering
           val (start, end) = if (atStart) {
             (snaps.starting((pos + offset - 10).max(0.0), pos + offset).lastOption.map(_._1 - offset),
               snaps.starting(pos + offset, pos + offset + 10).headOption.map(_._1 - offset))
@@ -86,7 +87,7 @@ class TrackView(initPxPerSec: Double, val track: Track, snaps: ObjectProperty[Op
                 } ++ Iterator(e)
               case None => Iterator(s)
             }
-            case None => end.toIterator
+            case None => end.iterator
           }).filter(x => (x - pos).abs <= 0.1)
           if (points.isEmpty) {
             None

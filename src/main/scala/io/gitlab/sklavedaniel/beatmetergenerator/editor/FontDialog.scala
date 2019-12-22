@@ -36,7 +36,7 @@ class FontDialog(ownerWindow: Option[Window], initFont: (String, Int, Boolean, B
   width = 400
   height = 500
   ownerWindow.foreach(initOwner)
-  val families = new ListView[String](Font.families.sorted) {
+  val families = new ListView[String](Font.families.sorted.toSeq) {
     cellFactory = _ => {
       val cell = new ListCell[String]() {
         item.onChange { (_, _, family) =>

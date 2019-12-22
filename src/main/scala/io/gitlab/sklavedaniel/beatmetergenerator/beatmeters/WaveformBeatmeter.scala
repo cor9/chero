@@ -180,7 +180,7 @@ class WaveformBeatmeter(conf: WaveformBeatmeter.Conf_V0_2_0) extends Beatmeter {
         Font.PLAIN
       }),
       conf.messageFont._2)
-    val messageStream = ElementStream(messages.toStream.map(b => (b._1 * conf.frames, b._2 * conf.frames, b._3)).map { b =>
+    val messageStream = ElementStream(messages.to(LazyList).map(b => (b._1 * conf.frames, b._2 * conf.frames, b._3)).map { b =>
       val startFrame = b._1.ceil.toInt
       val endFrame = b._2.ceil.toInt
       Timed(startFrame, endFrame, PositionDrawable(_ => (conf.messagePosition * conf.width, 0),
@@ -210,19 +210,19 @@ class WaveformBeatmeter(conf: WaveformBeatmeter.Conf_V0_2_0) extends Beatmeter {
 
     List(
       ElementStream(
-        Stream(
+        LazyList(
           Fixed((endPos * conf.width, beatmeterY), beatmeterBackground)
         )
       ).toTimed().clip(new geom.Rectangle2D.Double(endPos * conf.width, beatmeterY, beatmeterWidth, conf.height)),
       beatmeterStream.toTimed(conf.speed * conf.width / conf.frames, conf.width),
         //.clip(new geom.Rectangle2D.Double(conf.width * endPos, beatmeterY, beatmeterWidth, conf.height)),
       ElementStream(
-        Stream(
+        LazyList(
           Fixed((endPos * conf.width, beatmeterY), beatmeterForeground)
         )
       ).toTimed().clip(new geom.Rectangle2D.Double(endPos * conf.width, beatmeterY, beatmeterWidth, conf.height)),
       ElementStream(
-        Stream(
+        LazyList(
           Fixed((conf.position * conf.width - beatmeterMarker.getWidth / 2.0, beatmeterY), beatmeterMarker),
           Fixed((startPos * conf.width - beatmeterStart.getWidth / 2.0, beatmeterY), beatmeterStart),
           Fixed((endPos * conf.width - beatmeterEnd.getWidth / 2.0, beatmeterY), beatmeterEnd)

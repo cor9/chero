@@ -56,7 +56,7 @@ trait SelectionContainer[A <: TrackElement] {
 
   def snap(pos: Double, offset: Double, atStart: Boolean): Double
 
-  def propagateDragOver()
+  def propagateDragOver(): Unit
 
   def delete(view: TrackElementView[A, A]): Unit = {
     if (view.selected()) {
@@ -85,6 +85,7 @@ trait SelectionContainer[A <: TrackElement] {
 
   def copySlected(): Unit = {
     if (selectedElements.nonEmpty) {
+      import Ordering.Double.TotalOrdering
       val offset = selectedElements.toList.map(_.position()._1).min
       val data: List[(Double, Double, ImmutableTrackElement)] = selectedElements.toList.map(
         elem => (elem.position()._1 - offset, elem.position()._2 - offset, elem.element.toImmutable()))
@@ -97,6 +98,7 @@ trait SelectionContainer[A <: TrackElement] {
 
 
   def insert(x: Double): Unit = {
+    import Ordering.Double.TotalOrdering
     Clipboard.systemClipboard.content.get(BeatEditor.dataformat).foreach { data =>
       if (data.asInstanceOf[List[(Double, Double, ImmutableTrackElement)]].forall(elem => clazz.isInstance(elem._3))) {
         val insert = data.asInstanceOf[List[(Double, Double, ImmutableTrackElement)]].map { elem =>
@@ -150,6 +152,7 @@ trait SelectionContainer[A <: TrackElement] {
   def selectionActive(x: => Double) = true
 
   onDragDetected = e => {
+    import Ordering.Double.TotalOrdering
     if (selectionActive(e.getX)) {
       pressedX.foreach { v =>
         val x = v / pxPerSec()

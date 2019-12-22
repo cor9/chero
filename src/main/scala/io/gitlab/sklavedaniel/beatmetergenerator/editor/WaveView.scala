@@ -29,6 +29,8 @@ import scalafx.util.Duration
 
 class WaveView(position: ObjectProperty[(Double, Boolean)]) extends Pane {
   self =>
+  import Ordering.Float.TotalOrdering
+
   val pxPerSec = DoubleProperty(1.0)
   val points = ObjectProperty[Option[(Array[Float], Array[Float])]](None)
   val waveDuration = DoubleProperty(0.0)
@@ -38,7 +40,9 @@ class WaveView(position: ObjectProperty[(Double, Boolean)]) extends Pane {
   val realX = Bindings.createDoubleBinding(() => padding().getLeft, padding)
   val realWidth = Bindings.createDoubleBinding(() => width.value - padding().getLeft - padding().getRight, width, padding)
   val realHeight = Bindings.createDoubleBinding(() => height.value - padding().getTop - padding().getBottom, height, padding)
-  val maxVolume = Bindings.createObjectBinding[Option[Float]](() => points().map(p => p._1.max max p._2.max), points)
+  val maxVolume = Bindings.createObjectBinding[Option[Float]](() => points().map { p =>
+    p._1.max max p._2.max
+  }, points)
   val visibleX = pxPerSec * visiblePosition
 
   val canvas = new Canvas {
@@ -66,7 +70,7 @@ class WaveView(position: ObjectProperty[(Double, Boolean)]) extends Pane {
   }, points, waveDuration, realWidth, visibleX, pxPerSec)
 
   wave.onChange { (_, _, _) =>
-    val gc = canvas.getGraphicsContext2D()
+    val gc = canvas.getGraphicsContext2D
     gc.clearRect(0.0, 0.0, realWidth.doubleValue(), self.height())
     gc.setStroke(Color.Black)
     for ((x, y1, y2) <- wave()) {
@@ -92,7 +96,7 @@ class WaveView(position: ObjectProperty[(Double, Boolean)]) extends Pane {
 
   onMousePressed = e => {
     timeline.stop()
-    if (e.isPrimaryButtonDown ) {
+    if (e.isPrimaryButtonDown) {
       mouseX = Some(e.getX)
       updateMouse()
       timeline.play()

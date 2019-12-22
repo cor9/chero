@@ -138,7 +138,7 @@ class FlyingBeatmeter(conf: FlyingBeatmeter.Conf_V0_2_3) extends Beatmeter {
 
   override def getElementStreams(beats: Seq[(Double, Boolean)], messages: Seq[(Double, Double, String)], frameCount: Int): List[TimedStream] = {
     val beatmeterStream = {
-      val bs = beats.map(b => ((b._1 * conf.speed + conf.position) * conf.width, b._2)).toStream
+      val bs = beats.map(b => ((b._1 * conf.speed + conf.position) * conf.width, b._2)).to(LazyList)
       ElementStream(bs.map {
         beat1 =>
           val img = if (beat1._2) {
@@ -149,7 +149,7 @@ class FlyingBeatmeter(conf: FlyingBeatmeter.Conf_V0_2_3) extends Beatmeter {
           Positioned((beat1._1, beatmeterY), 0.0, img)
       })
     }
-    val beatAnimStream = ElementStream((beats :+ (Double.PositiveInfinity, true)).sliding(2).toStream.map(b => (b.head._1 * conf.frames, b.head._2, b.tail.head._1 * conf.frames)).map { b =>
+    val beatAnimStream = ElementStream((beats :+ (Double.PositiveInfinity, true)).sliding(2).to(LazyList).map(b => (b.head._1 * conf.frames, b.head._2, b.tail.head._1 * conf.frames)).map { b =>
       val frame = b._1.ceil.toInt
       val beat = if (b._2) {
         beatmeterBeatHighlightedAnim
@@ -173,7 +173,7 @@ class FlyingBeatmeter(conf: FlyingBeatmeter.Conf_V0_2_3) extends Beatmeter {
         Font.PLAIN
       }),
       conf.messageFont._2)
-    val messageStream = ElementStream(messages.toStream.map(b => (b._1 * conf.frames, b._2 * conf.frames, b._3)).map { b =>
+    val messageStream = ElementStream(messages.to(LazyList).map(b => (b._1 * conf.frames, b._2 * conf.frames, b._3)).map { b =>
       val startFrame = b._1.ceil.toInt
       val endFrame = b._2.ceil.toInt
       Timed(startFrame, endFrame, PositionDrawable(_ => (conf.messagePosition * conf.width, 0),
@@ -200,7 +200,7 @@ class FlyingBeatmeter(conf: FlyingBeatmeter.Conf_V0_2_3) extends Beatmeter {
     })
 
     List(
-      ElementStream(Stream(
+      ElementStream(LazyList(
         Fixed((0.0, beatmeterY), ImageDrawable(beatmeterBackground, AlignCenter, AlignMiddle))
       )).toTimed(),
       beatmeterStream.toTimed(conf.speed * conf.width / conf.frames, conf.position * conf.width, beatmeterWidth, 0.5),

@@ -37,7 +37,7 @@ object ObservableIntervalMap {
   def apply[A, B](implicit fractional: Fractional[A]) = new ObservableIntervalMap[A, B]()
 
   trait ChangeListener[A, B] {
-    def onChange(map: ObservableIntervalMap[A, B], change: Change[A, B])
+    def onChange(map: ObservableIntervalMap[A, B], change: Change[A, B]): Unit
   }
 
   def WeakChangeListner[A, B](listener: ChangeListener[A, B]) = new ChangeListener[A, B] with WeakListener {
@@ -63,7 +63,7 @@ object ObservableIntervalMap {
 
 }
 
-class ObservableIntervalMap[A, B](implicit fractional: Fractional[A]) extends Observable with Traversable[(A, A, B)] {
+class ObservableIntervalMap[A, B](implicit fractional: Fractional[A]) extends Observable with Iterable[(A, A, B)] {
 
   import fractional.mkNumericOps
   import fractional.mkOrderingOps
@@ -74,35 +74,35 @@ class ObservableIntervalMap[A, B](implicit fractional: Fractional[A]) extends Ob
   private var listeners = Set[ObservableIntervalMap.ChangeListener[A, B]]()
 
   def apply(a: A): Option[(A, A, B)] =
-    ends.from(a).headOption.map(_._2).filter(_._1 <= a)
+    ends.rangeFrom(a).headOption.map(_._2).filter(_._1 <= a)
 
   def increase(a: A): Option[(A, A, B)] =
-    starts.from(a).take(2).values.find(_._1 > a)
+    starts.rangeFrom(a).take(2).values.find(_._1 > a)
 
   def decrease(a: A): Option[(A, A, B)] =
-    starts.to(a).takeRight(2).values.find(_._1 < a)
+    starts.rangeTo(a).takeRight(2).values.find(_._1 < a)
 
   def apply(startA: A, endA: A): List[(A, A, B)] =
-    starts.from(startA).iterator.map(_._2).takeWhile(_._2 <= endA).toList
+    starts.rangeFrom(startA).iterator.map(_._2).takeWhile(_._2 <= endA).toList
 
 
   def starting(startA: A, endA: A): List[(A, A, B)] =
-    starts.from(startA).iterator.takeWhile(_._1 <= endA).map(_._2).toList
+    starts.rangeFrom(startA).iterator.takeWhile(_._1 <= endA).map(_._2).toList
 
   def ending(startA: A, endA: A): List[(A, A, B)] =
-    ends.from(startA).iterator.takeWhile(_._1 <= endA).map(_._2).toList
+    ends.rangeFrom(startA).iterator.takeWhile(_._1 <= endA).map(_._2).toList
 
   def intersecting(startA: A, endA: A): List[(A, A, B)] = {
-    ends.from(startA).iterator.map(_._2).takeWhile(_._1 <= endA).toList
+    ends.rangeFrom(startA).iterator.map(_._2).takeWhile(_._1 <= endA).toList
   }
 
   def within(startA: A, endA: A): List[(A, A, B)] = {
-    starts.from(startA).iterator.map(_._2).takeWhile(_._2 <= endA).toList
+    starts.rangeFrom(startA).iterator.map(_._2).takeWhile(_._2 <= endA).toList
   }
 
-  def --=(elems: TraversableOnce[(A, A)]): List[(A, A, B)] = {
+  def --=(elems: IterableOnce[(A, A)]): List[(A, A, B)] = {
     val result = ListBuffer[(A, A, B)]()
-    for ((startA, endA) <- elems; (startA2, endA2, b) <- apply(startA, endA)) {
+    for ((startA, endA) <- elems.iterator; (startA2, endA2, b) <- apply(startA, endA)) {
       starts -= startA2
       ends -= endA2
       result += ((startA2, endA2, b))
@@ -176,13 +176,13 @@ class ObservableIntervalMap[A, B](implicit fractional: Fractional[A]) extends Ob
     }
   }
 
-  def contains(startA: A, endA: A) = starts.from(startA).headOption.exists(_ == endA)
+  def contains(startA: A, endA: A) = starts.rangeFrom(startA).headOption.exists(_ == endA)
 
-  def ++=(elems: TraversableOnce[(A, A, B)]): Unit = {
-    val list = elems.toList
-    require(list.forall(e => intersecting(e._1, if(e._3.isInstanceOf[Unscalable[A]]) e._1 + e._3.asInstanceOf[Unscalable[A]].duration else e._2).isEmpty))
+  def ++=(elems: IterableOnce[(A, A, B)]): Unit = {
+    val list = elems.iterator.toList
+    require(list.forall(e => intersecting(e._1, if (e._3.isInstanceOf[Unscalable[A]]) e._1 + e._3.asInstanceOf[Unscalable[A]].duration else e._2).isEmpty))
     for ((startA, endA, b) <- list) {
-      val tmp = if(b.isInstanceOf[Unscalable[A]]) startA + b.asInstanceOf[Unscalable[A]].duration else endA
+      val tmp = if (b.isInstanceOf[Unscalable[A]]) startA + b.asInstanceOf[Unscalable[A]].duration else endA
       starts(startA) = (startA, tmp, b)
       ends(tmp) = (startA, tmp, b)
     }
@@ -194,9 +194,7 @@ class ObservableIntervalMap[A, B](implicit fractional: Fractional[A]) extends Ob
     }
   }
 
-  override def foreach[U](f: ((A, A, B)) => U): Unit = {
-    starts.values.foreach(f)
-  }
+  override def iterator = starts.values.iterator
 
   def invalidate(): Unit = {
     invalidationListeners.foreach(_.invalidated(this))

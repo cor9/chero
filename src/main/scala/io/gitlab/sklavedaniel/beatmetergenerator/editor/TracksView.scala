@@ -67,7 +67,7 @@ class TracksView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlay
 
   vgrow = Priority.Sometimes
 
-  override def requestFocus() {
+  override def requestFocus(): Unit = {
 
   }
 
@@ -87,6 +87,7 @@ class TracksView(val tracks: Tracks, undoManager: UndoManager, player: AudioPlay
   }
 
   private def calcTracksDuration(): Unit = {
+    import Ordering.Double.TotalOrdering
     tracksDuration_() = (Iterator(0.0) ++ (for {
       track <- tracks.content
       (_, d, _) <- track.content.lastOption

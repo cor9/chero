@@ -27,7 +27,6 @@ import io.gitlab.sklavedaniel.beatmetergenerator.utils.{ObservableIntervalMap, _
 import javafx.beans.InvalidationListener
 import javax.sound.sampled._
 import org.apache.commons.io.IOUtils
-import resource._
 import scalafx.Includes._
 import scalafx.application.Platform
 import scalafx.beans.binding.Bindings
@@ -35,6 +34,8 @@ import scalafx.beans.property._
 import scalafx.collections.ObservableBuffer
 import scalafx.collections.ObservableBuffer.{Add, Remove}
 import scalafx.stage.Window
+
+import scala.util.{Try, Using}
 
 object AudioPlayer {
 
@@ -49,9 +50,9 @@ object AudioPlayer {
   val format = new AudioFormat(44100, 16, 2, true, false)
 
   def readData(data: InputStream): WithFailures[Array[Short], Throwable] = {
-    WithFailures.fromTry((for {
-      ais2 <- managed(AudioSystem.getAudioInputStream(format, AudioSystem.getAudioInputStream(data)))
-    } yield {
+    WithFailures.fromTry(Try(Using.resource(
+      AudioSystem.getAudioInputStream(format, AudioSystem.getAudioInputStream(data))
+    ) { ais2 =>
       val array = IOUtils.toByteArray(ais2)
       val buffer = ByteBuffer.allocate(array.length).order(if (format.isBigEndian) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN)
       buffer.put(array)
@@ -59,7 +60,7 @@ object AudioPlayer {
       val result = new Array[Short](buffer.limit() / 2)
       buffer.asShortBuffer().get(result)
       result
-    }).tried)
+    }))
   }
 
   class BeatInfo {
@@ -139,6 +140,7 @@ class AudioPlayer() {
   val beatsDuration = beatsDuration_.readOnlyProperty
 
   private def calcBeatsInfo(): Unit = {
+    import Ordering.Double.TotalOrdering
     beatsDuration_() = (Iterator(0.0) ++ (for {
       (b, info, map) <- beats
       if b()

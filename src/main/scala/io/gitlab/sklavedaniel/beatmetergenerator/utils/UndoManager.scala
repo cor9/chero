@@ -18,25 +18,25 @@
 
 package io.gitlab.sklavedaniel.beatmetergenerator.utils
 
-import scala.collection.JavaConverters
+import scala.jdk.CollectionConverters._
 import scalafx.beans.property.{Property, ReadOnlyBooleanWrapper}
 import scalafx.beans.value.ObservableValue
 import scalafx.collections.ObservableBuffer
 
 object UndoManager {
-  def register[A, B](undoManager: Option[UndoManager], property: Property[A, B]) = {
+  def register[A, B](undoManager: Option[UndoManager], property: Property[A, B]): Unit = {
     undoManager.foreach(um => {
       property.onChange(um.propertyAction(property))
     })
   }
 
-  def register[A](undoManager: Option[UndoManager], list: ObservableBuffer[A]) = {
+  def register[A](undoManager: Option[UndoManager], list: ObservableBuffer[A]): Unit = {
     undoManager.foreach(um => {
       list.onChange(um.listAction(list))
     })
   }
 
-  def register[A, B](undoManager: Option[UndoManager], map: ObservableIntervalMap[A, B]) = {
+  def register[A, B](undoManager: Option[UndoManager], map: ObservableIntervalMap[A, B]): Unit = {
     undoManager.foreach(um => {
       map.addListener(um.intervalMapAction(map))
     })
@@ -89,16 +89,16 @@ final class UndoManager {
       val changes = for (c <- cs) yield
         c match {
           case ObservableBuffer.Add(pos, elems) =>
-            Left((pos, JavaConverters.asJavaCollection(elems.toList)))
+            Left((pos, elems.toList))
           case ObservableBuffer.Remove(pos, elems) =>
-            Right((pos, JavaConverters.asJavaCollection(elems.toList)))
+            Right((pos, elems.toList))
           case _ => assert(false); ???
         }
       doAction(() => {
         for (c <- changes) {
           c match {
             case Left((pos, elems)) =>
-              list.addAll(pos, elems)
+              list.addAll(pos, elems.asJava)
             case Right((pos, elems)) =>
               list.remove(pos, elems.size)
           }
@@ -109,7 +109,7 @@ final class UndoManager {
             case Left((pos, elems)) =>
               list.remove(pos, elems.size)
             case Right((pos, elems)) =>
-              list.addAll(pos, elems)
+              list.addAll(pos, elems.asJava)
             case _ => assert(false)
           }
         }

@@ -40,8 +40,8 @@ object BeatsDetector {
       val frame = protoframe.map(x => x.toFloat / 32768f)
       transformer.forward(frame)
       previousSpectrum = currentSpectrum
-      currentSpectrum = Array(transformer.getSpectrum: _*)
-      val flux = currentSpectrum.toIterator.zip(previousSpectrum.toIterator).map(x => x._1 + x._2).filter(_ > 0).sum
+      currentSpectrum = Array.from(transformer.getSpectrum)
+      val flux = currentSpectrum.iterator.zip(previousSpectrum.iterator).map(x => x._1 + x._2).filter(_ > 0).sum
       flux
     }
   }

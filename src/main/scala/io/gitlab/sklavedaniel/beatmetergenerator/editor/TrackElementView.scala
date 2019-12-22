@@ -431,7 +431,7 @@ final class BPMPatternView(val bpmPattern: BPMPattern, context: SelectionContain
           val task = (callback: (Option[Double], Option[String]) => Boolean) => {
             val detection = new WaveletBPMDetection(WaveletBPMDetection.Daubechies4, 17)
             val dataSlice = data.slice((start * AudioPlayer.format.getFrameRate * 2).toInt, (end * AudioPlayer.format.getFrameRate * 2).toInt + 1)
-            val monoData = dataSlice.toIterator.grouped(AudioPlayer.format.getChannels).map(_.map(_.toDouble).sum / Short.MaxValue).toArray
+            val monoData = dataSlice.iterator.grouped(AudioPlayer.format.getChannels).map(_.map(_.toDouble).sum / Short.MaxValue).toArray
             val (bpm, bpms) = detection.detect(monoData, AudioPlayer.format.getSampleRate, Some((t, d) => {
               callback(Some(t / (end - start)), Some(f"$d%.3f bpm after $t%.3f"))
             }))

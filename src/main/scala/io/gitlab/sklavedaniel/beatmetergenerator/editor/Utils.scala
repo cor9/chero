@@ -62,8 +62,8 @@ object Utils {
     f"$minutes%02d:$seconds%02d.$milis%03d"
   }
 
-  def merge[A, B: Ordering](seq: Seq[Traversable[A]], f: A => B): List[A] = {
-    def impl(seq: Seq[Traversable[A]], result: ListBuffer[A]): List[A] = {
+  def merge[A, B: Ordering](seq: Seq[Iterable[A]], f: A => B): List[A] = {
+    def impl(seq: Seq[Iterable[A]], result: ListBuffer[A]): List[A] = {
       if (seq.isEmpty) {
         result.toList
       } else {

@@ -44,30 +44,30 @@ object Beatmeter {
   }
 
   object ElementStream {
-    def apply[B <: Element]() = new ElementStream(None, Stream[B]())
+    def apply[B <: Element]() = new ElementStream(None, LazyList[B]())
 
-    def apply[B <: Element](stream: Stream[B]) = new ElementStream(None, stream)
+    def apply[B <: Element](lazyList: LazyList[B]) = new ElementStream(None, lazyList)
 
-    def apply[B <: Element](element: B) = new ElementStream(None, Stream(element))
+    def apply[B <: Element](element: B) = new ElementStream(None, LazyList(element))
   }
 
-  case class ElementStream[+A <: Option[Shape], B <: Element](clip: A, stream: Stream[B]) {
+  case class ElementStream[+A <: Option[Shape], B <: Element](clip: A, lazyList: LazyList[B]) {
     def toPositioned(offset: Double, y: Double)(implicit ev: B =:= Appended) =
       ElementStream(clip,
-        if (stream.nonEmpty) {
-          stream.tail.scanLeft(Positioned((offset, y), ev(stream.head).width, ev(stream.head).drawable)) {
+        if (lazyList.nonEmpty) {
+          lazyList.tail.scanLeft(Positioned((offset, y), ev(lazyList.head).width, ev(lazyList.head).drawable)) {
             case (Positioned((pos, _), width, _), drawable) =>
               Positioned((pos + width, y), ev(drawable).width, ev(drawable).drawable)
           }
         } else {
-          Stream()
+          LazyList()
         })
 
     def toTimed(pxPerFrame: Double, width: Double)(implicit ev: B =:= Positioned): ElementStream[A, Timed] = toTimed(pxPerFrame, 0.0, width)
 
     def toTimed(pxPerFrame: Double, offset: Double, width: Double, disappear: Double = 1.0)(implicit ev: B =:= Positioned): ElementStream[A, Timed] =
       ElementStream(clip,
-        stream.map { case Positioned((x, y), w, drawable) =>
+        lazyList.map { case Positioned((x, y), w, drawable) =>
           val startFrame = (x - width - offset) / pxPerFrame
           val error = (startFrame.ceil - startFrame) * pxPerFrame
           Timed(startFrame.ceil.toInt,
@@ -79,14 +79,14 @@ object Beatmeter {
 
     def toTimed()(implicit ev: B =:= Fixed) =
       ElementStream(clip,
-        stream.map {
+        lazyList.map {
           case Fixed((x, y), drawable) => Timed(0, Integer.MAX_VALUE, PositionDrawable(_ => (x, y), drawable))
         })
 
     def ++(other: ElementStream[None.type, B])(implicit ev: ElementStream[A, B] <:< ElementStream[None.type, B]): ElementStream[None.type, B] =
-      ElementStream(ev(this).stream ++ other.stream)
+      ElementStream(ev(this).lazyList ++ other.lazyList)
 
-    def clip(clip: Shape) = ElementStream(Some(clip), stream)
+    def clip(clip: Shape) = ElementStream(Some(clip), lazyList)
   }
 
 
@@ -113,7 +113,7 @@ object Beatmeter {
   case class Timed(startFrame: Int, endFrame: Int, drawable: Drawable) extends Element
 
   trait Drawable {
-    def draw(frame: Int, g: Graphics2D)
+    def draw(frame: Int, g: Graphics2D): Unit
   }
 
   case class PositionDrawable(position: Int => (Double, Double), drawable: Drawable) extends Drawable {
@@ -312,19 +312,19 @@ object Beatmeter {
       (i, tmp % patternWidth, tmp / patternWidth)
     }
     val result = if (counts.isEmpty) {
-      clipImage(pattern._1, width).map(Appended(_)).toStream
+      clipImage(pattern._1, width).map(Appended(_)).to(LazyList)
     } else {
       val (endIdx, _, count) = counts.minBy(_._2)
       val imgs: Seq[Appended] = for {
         _ <- 0 until count
         img <- pattern._3
       } yield Appended(img._1)
-      val endImgs = (pattern._3.slice(0, endIdx).map(x => x._1) :+ pattern._3(endIdx)._2).toStream
+      val endImgs = (pattern._3.slice(0, endIdx).map(x => x._1) :+ pattern._3(endIdx)._2).to(LazyList)
       val restWidth = width - patternWidth * count - endImgs.map(_.getWidth).sum - pattern._2.getWidth
       assert(restWidth >= 0, s"Expected >= 0 but was $restWidth")
       val extraImgStart = clipImage(pattern._1, restWidth / 2).map(Appended(_))
       val extraImgEnd = clipImage(pattern._1, restWidth - restWidth / 2).map(Appended(_))
-      extraImgStart.toStream ++ Stream(Appended(pattern._2)) ++ imgs ++ endImgs.map(Appended(_)) ++ extraImgEnd.toStream
+      extraImgStart.to(LazyList) ++ LazyList(Appended(pattern._2)) ++ imgs ++ endImgs.map(Appended(_)) ++ extraImgEnd.to(LazyList)
     }
     //assert(result.map(_.getWidth).sum - width == 0, s"Expected $width but was ${result.map(_.getWidth).sum}")
     ElementStream(None, result)

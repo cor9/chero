@@ -23,8 +23,6 @@ import java.awt.{GraphicsEnvironment, RenderingHints, Shape, SplashScreen}
 import java.io._
 import java.net.URI
 import java.nio.file.{Files, Paths}
-import java.util
-import java.util.{LinkedHashMap, LinkedList}
 
 import io.gitlab.sklavedaniel.beatmetergenerator._
 import io.gitlab.sklavedaniel.beatmetergenerator.beatmeters.Beatmeter.Timed
@@ -55,7 +53,7 @@ import v4lk.lwbd.decoders.Decoder
 
 import scala.collection.immutable.Queue
 import scala.io.Source
-import scala.util.Success
+import scala.util.{Success, Try, Using}
 
 object BeatEditor extends JFXApp {
   override def main(args: Array[String]): Unit = {
@@ -174,10 +172,10 @@ object BeatEditor extends JFXApp {
           case Some(file) =>
             val task = (callback: (Option[Double], Option[String]) => Boolean) => {
               val s = JsonSerialization.save(tracks().toImmutable(file.getParentFile.toURI))
-              val r = for (out <- resource.managed(new OutputStreamWriter(new FileOutputStream(file), "utf-8"))) yield {
+              val r = Try(Using.resource(new OutputStreamWriter(new FileOutputStream(file), "utf-8")) { out =>
                 out.write(s)
-              }
-              fromTry(r.tried).map(Some(_))
+              })
+              fromTry(r).map(Some(_))
             }
             val pd = new ProgressDialog[Unit](Some(mainView().scene().windowProperty()()), "Saving", Some("Saving..."), false, task)
             pd.showAndWait().get.asInstanceOf[WithFailures[Option[Unit], Throwable]] match {
@@ -337,7 +335,7 @@ object BeatEditor extends JFXApp {
                       val pd = new ProgressDialog[Array[Double]](Some(mainView().scene().windowProperty()()), "Detecting beats", Some("Analyzing..."), false, task)
                       pd.showAndWait().get.asInstanceOf[WithFailures[Option[Array[Double]], Throwable]] match {
                         case WithFailures(Some(Some(beats)), _) =>
-                          val filtered = (Iterator.single(-1.0) ++ beats.toIterator ++ Iterator.single(Double.MaxValue)).sliding(2).filter { case Seq(a: Double, b: Double) =>
+                          val filtered = (Iterator.single(-1.0) ++ beats.iterator ++ Iterator.single(Double.MaxValue)).sliding(2).filter { case Seq(a: Double, b: Double) =>
                             a + 0.1 < b
                           }.map(_.head).toList.tail
 
@@ -607,7 +605,7 @@ object BeatEditor extends JFXApp {
                 },
                 new MenuItem("Generate Video") {
                   onAction = handle {
-
+                    import Ordering.Double.TotalOrdering
                     val beats = merge[(Double, Boolean), Double](mainView().tracksView.views.toList.filter(_.track.display()).map(_.beats.toList.map(b => (b._1, b._3.highlight()))),
                       b => b._1)
                     val messages = merge[(Double, Double, String), Double](
@@ -642,11 +640,11 @@ object BeatEditor extends JFXApp {
                       } else {
                         val frameCount = (beatmeter.frames * player.duration.doubleValue()).round.toInt
 
-                        class State(val clip: Option[Shape], var remaining: Stream[Timed]) {
+                        class State(val clip: Option[Shape], var remaining: LazyList[Timed]) {
                           var current: Queue[Timed] = Queue()
                         }
 
-                        val states: List[State] = beatmeter.getElementStreams(beats, messages, frameCount).map(tl => new State(tl.clip, tl.stream))
+                        val states: List[State] = beatmeter.getElementStreams(beats, messages, frameCount).map(tl => new State(tl.clip, tl.lazyList))
 
                         val fc = new DirectoryChooser()
                         tracks().file().foreach { f =>
@@ -699,7 +697,7 @@ object BeatEditor extends JFXApp {
 
                                       for (state <- states) {
                                         state.current = state.current.filter { case Timed(_, endFrame, _) => endFrame > i }
-                                          .enqueue(state.remaining.takeWhile { case Timed(startFrame, _, _) => startFrame <= i })
+                                          .enqueueAll(state.remaining.takeWhile { case Timed(startFrame, _, _) => startFrame <= i })
                                         state.remaining = state.remaining.dropWhile { case Timed(startFrame, _, _) => startFrame <= i }
                                         state.clip.foreach(g.setClip)
 
@@ -749,6 +747,7 @@ object BeatEditor extends JFXApp {
                 },
                 new MenuItem("Export Beats and Messages") {
                   onAction = handle {
+                    import Ordering.Double.TotalOrdering
                     val videoBeats = merge[(Double, Boolean), Double](mainView().tracksView.views.filter(_.track.display()).map(_.beats.toList.map(b => (b._1, b._3.highlight()))),
                       b => b._1)
                     val audioBeats = merge[(Double, Boolean, Option[URI]), Double](mainView().tracksView.views.filter(_.track.play()).map(t => t.beats.toList.map(b => (b._1, b._3.highlight(), t.track.beat().map(_._1)))),
@@ -770,10 +769,10 @@ object BeatEditor extends JFXApp {
                       case Some(file) =>
                         val task = (callback: (Option[Double], Option[String]) => Boolean) => {
                           val s = JsonSerialization.export(videoBeats, audioBeats, messages)
-                          val r = for (out <- resource.managed(new OutputStreamWriter(new FileOutputStream(file), "utf-8"))) yield {
+                          val r = Try(Using.resource(new OutputStreamWriter(new FileOutputStream(file), "utf-8")) { out =>
                             out.write(s)
-                          }
-                          fromTry(r.tried).map(Some(_))
+                          })
+                          fromTry(r).map(Some(_))
                         }
                         val pd = new ProgressDialog[Unit](Some(mainView().scene().windowProperty()()), "Saving", Some("Saving..."), false, task)
                         pd.showAndWait().get.asInstanceOf[WithFailures[Option[Unit], Throwable]] match {

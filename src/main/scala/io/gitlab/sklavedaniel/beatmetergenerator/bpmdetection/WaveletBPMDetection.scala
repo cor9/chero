@@ -198,6 +198,7 @@ class WaveletBPMDetection(
         (0.0, 0.0)
       }
     }
+    import Ordering.Double.TotalOrdering
     (bpms.map(_._2).sorted.apply(bpms.size / 2), bpms)
   }
 

@@ -16,15 +16,11 @@
  *
  */
 
-import java.io.{FileOutputStream, OutputStream}
-import java.lang
-import java.nio.file.{Files, Path, Paths, StandardCopyOption}
-
 name := "Beatmeter Generator"
 
 version := "0.3.1"
 
-scalaVersion := "2.12.8"
+scalaVersion := "2.13.1"
 
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-Xcheckinit", "-encoding", "utf8")
 
@@ -34,12 +30,11 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= Seq(
-  "org.scalafx" %% "scalafx" % "11-R16",
+  "org.scalafx" %% "scalafx" % "12.0.2-R18",
   "org.apache.xmlgraphics" % "batik-transcoder" % "1.9",
   "org.apache.xmlgraphics" % "batik-svg-dom" % "1.9",
   "commons-io" % "commons-io" % "2.5",
-  "com.jsuereth" %% "scala-arm" % "2.0",
-  "com.github.benhutchison" %% "prickle" % "1.1.13"
+  "com.lihaoyi" %% "upickle" % "0.9.0"
 )
 
 lazy val javaFXModules = Seq("base", "controls", "fxml", "graphics", "media", "swing", "web")
@@ -172,7 +167,7 @@ packageMSI := {
         </Wix>
       """)
 
-    new lang.ProcessBuilder("wixl", "-v", "--arch", arch, s"$lcname-$arch.wxs").directory(output).inheritIO().start().waitFor()
+    new ProcessBuilder("wixl", "-v", "--arch", arch, s"$lcname-$arch.wxs").directory(output).inheritIO().start().waitFor()
   }
 
   for ((arch, folder, productId, updateId, jdk) <- winjdks) {

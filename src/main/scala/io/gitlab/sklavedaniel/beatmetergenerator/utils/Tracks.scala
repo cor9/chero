@@ -115,7 +115,7 @@ class Beat(override val undoManager: Option[UndoManager]) extends TrackElement w
 
 
 sealed trait BeatsGenerator extends TrackElement {
-  def beats: ObjectBinding[Stream[(Double, Double, Beat)]]
+  def beats: ObjectBinding[LazyList[(Double, Double, Beat)]]
 }
 
 class BPMPattern(val beat: Beat, override val undoManager: Option[UndoManager]) extends BeatsGenerator {
@@ -130,9 +130,9 @@ class BPMPattern(val beat: Beat, override val undoManager: Option[UndoManager]) 
   private val firstBeat = new Beat(None)
   firstBeat.highlight <== highlightFirst
   val beats = Bindings.createObjectBinding(() => if (bpm() == 0) {
-    Stream.empty
+    LazyList.empty
   } else {
-    Stream((0.0, 0.05, firstBeat)) ++ Stream.from(1).map { i =>
+    LazyList((0.0, 0.05, firstBeat)) ++ LazyList.from(1).map { i =>
       (i * 60 / bpm(), i * 60 / bpm() + 0.05, beat)
     }
   }, bpm)
@@ -152,9 +152,9 @@ class BeatsPattern(override val undoManager: Option[UndoManager]) extends BeatsG
   UndoManager.register(undoManager, pattern)
   val beats = Bindings.createObjectBinding(() => {
     if (pattern.isEmpty) {
-      Stream.empty
+      LazyList.empty
     } else {
-      val tmp = Stream.from(0).flatMap { i =>
+      val tmp = LazyList.from(0).flatMap { i =>
         pattern.map { b =>
           (i * patternDuration() + b._1, i * patternDuration() + b._2, b._3)
         }
@@ -165,11 +165,11 @@ class BeatsPattern(override val undoManager: Option[UndoManager]) extends BeatsG
           b3.highlight() = true
           (b._1, b._2, b3)
         }
-        bs.toStream ++ tmp.drop(pattern.size)
+        bs.to(LazyList) ++ tmp.drop(pattern.size)
       } else if (highlightFirst()) {
         val b = pattern.head._3.toImmutable().toMutable(None)
         b.highlight() = true
-        Stream((pattern.head._1, pattern.head._2, b)) ++ tmp.tail
+        LazyList((pattern.head._1, pattern.head._2, b)) ++ tmp.tail
       } else {
         tmp
       }
