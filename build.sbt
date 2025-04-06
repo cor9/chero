@@ -21,7 +21,8 @@ libraryDependencies ++= Seq(
   "org.apache.xmlgraphics" % "batik-svg-dom" % "1.9",
   "commons-io" % "commons-io" % "2.5",
   "com.jsuereth" %% "scala-arm" % "2.0",
-  "com.github.benhutchison" %% "prickle" % "1.1.13"
+  "com.github.benhutchison" %% "prickle" % "1.1.13",
+  "de.sciss" % "jwave" % "1.0.3"
 )
 
 lazy val javaFXModules = Seq("base", "controls", "fxml", "graphics", "media", "swing", "web")
