@@ -1,18 +1,19 @@
-name: Build and Release
+name: Build JAR (and Release on tags)
 
 on:
-  workflow_dispatch:
-  push:
-    tags:
-      - 'v*'   # runs when you push a tag like v1.0.0
+  workflow_dispatch:          # manual "Run workflow" button
+  push:                       # any branch: master/main/development/etc.
+    branches: ['**']
+  # Releases happen only if you push a tag like v1.0.0
+  # (This is handled inside the job with a conditional step)
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java 11
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -24,13 +25,22 @@ jobs:
       - name: Build JAR
         run: sbt -v clean package
 
-      - name: Find JAR
+      - name: Locate JAR
         id: jar
         run: |
           FILE=$(ls -1 target/scala-*/Beatmeter*.jar | head -n1)
           echo "file=$FILE" >> $GITHUB_OUTPUT
 
-      - name: Create GitHub Release
+      # Always upload as an artifact on Actions runs
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Beatmeter-jar
+          path: ${{ steps.jar.outputs.file }}
+
+      # Only create a GitHub Release when the ref is a tag (e.g., refs/tags/v1.0.0)
+      - name: Create GitHub Release (on tags)
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.jar.outputs.file }}
