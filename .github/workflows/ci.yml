@@ -1,14 +1,13 @@
-name: CI
+name: Build and Release
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main, development ]
-  pull_request:
-    branches: [ main, development ]
+    tags:
+      - 'v*'   # runs when you push a tag like v1.0.0
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,5 +21,18 @@ jobs:
       - name: Install sbt
         uses: sbt/setup-sbt@v1
 
-      - name: Build and Test
-        run: sbt -v test
+      - name: Build JAR
+        run: sbt -v clean package
+
+      - name: Find JAR
+        id: jar
+        run: |
+          FILE=$(ls -1 target/scala-*/Beatmeter*.jar | head -n1)
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.jar.outputs.file }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
