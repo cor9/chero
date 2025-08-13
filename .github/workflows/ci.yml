@@ -1,10 +1,11 @@
 name: CI
 
 on:
+  workflow_dispatch:        # <-- lets you run it by button
   push:
-    branches: [ main ]
+    branches: [ main, development ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, development ]
 
 jobs:
   build:
@@ -16,5 +17,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '11'
+          cache: sbt
       - name: Build and Test
-        run: sbt test
+        run: sbt -v test
