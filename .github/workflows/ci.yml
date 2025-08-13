@@ -1,7 +1,7 @@
 name: CI
 
 on:
-  workflow_dispatch:        # <-- lets you run it by button
+  workflow_dispatch:
   push:
     branches: [ main, development ]
   pull_request:
@@ -12,11 +12,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '11'
-          cache: sbt
+
+      - name: Install sbt
+        uses: sbt/setup-sbt@v1
+
       - name: Build and Test
         run: sbt -v test
